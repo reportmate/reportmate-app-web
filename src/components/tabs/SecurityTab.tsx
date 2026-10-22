@@ -26,6 +26,7 @@ import type { Severity } from '../../lib/settings/types'
 import { ModuleSlot } from '../modules/ModuleSlot'
 import { firewallAllowSigned, firewallStealthMode, securityInfoUrl, securityReleaseInfo, unpatchedCves as readUnpatchedCves } from '../../lib/security/macSecurityKeys'
 import { cveHref, safeHttpUrl } from '../../lib/security/safeUrl'
+import { certClassLabel, certDisplayName, certIssuerName, summarizeDeviceCertificates, type DeviceCertRow } from '../../lib/security/certificates'
 
 interface SecurityTabProps {
   device: any
@@ -160,7 +161,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const [selfSignedFilter, setSelfSignedFilter] = React.useState<boolean>(false)
   const [expandedStores, setExpandedStores] = React.useState<Set<string>>(new Set())
   const [certSearch, setCertSearch] = React.useState('')
-  const [showOsRoots, setShowOsRoots] = React.useState(false)
+  // Off by default: only actionable certificates (no class = actionable).
+  const [showSystemManaged, setShowSystemManaged] = React.useState(false)
   const [cveFilter, setCveFilter] = React.useState<'all' | 'unpatched' | 'patched'>('all')
   const [expandedDetections, setExpandedDetections] = React.useState<Set<number>>(new Set())
   // Collapse state for security posture lists (ASR rules, audit policy, exclusions)
@@ -1235,31 +1237,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           )
         }
         
-        // Use certificateSummary from collection if available, otherwise compute locally
-        const certSummary = security?.certificateSummary
-        
-        // Pre-filter: exclude expired OS root certs when toggle is off
-        const visibleCertificates = showOsRoots
-          ? certificates
-          : certificates.filter((c: any) => {
-              const isOsRoot = c.isOsTrustedRoot || c.is_os_trusted_root
-              const isExpired = c.status === 'Expired' || c.isExpired
-              return !(isOsRoot && isExpired)
-            })
-        
-        // Count by status (from visible certificates)
-        const expiredCount = certSummary && !showOsRoots
-          ? (certSummary.userExpiredCount ?? certSummary.user_expired_count ?? visibleCertificates.filter((c: any) => c.status === 'Expired' || c.isExpired).length)
-          : visibleCertificates.filter((c: any) => c.status === 'Expired' || c.isExpired).length
-        const expiringCount = visibleCertificates.filter((c: any) => c.status === 'ExpiringSoon' || c.isExpiringSoon).length
-        const validCount = visibleCertificates.filter((c: any) => c.status === 'Valid' || (!c.isExpired && !c.isExpiringSoon)).length
-        const osRootExpiredCount = certSummary
-          ? (certSummary.osRootExpiredCount ?? certSummary.os_root_expired_count ?? 0)
-          : certificates.filter((c: any) => (c.isOsTrustedRoot || c.is_os_trusted_root) && (c.status === 'Expired' || c.isExpired)).length
-        
+        // Actionable only unless "Show system-managed" is on; status is live
+        // from notAfter, since the stored status is frozen at collection.
+        const certSummary = summarizeDeviceCertificates(certificates, showSystemManaged)
+        const visibleCertificates: DeviceCertRow[] = certSummary.rows
+        const { expiredCount, expiringCount, validCount } = certSummary
+        const hiddenCertCount = certSummary.hiddenCount
+
         // Get unique stores
         const stores = Array.from(new Set(
-          visibleCertificates.map((c: any) => {
+          visibleCertificates.map(({ cert: c }) => {
             const storeLocation = c.storeLocation || c.store_location || ''
             return storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
           })
@@ -1272,8 +1259,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         }
         
         // Filter certificates
-        const filteredCertificates = visibleCertificates.filter((cert: any) => {
-          const status = cert.status || (cert.isExpired ? 'Expired' : (cert.isExpiringSoon ? 'ExpiringSoon' : 'Valid'))
+        const filteredCertificates = visibleCertificates.filter(({ cert, status }) => {
           const statusMatch = certFilter === 'all' || 
             (certFilter === 'expired' && status === 'Expired') ||
             (certFilter === 'expiringsoon' && status === 'ExpiringSoon') ||
@@ -1299,11 +1285,13 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           if (certSearch.trim()) {
             const searchLower = certSearch.toLowerCase()
             const commonName = (cert.commonName || cert.common_name || '').toLowerCase()
+            const displayName = certDisplayName(cert).toLowerCase()
             const subject = (cert.subject || '').toLowerCase()
-            const issuer = (cert.issuer || '').toLowerCase()
+            const issuer = `${cert.issuer || ''} ${cert.issuerName || ''}`.toLowerCase()
             const thumbprint = (cert.thumbprint || cert.sha1 || '').toLowerCase()
             
             return commonName.includes(searchLower) || 
+                   displayName.includes(searchLower) || 
                    subject.includes(searchLower) || 
                    issuer.includes(searchLower) ||
                    thumbprint.includes(searchLower)
@@ -1313,13 +1301,14 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         })
         
         // Group certificates by store
-        const groupedCertificates = filteredCertificates.reduce((acc: any, cert: any) => {
+        const groupedCertificates = filteredCertificates.reduce((acc: Record<string, DeviceCertRow[]>, row) => {
+          const cert = row.cert
           const storeLocation = cert.storeLocation || cert.store_location || ''
           const store = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
           if (!acc[store]) acc[store] = []
-          acc[store].push(cert)
+          acc[store].push(row)
           return acc
-        }, {})
+        }, {} as Record<string, DeviceCertRow[]>)
         
         return (
           <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1332,7 +1321,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Certificates</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {visibleCertificates.length} certificates{!showOsRoots && osRootExpiredCount > 0 ? ` (${osRootExpiredCount} expired OS roots hidden)` : ''}
+                      {showSystemManaged
+                        ? `${visibleCertificates.length} certificates (${certSummary.actionableCount} actionable)`
+                        : `${certSummary.actionableCount} actionable certificate${certSummary.actionableCount !== 1 ? 's' : ''}${hiddenCertCount > 0 ? ` (${hiddenCertCount} system-managed hidden)` : ''}`}
                     </p>
                   </div>
                 </div>
@@ -1358,7 +1349,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Store Filter Pills - toggle on/off (LEFT SIDE) */}
                     {stores.length > 1 && (stores as string[]).map((store: string) => {
-                      const storeCount = visibleCertificates.filter((c: any) => {
+                      const storeCount = visibleCertificates.filter(({ cert: c }) => {
                         const storeLocation = c.storeLocation || c.store_location || ''
                         const certStore = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
                         return certStore === store
@@ -1440,38 +1431,40 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                           : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
                       }`}
                     >
-                      Self-signed ({visibleCertificates.filter((c: any) => c.isSelfSigned || c.is_self_signed || c.self_signed === '1' || c.self_signed === 1).length})
+                      Self-signed ({visibleCertificates.filter(({ cert: c }) => c.isSelfSigned || c.is_self_signed || c.self_signed === '1' || c.self_signed === 1).length})
                     </button>
                     
-                    {/* OS Root Certs Toggle - only show when there are hidden OS roots */}
-                    {osRootExpiredCount > 0 && (
+                    {/* System-managed toggle: certificates the OS or an agent rotates, and trust-store roots */}
+                    {hiddenCertCount > 0 && (
                       <>
                         <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
                         <button
                           onClick={() => {
-                            setShowOsRoots(!showOsRoots)
+                            setShowSystemManaged(!showSystemManaged)
                             expandAllStores()
                           }}
+                          aria-pressed={showSystemManaged}
+                          title="Certificates the OS or an agent rotates, and OS trust-store roots"
                           className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
-                            showOsRoots
+                            showSystemManaged
                               ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                               : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                           }`}
                         >
-                          {showOsRoots ? 'Hide' : 'Show'} expired OS roots ({osRootExpiredCount})
+                          {showSystemManaged ? 'Hide' : 'Show'} system-managed ({hiddenCertCount})
                         </button>
                       </>
                     )}
                   </div>
                   
                   {/* Clear Filters Button - shown when any filter is active */}
-                  {(certFilter !== 'all' || storeFilter !== 'all' || selfSignedFilter || showOsRoots || certSearch.trim()) && (
+                  {(certFilter !== 'all' || storeFilter !== 'all' || selfSignedFilter || showSystemManaged || certSearch.trim()) && (
                     <button
                       onClick={() => {
                         setCertFilter('all')
                         setStoreFilter('all')
                         setSelfSignedFilter(false)
-                        setShowOsRoots(false)
+                        setShowSystemManaged(false)
                         setCertSearch('')
                       }}
                       className="px-3 py-1.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors flex items-center gap-1.5"
@@ -1489,7 +1482,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             {hasCertificates ? (
               filteredCertificates.length > 0 ? (
                 <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {Object.entries(groupedCertificates).sort().map(([storeName, storeCerts]: [string, any]) => {
+                  {Object.entries(groupedCertificates).sort().map(([storeName, storeCerts]: [string, DeviceCertRow[]]) => {
                     const toggleExpanded = () => {
                       const newSet = new Set(expandedStores)
                       if (newSet.has(storeName)) {
@@ -1536,21 +1529,17 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                                  {storeCerts.map((cert: any, index: number) => {
+                                  {storeCerts.map(({ cert, certClass, status, daysUntilExpiry }, index: number) => {
                                     // Normalize field names (support both camelCase and snake_case)
-                                    const commonName = cert.commonName || cert.common_name || ''
-                                    const subject = cert.subject || ''
-                                    const issuer = cert.issuer || ''
+                                    const issuer = certIssuerName(cert)
                                     const notBefore = cert.notBefore || cert.not_before || cert.not_valid_before || ''
                                     const notAfter = cert.notAfter || cert.not_after || cert.not_valid_after || ''
-                                    const status = cert.status || (cert.isExpired ? 'Expired' : (cert.isExpiringSoon ? 'ExpiringSoon' : 'Valid'))
-                                    const daysUntilExpiry = cert.daysUntilExpiry ?? cert.days_until_expiry
                                     const thumbprint = cert.thumbprint || cert.sha1 || ''
                                     const isSelfSigned = cert.isSelfSigned || cert.is_self_signed || cert.self_signed === '1' || cert.self_signed === 1
                                     const certPath = cert.path || ''
                                     
-                                    // Display name: prefer commonName, fallback to subject
-                                    const displayName = commonName || (subject ? subject.split(',')[0]?.replace(/^CN\s*=\s*/i, '') : '—')
+                                    // Display name: the API's readable name, then commonName, then the subject's CN
+                                    const displayName = certDisplayName(cert)
                                     
                                     // Extract keychain name from path (e.g., /Library/Keychains/System.keychain → System.keychain)
                                     const keychainName = certPath ? certPath.split('/').pop() || certPath : '—'
@@ -1568,6 +1557,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                                               {displayName}
                                               {isSelfSigned && (
                                                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(self-signed)</span>
+                                              )}
+                                              {certClass !== 'actionable' && (
+                                                <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                                  {certClassLabel(certClass)}
+                                                </span>
                                               )}
                                             </span>
                                             {issuer && (
