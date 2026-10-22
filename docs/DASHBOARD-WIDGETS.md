@@ -130,49 +130,54 @@ and printers and displays counted fleet-wide, with the top 3 rooms
 No real device names or serials in fixtures, docs or screenshots in commits. Use
 `SAMPLE1`-style values.
 
-## Changes found while building the web app (2026-10-22)
+## Revision 2: targeted cards and one cached endpoint (supersedes the above where they differ)
 
-These amend the sections above. Swift and C# should follow them.
+Rod: cards named after a module (Identity, Management, Hardware…) don't belong on the
+dashboard. Every card answers one targeted question, like Install Health or OS
+Currency do. Cards are renamed and refocused on the problem, not the module:
 
-- **Shared rules.** Web keeps every rule a card counts with and a report filters with in
-  `src/lib/dashboard/reportRules.ts`. Port that file rather than re-deriving the rules.
-- **`/devices?platform=`** is the global platform toggle (`mac` or `win`), not a devices-page
-  filter. The devices page also takes `usage`, `catalog`, `area`, `location` and `fleet`.
-- **Platform Distribution.** Clicking a platform still expands it in place. Its count opens
-  `/devices?platform=mac|win`. Drill-down bars open `/devices?platform=…&usage=…` (and the same
-  for `catalog`, and `area` for department). Architecture opens `/hardware?arch=<family>`.
-- **System Health.** The pending chip opens `/system?pending=1-5,6-10,10+`.
-- **Management.** The donut's Enrolled row opens `?enrolled=1` and Not Enrolled opens
-  `?enrolled=0`. The provider list adds an `Unmanaged` row (→ `?provider=Unmanaged`).
-- **5 Install Health.** `/api/v1/installs` is about 94 MB, so the top failing items come from
-  `/api/v1/installs/filters` instead (17 MB, the payload the installs report itself reads).
-  Each device's `modules.installs.{cimian,munki}.items[]` is classified with the installs
-  report's `isErrorItem`. Those devices carry no `platform`: Cimian means Windows, Munki
-  means macOS. `staleAgentThresholdDays` is 1 in the payload, so the card applies its own
-  7-day threshold (`staleDays > 7`), and so does `/installs?stale=1`.
-- **6 Check-in Gaps.** The web routes are `/api/dashboard` and `/api/events/failures`. The
-  failure summary has no platform, so the 24-hour numbers stay fleet-wide and are labelled
-  "All platforms" when the platform toggle is set. The silent-device counts do follow the toggle.
-  Rejected opens `/events/failures?hours=24` (rejected is that page's default). Retried and
-  Repaired (`accepted`) add `outcome=`.
-- **7 OS Currency.** macOS releases are ordered by release, not by number: 15 is followed by
-  26. With 27 the newest, 15 is still supported and 14 isn't. Windows patch level is
-  `featureUpdate` (the update revision, e.g. 9711) within one `buildNumber`. The 5-device
-  minimum applies to Windows builds the same way. "On latest patch" opens `/system`
-  unfiltered, because there's no parameter for it.
-- **8 Software Risk.** The live fleet reports `criticalCveCount` and
-  `activelyExploitedCveCount` as 0 everywhere. Few install items carry both
-  `installedVersion` and `latestVersion`, so the "behind" list is usually empty, and the card
-  says so.
-- **9 Certificates.** In certificate rows, `serialNumber` is the device's serial and
-  `certSerialNumber` is the certificate's. Devices are counted by `serialNumber`.
-- **10 Identity.** The identity report's directory donut, which reads the route's
-  `enrollmentType`, counts hybrid devices as "Domain Joined". The card and `?join=` use the
-  four-way `joinType` (from `entraJoined` and `domainJoined`), so `hybrid` is its own slice.
-- **11 App Usage.** The usage report covers the whole fleet, so the card is labelled "All
-  platforms" when the platform toggle is set. Least-used ranks by `activeDeviceCount / installedDeviceCount`.
-- **12 Network & Peripherals.** Network rows have no `platform`, so it comes from
-  `operatingSystem`. Rooms are ranked by printer count. `/network` also accepts
-  `signal=excellent|good|fair`.
-- **Degrading.** A card that reads two sources shows whichever one loaded and says which
-  one didn't. A card shows its error only when every source it reads has failed.
+| # | Old | New title | What it shows (all items deep-link as before) |
+|---|---|---|---|
+| 1 | System Health | Reboot & Update Debt | up 30+ days, up 2–4 weeks, pending updates, deferred updates |
+| 2 | Security Posture | Protection Gaps | devices WITHOUT encryption / firewall / AV / SIP / Secure Boot (counts of gaps, worst first), with threats, critical CVEs |
+| 3 | Management | Unmanaged Devices | not enrolled in MDM (count + %), by platform, last seen; enrolled % as context only |
+| 4 | Hardware | Hardware at Risk | under 10% storage free, 8 GB RAM or less, Intel Macs (next-macOS risk) |
+| 5 | Install Health | Install Health | unchanged |
+| 6 | Check-in Gaps | Check-in Gaps | unchanged |
+| 7 | OS Currency | OS Currency | unchanged |
+| 8 | Software Risk | Software Risk | unchanged |
+| 9 | Certificates | Expiring Certificates | expiring in 30 days, expired user certs, soonest 5 |
+| 10 | Identity | Local Admin Exposure | devices with extra local admins (top counts), devices not Entra/domain joined (workgroup) |
+| 11 | App Usage | Unused Software | least-used apps installed on 10+ devices (shelfware); most-used 5 as a secondary list |
+| 12 | Network & Peripherals | Connectivity Problems | weak Wi-Fi signal, poor network-quality rating, devices on VPN; no peripheral counts |
+
+### Data: one cached endpoint
+
+The bulk reports are too heavy to fetch from every client. On 2026-10-22, test
+clients doing that pinned the API container at its 4 GiB memory limit and it
+restarted repeatedly. All three apps read one endpoint instead:
+
+`GET /api/v1/dashboard/insights?platform=all|macOS|Windows` returns one JSON
+document with a section per card. Each section holds only the numbers and short
+top-N lists the card shows (no device rows), plus the link params for each item.
+The server computes it with SQL aggregation (no loading every row into Python),
+caches it per platform for 5 minutes in process, and returns `generatedAt`.
+Clients poll it every 5 minutes and render skeletons until the first answer. A
+section that failed server-side comes back as `{"error": "..."}` and the card
+shows its error state; the rest render.
+
+## Web notes (2026-10-22)
+
+- The web app reads the endpoint through `app/api/v1/dashboard/insights/route.ts` and renders
+  each item's `link` as-is (`src/lib/dashboard/insights.ts`, `linkHref`). Commas in params
+  stay literal.
+- The API currently links Connectivity Problems' poor quality and VPN items to `/network`
+  unfiltered. Web fills them in as `/network?quality=poor` and `/network?vpn=1`, which the
+  network report now reads. `quality=poor` uses the same rule as the API: `rating` is Low, or,
+  when there's no overall rating, `dlRating` or `ulRating` is Low. Once the API sends those
+  params, the web fallback goes unused.
+- `/devices?platform=` is the global platform toggle (`mac` or `win`). The devices page also
+  takes `usage`, `catalog`, `area`, `location` and `fleet`. Platform Distribution's count and
+  drill-down bars link there; architecture opens `/hardware?arch=<family>`.
+- Report-side rules shared with the API's SQL live in `src/lib/dashboard/reportRules.ts`.
+

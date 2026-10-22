@@ -116,7 +116,7 @@ export default function ClientDashboard() {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const insights = useDashboardInsights()
+  const insights = useDashboardInsights(platformFilter)
   const layout = useInsightLayout()
   
   // Filter devices by platform
@@ -131,13 +131,7 @@ export default function ClientDashboard() {
     return events.filter(event => isPlatformVisible(event.platform || 'Unknown'))
   }, [events, platformFilter, isPlatformVisible])
   
-  const insightCtx: InsightContext = useMemo(() => ({
-    insights,
-    isPlatformVisible,
-    platformFilter,
-    installStats,
-    devices: filteredDevices,
-  }), [insights, isPlatformVisible, platformFilter, installStats, filteredDevices])
+  const insightCtx: InsightContext = useMemo(() => ({ insights, platformFilter }), [insights, platformFilter])
 
   // Mark as mounted
   useEffect(() => {

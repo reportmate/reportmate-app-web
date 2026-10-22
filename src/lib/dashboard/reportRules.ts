@@ -494,3 +494,17 @@ export const hasManagedItem = (items: Row[], name: string): boolean => {
     )
   );
 };
+
+/**
+ * `quality=poor`: the speed test rated the connection Low, read from the raw
+ * network block exactly as the API's Connectivity Problems card counts it
+ * (`rating`, or the download/upload ratings when there is no overall one).
+ */
+export function isPoorNetworkQuality(r: Row): boolean {
+  const nq = r.raw?.networkQuality;
+  if (!nq || typeof nq !== "object") return false;
+  const low = (v: any) => String(v ?? "").trim().toLowerCase() === "low";
+  const rating = String(nq.rating ?? "").trim();
+  if (rating) return low(rating);
+  return low(nq.dlRating ?? nq.dl_rating) || low(nq.ulRating ?? nq.ul_rating);
+}

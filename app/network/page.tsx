@@ -13,7 +13,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
-import { connectionKind, signalPercent } from "@/src/lib/dashboard/reportRules"
+import { connectionKind, isPoorNetworkQuality, signalPercent } from "@/src/lib/dashboard/reportRules"
 
 interface NetworkDevice {
   id: string
@@ -51,6 +51,9 @@ function signalBucket(device: { networkInfo: unknown }): SignalBucket | null {
 
 // `connection=wired|wifi` maps onto the page's Wired / Wireless toggle;
 // `signal=weak` onto the Signal Quality widget's Poor row.
+// `vpn=1` (the dashboard's Connectivity Problems link) is the VPN toggle too.
+const connectionFromParams = (params: URLSearchParams): ConnectionFilter =>
+  params.get('vpn') === '1' ? 'vpn' : connectionFromParam(params.get('connection'))
 const connectionFromParam = (value: string | null): ConnectionFilter =>
   value === 'wired' ? 'wired' : value === 'wifi' || value === 'wireless' ? 'wireless' : value === 'vpn' ? 'vpn' : 'all'
 const connectionToParam = (filter: ConnectionFilter): string | null =>
@@ -68,8 +71,9 @@ function NetworkPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
   const router = useRouter()
-  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>(() => connectionFromParam(searchParams.get('connection')))
+  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>(() => connectionFromParams(searchParams))
   const [signalFilter, setSignalFilter] = useState<SignalBucket | null>(() => signalFromParam(searchParams.get('signal')))
+  const [poorQualityOnly, setPoorQualityOnly] = useState(() => searchParams.get('quality') === 'poor')
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
@@ -151,6 +155,7 @@ function NetworkPageContent() {
     setSelectedFleets([])
     setConnectionFilter('all')
     setSignalFilter(null)
+    setPoorQualityOnly(false)
     setSearchQuery('')
   }
 
@@ -171,8 +176,9 @@ function NetworkPageContent() {
   useEffect(() => {
     const current = searchParams.toString()
     if (current === lastWrittenQuery.current) return
-    setConnectionFilter(connectionFromParam(searchParams.get('connection')))
+    setConnectionFilter(connectionFromParams(searchParams))
     setSignalFilter(signalFromParam(searchParams.get('signal')))
+    setPoorQualityOnly(searchParams.get('quality') === 'poor')
   }, [searchParams])
 
   // State → URL. Reads the live query so unrelated params (platform, from)
@@ -183,14 +189,16 @@ function NetworkPageContent() {
       if (value) params.set(key, value)
       else params.delete(key)
     }
-    set('connection', connectionToParam(connectionFilter))
+    set('connection', connectionFilter === 'vpn' ? null : connectionToParam(connectionFilter))
+    set('vpn', connectionFilter === 'vpn' ? '1' : null)
     set('signal', signalToParam(signalFilter))
+    set('quality', poorQualityOnly ? 'poor' : null)
     // Commas stay literal so lists read `kind=printers,displays`, as the contract writes them.
     const next = params.toString().replace(/%2C/gi, ',')
     if (next === window.location.search.replace(/^\?/, '')) return
     lastWrittenQuery.current = next
     router.replace(next ? `${window.location.pathname}?${next}` : window.location.pathname, { scroll: false })
-  }, [connectionFilter, signalFilter, router])
+  }, [connectionFilter, signalFilter, poorQualityOnly, router])
 
   useEffect(() => {
     const fetchNetworkDevices = async () => {
@@ -394,6 +402,9 @@ function NetworkPageContent() {
 
     // Signal Quality widget filter (Poor is `signal=weak`)
     if (signalFilter && signalBucket(n) !== signalFilter) return false
+
+    // `quality=poor`: speed test rated Low (reportRules, same rule as the API card)
+    if (poorQualityOnly && !isPoorNetworkQuality(n)) return false
 
     // Network quality widget filter
     if (speedFilter) {
@@ -695,6 +706,16 @@ function NetworkPageContent() {
                         </span>
                       )}
                     </button>
+                    {poorQualityOnly && (
+                      <button
+                        onClick={() => setPoorQualityOnly(false)}
+                        title="Remove this filter"
+                        className="px-3 py-1.5 text-sm rounded-lg border bg-red-100 border-red-300 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200 flex items-center gap-1.5"
+                      >
+                        Poor network quality
+                        <span aria-hidden="true">&times;</span>
+                      </button>
+                    )}
                   </div>
                   
                   {/* Export to CSV Button */}

@@ -1,180 +1,79 @@
 /**
- * Dashboard insight cards. docs/DASHBOARD-WIDGETS.md is the contract shared
- * with the Swift and C# apps: the same twelve cards, the same numbers and the
- * same click targets. Each card reads an endpoint its report page already
- * uses, and every number, bar, legend row and chip links to that report with
- * the matching filter set. The classification rules live in
- * src/lib/dashboard/reportRules.ts, which the reports filter with too.
+ * Dashboard insight cards. Every number comes from one cached document,
+ * GET /api/v1/dashboard/insights (src/lib/dashboard/insights.ts), and every
+ * item links where the server says, so web, Swift and C# open the same
+ * filtered report. docs/DASHBOARD-WIDGETS.md is the shared contract.
  */
 
 "use client";
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  type Row,
-  JOIN_LABELS,
-  type JoinType,
-  SECURITY_PARAM_RULES,
-  archFamily,
-  boolish,
-  boolishIfPresent,
-  connectionKind,
-  deviceRoom,
-  displayCount,
-  expiredCerts,
-  hasAntivirusProduct,
-  hasDeferredUpdates,
-  hasExtraAdmins,
-  isLaptop,
-  isLowMemory,
-  isLowStorage,
-  isSilentAgent,
-  SILENT_AGENT_DAYS,
-  isWeakSignal,
-  joinType,
-  managementProvider,
-  num,
-  osCurrency,
-  pendingBucketKey,
-  printerCount,
-  rowPlatform,
-  securityThreats,
-  uptimeBucketKey,
-  usageKind,
-} from "../../dashboard/reportRules";
-import { getDeviceInstallItems, isErrorItem } from "../../installs/status";
-import type { InstallStatsData } from "./DashboardStats";
+  type CheckinGapsCard,
+  type ConnectivityProblemsCard,
+  type ExpiringCertificatesCard,
+  type HardwareAtRiskCard,
+  type InsightCardKey,
+  type InsightCards as InsightCardData,
+  type InsightsState,
+  type InstallHealthCard,
+  type LocalAdminExposureCard,
+  type OSCurrencyCard,
+  type ProtectionGapsCard,
+  type RebootDebtCard,
+  type SoftwareRiskCard,
+  type UnmanagedDevicesCard,
+  type UnusedSoftwareCard,
+  isCardError,
+  linkHref,
+  withDefaultParams,
+} from "../../dashboard/insights";
 
-const REFRESH_MS = 5 * 60 * 1000;
+export { useDashboardInsights } from "../../dashboard/insights";
 
-// MARK: - Loading
+/** What one card has to show: skeleton, error with Retry, or its section. */
+type CardSlot<T> =
+  | { status: "loading" }
+  | { status: "error"; error: string; retry: () => void; retrying: boolean }
+  | { status: "ready"; data: T };
 
-/**
- * One fetch per endpoint, shared by every card that reads it. The order is
- * the load order: the install filters payload is ~17 MB and sometimes answers
- * 502, so it goes last and the cards treat it as optional.
- */
-const ENDPOINTS = {
-  system: "/api/v1/system",
-  security: "/api/v1/security",
-  management: "/api/v1/management",
-  hardware: "/api/v1/hardware",
-  failures: "/api/events/failures?hours=24",
-  certs: "/api/v1/security/certificates?status=expiring",
-  identity: "/api/v1/identity",
-  usage: "/api/v1/applications/usage?days=30",
-  network: "/api/v1/network",
-  peripherals: "/api/v1/peripherals",
-  installFilters: "/api/v1/installs/filters",
-} as const;
-
-export type ReportKey = keyof typeof ENDPOINTS;
-const REPORTS = Object.keys(ENDPOINTS) as ReportKey[];
-
-export interface InsightsState {
-  data: Partial<Record<ReportKey, any>>;
-  loading: Set<ReportKey>;
-  errors: Partial<Record<ReportKey, string>>;
+/** Everything the cards read: the insights state and the platform toggle. */
+export interface InsightContext {
+  insights: InsightsState;
+  platformFilter: string;
 }
 
-export function extractRows(json: any): Row[] {
-  if (Array.isArray(json)) return json;
-  for (const key of ["devices", "data", "items", "results"]) {
-    if (Array.isArray(json?.[key])) return json[key];
-  }
-  return [];
-}
-
-/** Payloads too heavy to ask for twice: one attempt per load, never retried. */
-const NO_RETRY: ReadonlySet<ReportKey> = new Set(["installFilters"]);
-
-async function fetchReport(key: ReportKey): Promise<any> {
-  const attempts = NO_RETRY.has(key) ? 1 : 2;
-  for (let attempt = 0; attempt < attempts; attempt++) {
-    try {
-      const res = await fetch(ENDPOINTS[key], {
-        cache: "no-store",
-        credentials: "include",
-      });
-      if (res.ok) return await res.json();
-      if (res.status < 500 || attempt === attempts - 1)
-        throw new Error(`HTTP ${res.status}`);
-    } catch (err) {
-      if (attempt === attempts - 1) throw err;
-    }
-    await new Promise((r) => setTimeout(r, 3000));
-  }
-  return null;
-}
-
-/**
- * Loads every report the cards read, two at a time, with one retry on a 5xx
- * or a dropped connection, and refreshes every five minutes. A refresh keeps
- * the last good payload on screen while it runs and if it fails.
- */
-export function useDashboardInsights(): InsightsState {
-  const [state, setState] = useState<InsightsState>({
-    data: {},
-    loading: new Set(REPORTS),
-    errors: {},
-  });
-  const active = useRef(true);
-
-  const load = useCallback(async () => {
-    setState((s) => ({ ...s, loading: new Set(REPORTS) }));
-    const queue = [...REPORTS];
-    const worker = async () => {
-      while (queue.length && active.current) {
-        const key = queue.shift()!;
-        try {
-          const json = await fetchReport(key);
-          if (!active.current) return;
-          setState((s) => {
-            const loading = new Set(s.loading);
-            loading.delete(key);
-            const errors = { ...s.errors };
-            delete errors[key];
-            return { data: { ...s.data, [key]: json }, loading, errors };
-          });
-        } catch (err) {
-          if (!active.current) return;
-          setState((s) => {
-            const loading = new Set(s.loading);
-            loading.delete(key);
-            return {
-              ...s,
-              loading,
-              errors: {
-                ...s.errors,
-                [key]: err instanceof Error ? err.message : "Failed to load",
-              },
-            };
-          });
-        }
-      }
+function slot<K extends InsightCardKey>(
+  ctx: InsightContext,
+  key: K,
+): CardSlot<Exclude<InsightCardData[K], { error: string }>> {
+  const { data, loading, error, refresh } = ctx.insights;
+  const section = data?.cards?.[key];
+  if (!data) {
+    if (loading) return { status: "loading" };
+    return {
+      status: "error",
+      error: error || "No answer from the server",
+      retry: refresh,
+      retrying: loading,
     };
-    await Promise.all([worker(), worker()]);
-  }, []);
-
-  useEffect(() => {
-    active.current = true;
-    load();
-    const timer = setInterval(load, REFRESH_MS);
-    return () => {
-      active.current = false;
-      clearInterval(timer);
+  }
+  if (!section || isCardError(section))
+    return {
+      status: "error",
+      error: section && isCardError(section) ? section.error : "Missing from the response",
+      retry: refresh,
+      retrying: loading,
     };
-  }, [load]);
-
-  return state;
+  return {
+    status: "ready",
+    data: section as Exclude<InsightCardData[K], { error: string }>,
+  };
 }
+
+const plural = (n: number, one: string, many = `${one}s`) =>
+  `${n} ${n === 1 ? one : many}`;
 
 // MARK: - Layout
 
@@ -253,24 +152,13 @@ type Tone = keyof typeof TONES;
 const ROW_LINK =
   "rounded-md -mx-1.5 px-1.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors";
 
-/** Builds `path?k=v&…`, dropping empty values. */
-const href = (path: string, params: Record<string, string | number> = {}) => {
-  const q = new URLSearchParams();
-  for (const [k, v] of Object.entries(params))
-    if (v !== "" && v !== undefined) q.set(k, String(v));
-  const s = q.toString();
-  return s ? `${path}?${s}` : path;
-};
-
 function InsightCard({
   title,
   subtitle,
   link,
   tone,
   icon,
-  loading,
-  error,
-  empty,
+  card,
   children,
 }: {
   title: string;
@@ -278,9 +166,7 @@ function InsightCard({
   link: string;
   tone: Tone;
   icon: React.ReactNode;
-  loading: boolean;
-  error?: string;
-  empty: boolean;
+  card: CardSlot<unknown>;
   children: React.ReactNode;
 }) {
   return (
@@ -312,19 +198,26 @@ function InsightCard({
         </div>
       </Link>
       <div className="p-6">
-        {error && empty ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Couldn&apos;t load this report ({error}). It retries every five
-            minutes.
-          </p>
-        ) : loading && empty ? (
-          <div className="space-y-3 animate-pulse">
+        {card.status === "loading" ? (
+          <div className="space-y-3 animate-pulse" data-testid="insight-skeleton">
             <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
             <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
             <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
           </div>
-        ) : empty ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500">No data</p>
+        ) : card.status === "error" ? (
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Couldn&apos;t load this card: {card.error}
+            </p>
+            <button
+              type="button"
+              onClick={card.retry}
+              disabled={card.retrying}
+              className="shrink-0 px-2.5 py-1 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+            >
+              {card.retrying ? "Retrying…" : "Retry"}
+            </button>
+          </div>
         ) : (
           children
         )}
@@ -341,36 +234,33 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ComplianceRow({
+/** A protection that is off on some devices: "151 of 931", with a bar of the gap. */
+function GapRow({
   label,
-  on,
+  count,
   total,
   link,
 }: {
   label: string;
-  on: number;
+  count: number;
   total: number;
   link: string;
 }) {
-  const pct = total === 0 ? 0 : on / total;
-  const tone: Tone = pct >= 0.9 ? "green" : pct >= 0.7 ? "yellow" : "red";
+  const pct = total === 0 ? 0 : count / total;
+  const tone: Tone = count === 0 ? "green" : pct >= 0.3 ? "red" : pct >= 0.1 ? "orange" : "yellow";
   return (
-    <Link
-      href={link}
-      className={`block py-0.5 ${ROW_LINK}`}
-      title={`${total - on} without ${label.toLowerCase()}`}
-    >
+    <Link href={link} className={`block py-0.5 ${ROW_LINK}`}>
       <div className="flex items-center gap-2 text-sm">
         <span className="text-gray-900 dark:text-gray-100 flex-1 truncate">
           {label}
         </span>
-        <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-          {on} of {total}
-        </span>
         <span
-          className={`text-xs font-medium tabular-nums w-10 text-right ${TONES[tone].text}`}
+          className={`font-medium tabular-nums ${count === 0 ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
         >
-          {Math.round(pct * 100)}%
+          {count}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-16 text-right">
+          of {total}
         </span>
       </div>
       <div className="mt-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
@@ -432,7 +322,7 @@ function BigStat({
       >
         {value}
       </div>
-      <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
+      <div className="text-xs leading-snug text-gray-600 dark:text-gray-400">
         {label}
       </div>
     </Link>
@@ -594,1156 +484,543 @@ const ICONS = {
     "M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0",
 };
 
-// MARK: - Card context
-
-/** A device row from the dashboard payload (lastSeen and computed status). */
-export interface DashboardDevice {
-  status?: string;
-  platform?: string;
-  lastSeen?: string;
+/** Named rows (devices, certificates, apps) with a right-hand detail, each a link. */
+function DeviceList({
+  items,
+}: {
+  items: { key: string; name: string; detail: string; link: string; urgent?: boolean }[];
+}) {
+  return (
+    <ul className="space-y-0.5">
+      {items.map((i) => (
+        <li key={i.key}>
+          <Link href={i.link} className={`flex items-center gap-2 text-sm py-0.5 ${ROW_LINK}`}>
+            <span className="flex-1 truncate text-gray-900 dark:text-gray-100">{i.name}</span>
+            <span
+              className={`text-xs tabular-nums whitespace-nowrap ${i.urgent ? TONES.red.text : "text-gray-500 dark:text-gray-400"}`}
+            >
+              {i.detail}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
-export interface InsightContext {
-  insights: InsightsState;
-  isPlatformVisible: (platform: string) => boolean;
-  platformFilter: string;
-  installStats: InstallStatsData | null;
-  devices: DashboardDevice[];
-}
+// MARK: - 1 Reboot & Update Debt
 
-interface Source {
-  rows: Row[];
-  all: Row[];
-  json: any;
-  loading: boolean;
-  error?: string;
-}
-
-function source(ctx: InsightContext, key: ReportKey): Source {
-  const json = ctx.insights.data[key];
-  const all = extractRows(json);
-  return {
-    json,
-    all,
-    rows: all.filter((r) => ctx.isPlatformVisible(rowPlatform(r))),
-    loading: ctx.insights.loading.has(key),
-    error: ctx.insights.errors[key],
-  };
-}
-
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
-
-// MARK: - 1 System health
-
-const UPTIME_LABELS: Record<string, string> = {
-  lt1d: "< 1 day",
-  "1-3d": "1-3 days",
-  "3-7d": "3-7 days",
-  "1-2w": "1-2 weeks",
-  "2-4w": "2-4 weeks",
-  "30d+": "30+ days",
-};
-
-function SystemHealthCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "system");
-  const { rows } = src;
-  const s = useMemo(() => {
-    const buckets = new Map<string, number>();
-    for (const r of rows) {
-      const k = uptimeBucketKey(r);
-      if (k) buckets.set(k, (buckets.get(k) || 0) + 1);
-    }
-    return {
-      buckets,
-      pending: rows.filter((r) => {
-        const k = pendingBucketKey(r);
-        return !!k && k !== "up-to-date";
-      }).length,
-      deferred: rows.filter(hasDeferredUpdates).length,
-    };
-  }, [rows]);
+function RebootDebt({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "rebootDebt");
+  const d = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
-      title="System Health"
-      subtitle="Uptime and pending updates"
+      title="Reboot & Update Debt"
+      subtitle="Long uptimes and updates waiting"
       link="/system"
       tone="orange"
-      loading={src.loading}
-      error={src.error}
-      empty={rows.length === 0}
-      icon={<Icon d={ICONS.gear} />}
+      icon={<Icon d={ICONS.refresh} />}
+      card={card}
     >
-      <SectionLabel>Uptime</SectionLabel>
-      <BarList
-        color={TONES.orange.hex}
-        labelWidth="w-24"
-        items={Object.entries(UPTIME_LABELS).map(([key, label]) => ({
-          label,
-          count: s.buckets.get(key) || 0,
-          link: href("/system", { uptime: key }),
-        }))}
-      />
-      <div className="flex flex-wrap gap-2 mt-4">
-        <StatChip
-          value={s.pending}
-          label="with pending updates"
-          tone="yellow"
-          link={href("/system", { pending: "1-5,6-10,10+" })}
-        />
-        <StatChip
-          value={s.deferred}
-          label="with deferred updates"
-          tone="orange"
-          link={href("/system", { deferred: 1 })}
-        />
-      </div>
+      {d && (
+        <>
+          <div className="flex gap-2">
+            <BigStat value={d.uptime30dPlus.count} label="up 30+ days" tone="red" link={linkHref(d.uptime30dPlus.link)} />
+            <BigStat value={d.uptime2to4w.count} label="up 2-4 weeks" tone="orange" link={linkHref(d.uptime2to4w.link)} />
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <StatChip value={d.pendingUpdates.count} label="with pending updates" tone="yellow" link={linkHref(d.pendingUpdates.link)} />
+            <StatChip value={d.deferredUpdates.count} label="with deferred updates" tone="orange" link={linkHref(d.deferredUpdates.link)} />
+          </div>
+          {d.uptimeBuckets.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Uptime, all {d.devices} devices</SectionLabel>
+              <BarList
+                color={TONES.orange.hex}
+                labelWidth="w-24"
+                items={d.uptimeBuckets.map((b) => ({ label: b.label, count: b.count, link: linkHref(b.link) }))}
+              />
+            </div>
+          )}
+        </>
+      )}
     </InsightCard>
   );
 }
 
-// MARK: - 2 Security posture
+// MARK: - 2 Protection Gaps
 
-function SecurityPostureCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "security");
-  const { rows } = src;
-  const s = useMemo(() => {
-    const count = (param: string, value = "off") =>
-      rows.filter(SECURITY_PARAM_RULES[param][value]).length;
-    const isWin = (r: Row) => rowPlatform(r) === "Windows";
-    const sipTotal = rows.filter(
-      (r) => !isWin(r) && boolishIfPresent(r.sipEnabled) !== null,
-    ).length;
-    const winTotal = rows.filter(isWin).length;
-    const protectors = rows.filter(hasAntivirusProduct).length;
-    return {
-      total: rows.length,
-      encryption: rows.length - count("encryption"),
-      firewall: rows.length - count("firewall"),
-      protectors,
-      antivirus: protectors - count("antivirus"),
-      sipTotal,
-      sip: sipTotal - count("sip"),
-      winTotal,
-      secureBoot: winTotal - count("secureBoot"),
-      withThreats: rows.filter((r) => securityThreats(r) > 0).length,
-      expiredCerts: rows.filter((r) => expiredCerts(r) > 0).length,
-      criticalCves: count("cve", "critical"),
-    };
-  }, [rows]);
+function ProtectionGaps({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "protectionGaps");
+  const d: ProtectionGapsCard | null = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
-      title="Security Posture"
-      subtitle="Fleet-wide protections in place"
+      title="Protection Gaps"
+      subtitle="Devices missing a protection, worst first"
       link="/security"
-      tone="green"
-      loading={src.loading}
-      error={src.error}
-      empty={rows.length === 0}
+      tone="red"
       icon={<Icon d={ICONS.shield} />}
+      card={card}
     >
-      <div className="space-y-2">
-        <ComplianceRow
-          label="Disk encryption"
-          on={s.encryption}
-          total={s.total}
-          link={href("/security", { encryption: "off" })}
-        />
-        <ComplianceRow
-          label="Firewall"
-          on={s.firewall}
-          total={s.total}
-          link={href("/security", { firewall: "off" })}
-        />
-        {s.protectors > 0 && (
-          <ComplianceRow
-            label="Antivirus protection"
-            on={s.antivirus}
-            total={s.protectors}
-            link={href("/security", { antivirus: "off" })}
-          />
-        )}
-        {s.sipTotal > 0 && (
-          <ComplianceRow
-            label="System Integrity Protection"
-            on={s.sip}
-            total={s.sipTotal}
-            link={href("/security", { sip: "off" })}
-          />
-        )}
-        {s.winTotal > 0 && (
-          <ComplianceRow
-            label="Secure Boot"
-            on={s.secureBoot}
-            total={s.winTotal}
-            link={href("/security", { secureBoot: "off" })}
-          />
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2 mt-4">
-        <StatChip
-          value={s.withThreats}
-          label="with threats"
-          tone="red"
-          link={href("/security", { threats: 1 })}
-        />
-        <StatChip
-          value={s.expiredCerts}
-          label="expired certs"
-          tone="yellow"
-          link={href("/security", { certs: "expired" })}
-        />
-        <StatChip
-          value={s.criticalCves}
-          label="critical CVEs"
-          tone="orange"
-          link={href("/security", { cve: "critical" })}
-        />
-      </div>
+      {d && (
+        <>
+          <div className="space-y-2">
+            {d.gaps.map((g) => (
+              <GapRow key={g.key} label={g.label} count={g.count} total={g.total} link={linkHref(g.link)} />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={d.withThreats.count} label="with threats" tone="red" link={linkHref(d.withThreats.link)} />
+            <StatChip value={d.criticalCves.count} label="with critical CVEs" tone="orange" link={linkHref(d.criticalCves.link)} />
+          </div>
+        </>
+      )}
     </InsightCard>
   );
 }
 
-// MARK: - 3 Management
+// MARK: - 3 Unmanaged Devices
 
-function ManagementCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "management");
-  const { rows } = src;
-  const s = useMemo(() => {
-    const providers = new Map<string, number>();
-    let enrolled = 0;
-    for (const r of rows) {
-      const p = managementProvider(r);
-      if (p !== "Unmanaged") enrolled++;
-      providers.set(p, (providers.get(p) || 0) + 1);
-    }
-    const unmanaged = providers.get("Unmanaged") || 0;
-    providers.delete("Unmanaged");
-    const top = [...providers.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 4);
-    if (unmanaged) top.push(["Unmanaged", unmanaged]);
-    return { total: rows.length, enrolled, top };
-  }, [rows]);
-  const pct = s.total ? Math.round((s.enrolled / s.total) * 100) : 0;
+function UnmanagedDevices({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "unmanagedDevices");
+  const d: UnmanagedDevicesCard | null = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
-      title="Management"
-      subtitle="MDM enrollment across the fleet"
+      title="Unmanaged Devices"
+      subtitle="Not enrolled in MDM"
       link="/management"
       tone="purple"
-      loading={src.loading}
-      error={src.error}
-      empty={rows.length === 0}
       icon={<Icon d={ICONS.clipboard} />}
+      card={card}
     >
-      <Donut
-        center={`${pct}%`}
-        data={[
-          {
-            label: "Enrolled",
-            count: s.enrolled,
-            color: TONES.green.hex,
-            link: href("/management", { enrolled: 1 }),
-          },
-          {
-            label: "Not Enrolled",
-            count: s.total - s.enrolled,
-            color: TONES.gray.hex,
-            link: href("/management", { enrolled: 0 }),
-          },
-        ]}
-      />
-      {s.top.length > 0 && (
-        <div className="mt-4">
-          <SectionLabel>Providers</SectionLabel>
-          <BarList
-            color="rgba(168,85,247,0.55)"
-            labelWidth="w-36"
-            items={s.top.map(([name, count]) => ({
-              label: name,
-              count,
-              link: href("/management", { provider: name }),
-            }))}
-          />
+      {d && (
+        <>
+          <div className="flex gap-2">
+            <BigStat value={d.unmanaged.count} label={`unmanaged, ${d.unmanaged.pct}% of ${d.devices}`} tone="red" link={linkHref(d.unmanaged.link)} />
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{d.enrolledPct}% of the fleet is enrolled.</p>
+          {d.byPlatform.length > 1 && (
+            <div className="mt-4">
+              <SectionLabel>By platform</SectionLabel>
+              <BarList
+                color="rgba(168,85,247,0.55)"
+                items={d.byPlatform.map((p) => ({
+                  label: p.platform,
+                  count: p.count,
+                  detail: `${p.count} of ${p.devices}`,
+                  link: linkHref(p.link),
+                }))}
+              />
+            </div>
+          )}
+          <div className="mt-4">
+            <SectionLabel>Last seen</SectionLabel>
+            <BarList
+              color="rgba(168,85,247,0.55)"
+              labelWidth="w-36"
+              items={d.lastSeen.map((b) => ({ label: b.label, count: b.count, link: linkHref(b.link) }))}
+            />
+          </div>
+          {d.recent.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Most recently seen</SectionLabel>
+              <DeviceList items={d.recent.map((r) => ({ key: r.serialNumber, name: r.name, detail: r.platform || "", link: linkHref(r.link) }))} />
+            </div>
+          )}
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - 4 Hardware at Risk
+
+function HardwareAtRisk({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "hardwareAtRisk");
+  const d: HardwareAtRiskCard | null = card.status === "ready" ? card.data : null;
+  return (
+    <InsightCard
+      title="Hardware at Risk"
+      subtitle="Low storage, low memory, Intel Macs"
+      link="/hardware"
+      tone="teal"
+      icon={<Icon d={ICONS.chip} />}
+      card={card}
+    >
+      {d && (
+        <div className="grid grid-cols-3 gap-2">
+          <BigStat value={d.lowStorage.count} label="under 10% free" tone="red" link={linkHref(d.lowStorage.link)} />
+          <BigStat value={d.lowMemory.count} label="8 GB RAM or less" tone="orange" link={linkHref(d.lowMemory.link)} />
+          <BigStat value={d.intelMacs.count} label={`Intel Macs of ${d.intelMacs.macs}`} tone="yellow" link={linkHref(d.intelMacs.link)} />
         </div>
       )}
     </InsightCard>
   );
 }
 
-// MARK: - 4 Hardware
+// MARK: - 5 Install Health
 
-const FAMILY_COLORS: Record<string, string> = {
-  "Apple Silicon": "#3b82f6",
-  Intel: "#6366f1",
-  ARM64: "#14b8a6",
-  x64: "#06b6d4",
-  Unknown: "#9ca3af",
-};
-
-function HardwareCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "hardware");
-  const { rows } = src;
-  const s = useMemo(() => {
-    const families = new Map<string, number>();
-    for (const r of rows) {
-      const f = archFamily(r);
-      families.set(f, (families.get(f) || 0) + 1);
-    }
-    const data = [...families.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([label, count]) => ({
-        label,
-        count,
-        color: FAMILY_COLORS[label] || TONES.gray.hex,
-        link:
-          label === "Unknown"
-            ? "/hardware"
-            : href("/hardware", { arch: label }),
-      }));
-    return {
-      count: rows.length,
-      data,
-      lowStorage: rows.filter(isLowStorage).length,
-      lowMemory: rows.filter(isLowMemory).length,
-      laptops: rows.filter(isLaptop).length,
-    };
-  }, [rows]);
-  return (
-    <InsightCard
-      title="Hardware"
-      subtitle="Architecture, memory and storage"
-      link="/hardware"
-      tone="teal"
-      loading={src.loading}
-      error={src.error}
-      empty={rows.length === 0}
-      icon={<Icon d={ICONS.chip} />}
-    >
-      <Donut data={s.data} center={String(s.count)} />
-      <div className="flex flex-wrap gap-2 mt-4">
-        <StatChip
-          value={s.lowStorage}
-          label="under 10% free"
-          tone="red"
-          link={href("/hardware", { storage: "low" })}
-        />
-        <StatChip
-          value={s.lowMemory}
-          label="8 GB or less"
-          tone="yellow"
-          link={href("/hardware", { memory: "le8" })}
-        />
-        <StatChip
-          value={s.laptops}
-          label="laptops"
-          tone="blue"
-          link={href("/hardware", { type: "laptop" })}
-        />
-      </div>
-    </InsightCard>
-  );
-}
-
-// MARK: - 5 Install health
-
-/** The platform an install-filters device belongs to: Cimian is Windows, Munki is macOS. */
-const installPlatform = (d: Row): string =>
-  d.platform
-    ? rowPlatform(d)
-    : d.modules?.installs?.cimian
-      ? "Windows"
-      : "macOS";
-
-
-function InstallHealthCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "installFilters");
-  const json = src.json;
-  const stats = ctx.installStats;
-  const pf = ctx.platformFilter;
-  const errors = stats
-    ? pf === "macOS"
-      ? stats.macDevicesWithErrors
-      : pf === "Windows"
-        ? stats.winDevicesWithErrors
-        : stats.devicesWithErrors
-    : 0;
-  const warnings = stats
-    ? pf === "macOS"
-      ? stats.macDevicesWithWarnings
-      : pf === "Windows"
-        ? stats.winDevicesWithWarnings
-        : stats.devicesWithWarnings
-    : 0;
-  const isVisible = ctx.isPlatformVisible;
-  const s = useMemo(() => {
-    if (!json) return null;
-    const failing = new Map<string, number>();
-    for (const d of Array.isArray(json.devices) ? json.devices : []) {
-      if (d.archived === true || !isVisible(installPlatform(d))) continue;
-      const seen = new Set<string>();
-      for (const item of getDeviceInstallItems(d)) {
-        const name = item.itemName || item.name;
-        if (!name || seen.has(name) || !isErrorItem(item)) continue;
-        seen.add(name);
-        failing.set(name, (failing.get(name) || 0) + 1);
-      }
-    }
-    const stale = (
-      Array.isArray(json.staleAgents) ? json.staleAgents : []
-    ).filter(
-      (a: Row) =>
-        isSilentAgent(a) &&
-        isVisible(rowPlatform(a) === "Unknown" ? "macOS" : rowPlatform(a)),
-    ).length;
-    const top = [...failing.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 5);
-    return { top, stale };
-  }, [json, isVisible]);
+function InstallHealth({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "installHealth");
+  const d: InstallHealthCard | null = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
       title="Install Health"
       subtitle="Munki and Cimian results"
       link="/installs"
       tone="blue"
-      loading={src.loading}
-      error={undefined}
-      empty={!stats && !s}
       icon={<Icon d={ICONS.download} />}
+      card={card}
     >
-      <div className="flex gap-2">
-        <BigStat
-          value={errors}
-          label="devices with errors"
-          tone="red"
-          link={href("/installs", { filter: "errors" })}
-        />
-        <BigStat
-          value={warnings}
-          label="devices with warnings"
-          tone="yellow"
-          link={href("/installs", { filter: "warnings" })}
-        />
-      </div>
-      <div className="mt-4">
-        <SectionLabel>Top failing items</SectionLabel>
-        {s ? (
-          s.top.length ? (
-            <BarList
-              color={TONES.red.hex}
-              labelWidth="w-32"
-              items={s.top.map(([name, count]) => ({
-                label: name,
-                count,
-                link: href("/installs", { item: name, filter: "errors" }),
-              }))}
+      {d && (
+        <>
+          <div className="flex gap-2">
+            <BigStat value={d.withErrors.count} label="devices with errors" tone="red" link={linkHref(d.withErrors.link)} />
+            <BigStat value={d.withWarnings.count} label="devices with warnings" tone="yellow" link={linkHref(d.withWarnings.link)} />
+          </div>
+          <div className="mt-4">
+            <SectionLabel>Top failing items</SectionLabel>
+            {d.topFailing.length ? (
+              <BarList
+                color={TONES.red.hex}
+                labelWidth="w-32"
+                items={d.topFailing.map((i) => ({ label: i.name, count: i.devices, link: linkHref(i.link) }))}
+              />
+            ) : (
+              <p className="text-sm text-gray-400 dark:text-gray-500">No failing items</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip
+              value={d.silentAgents.count}
+              label={`agents silent over ${d.silentAgents.thresholdDays} days`}
+              tone="orange"
+              link={linkHref(d.silentAgents.link)}
             />
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">
-              No failing items
-            </p>
-          )
-        ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            {src.loading
-              ? "Loading install details…"
-              : "Install details unavailable"}
-          </p>
-        )}
-      </div>
-      {s && (
-        <div className="flex flex-wrap gap-2 mt-4">
-          <StatChip
-            value={s.stale}
-            label={`agents silent over ${SILENT_AGENT_DAYS} days`}
-            tone="orange"
-            link={href("/installs", { stale: 1 })}
-          />
-        </div>
+          </div>
+        </>
       )}
     </InsightCard>
   );
 }
 
-// MARK: - 6 Check-in gaps
+// MARK: - 6 Check-in Gaps
 
 const reasonLabel = (r: string) =>
   r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, " ") : "Unknown";
 
-function CheckInGapsCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "failures");
-  const json = src.json;
-  const { devices } = ctx;
-  const s = useMemo(() => {
-    const counts = json?.counts || {};
-    const reasons: Row[] = Array.isArray(json?.summary) ? json.summary : [];
-    return {
-      rejected: num(counts.rejected),
-      retried: num(counts.retried),
-      accepted: num(counts.accepted),
-      reasons: [...reasons]
-        .sort((a, b) => num(b.count) - num(a.count))
-        .slice(0, 5),
-      stale: devices.filter((d) => d.status === "stale").length,
-      missing: devices.filter((d) => d.status === "missing").length,
-    };
-  }, [json, devices]);
+function CheckinGaps({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "checkinGaps");
+  const d: CheckinGapsCard | null = card.status === "ready" ? card.data : null;
+  const allPlatforms = ctx.platformFilter !== "all" && d?.checkinsAllPlatforms !== false;
   return (
     <InsightCard
       title="Check-in Gaps"
-      subtitle={
-        ctx.platformFilter === "all"
-          ? "Failed check-ins and silent devices"
-          : "Check-ins: all platforms · silent devices: this platform"
-      }
-      link={href("/events/failures", { hours: 24 })}
+      subtitle="Failed check-ins and silent devices"
+      link={d ? linkHref(d.rejected.link) : "/events/failures"}
       tone="red"
-      loading={src.loading}
-      error={undefined}
-      empty={!json && devices.length === 0}
       icon={<Icon d={ICONS.signal} />}
+      card={card}
     >
-      {json ? (
+      {d && (
         <>
-          <SectionLabel>{ctx.platformFilter === "all" ? "Last 24 hours" : "Last 24 hours · All platforms"}</SectionLabel>
+          <SectionLabel>
+            Last {d.hours} hours{allPlatforms ? " · All platforms" : ""}
+          </SectionLabel>
           <div className="flex gap-2">
-            <BigStat
-              value={s.rejected}
-              label="rejected"
-              tone="red"
-              link={href("/events/failures", { hours: 24 })}
-            />
-            <BigStat
-              value={s.retried}
-              label="retried"
-              tone="yellow"
-              link={href("/events/failures", { hours: 24, outcome: "retried" })}
-            />
-            <BigStat
-              value={s.accepted}
-              label="repaired"
-              tone="blue"
-              link={href("/events/failures", {
-                hours: 24,
-                outcome: "accepted",
-              })}
-            />
+            <BigStat value={d.rejected.count} label="rejected" tone="red" link={linkHref(d.rejected.link)} />
+            <BigStat value={d.retried.count} label="retried" tone="yellow" link={linkHref(d.retried.link)} />
+            <BigStat value={d.accepted.count} label="repaired" tone="blue" link={linkHref(d.accepted.link)} />
           </div>
-          {s.reasons.length > 0 && (
+          {d.reasons.length > 0 && (
             <div className="mt-4">
               <SectionLabel>Rejection reasons</SectionLabel>
               <BarList
                 color={TONES.red.hex}
                 labelWidth="w-36"
-                items={s.reasons.map((r) => ({
+                items={d.reasons.map((r) => ({
                   label: reasonLabel(r.reason),
-                  count: num(r.count),
-                  detail: `${num(r.count)}`,
-                  link: href("/events/failures", {
-                    hours: 24,
-                    reason: r.reason,
-                  }),
+                  count: r.count,
+                  detail: `${r.count}`,
+                  link: linkHref(r.link),
                 }))}
               />
             </div>
           )}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={d.stale.count} label="silent 1-7 days" tone="yellow" link={linkHref(d.stale.link)} />
+            <StatChip value={d.missing.count} label="silent over 7 days" tone="red" link={linkHref(d.missing.link)} />
+          </div>
         </>
-      ) : (
-        <p className="text-sm text-gray-400 dark:text-gray-500">
-          {src.loading
-            ? "Loading check-in failures…"
-            : "Check-in failures unavailable"}
-        </p>
       )}
-      <div className="flex flex-wrap gap-2 mt-4">
-        <StatChip
-          value={s.stale}
-          label="silent 1-7 days"
-          tone="yellow"
-          link={href("/devices", { status: "stale" })}
-        />
-        <StatChip
-          value={s.missing}
-          label="silent over 7 days"
-          tone="red"
-          link={href("/devices", { status: "missing" })}
-        />
-      </div>
     </InsightCard>
   );
 }
 
-// MARK: - 7 OS currency
+// MARK: - 7 OS Currency
 
-function OSCurrencyCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "system");
-  const { rows, all } = src;
-  const s = useMemo(() => {
-    const rules = osCurrency(all);
-    const rated = rows.filter(rules.isRated);
-    const behindRows = rated.filter(rules.isBehind);
-    const lagging = new Map<string, number>();
-    for (const r of behindRows) {
-      const v = rules.versionKey(r);
-      if (v) lagging.set(v, (lagging.get(v) || 0) + 1);
-    }
-    return {
-      rated: rated.length,
-      behind: behindRows.length,
-      unsupported: rows.filter(rules.isUnsupportedMac).length,
-      win10: rows.filter(rules.isWindows10).length,
-      lagging: [...lagging.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 3),
-    };
-  }, [rows, all]);
-  const latest = s.rated - s.behind;
-  const pct = s.rated ? Math.round((latest / s.rated) * 100) : 0;
+function OSCurrency({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "osCurrency");
+  const d: OSCurrencyCard | null = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
       title="OS Currency"
-      subtitle="Latest patch per release, as seen in the fleet"
+      subtitle="Latest patch per release, as the fleet runs it"
       link="/system"
       tone="indigo"
-      loading={src.loading}
-      error={src.error}
-      empty={rows.length === 0}
       icon={<Icon d={ICONS.refresh} />}
+      card={card}
     >
-      <Donut
-        center={`${pct}%`}
-        data={[
-          {
-            label: "On latest patch",
-            count: latest,
-            color: TONES.green.hex,
-            link: "/system",
-          },
-          {
-            label: "Behind",
-            count: s.behind,
-            color: TONES.orange.hex,
-            link: href("/system", { patch: "behind" }),
-          },
-        ]}
-      />
-      {s.lagging.length > 0 && (
-        <div className="mt-4">
-          <SectionLabel>Most devices behind</SectionLabel>
-          <BarList
-            color={TONES.orange.hex}
-            items={s.lagging.map(([v, count]) => ({
-              label: /^\d+\.\d{4,}$/.test(v)
-                ? `Windows ${v.replace(".", " build ")}`
-                : `macOS ${v}`,
-              count,
-              link: href("/system", { osVersion: v }),
-            }))}
+      {d && (
+        <>
+          <Donut
+            center={`${d.pctOnLatest}%`}
+            data={[
+              { label: "On latest patch", count: d.onLatest, color: TONES.green.hex, link: "/system" },
+              { label: "Behind", count: d.behind.count, color: TONES.orange.hex, link: linkHref(d.behind.link) },
+            ]}
           />
-        </div>
+          {d.lagging.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Most devices behind</SectionLabel>
+              <BarList
+                color={TONES.orange.hex}
+                labelWidth="w-36"
+                items={d.lagging.map((v) => ({ label: v.label, count: v.devices, link: linkHref(v.link) }))}
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={d.unsupportedMac.count} label="unsupported macOS" tone="red" link={linkHref(d.unsupportedMac.link)} />
+            <StatChip value={d.windows10.count} label="Windows 10" tone="orange" link={linkHref(d.windows10.link)} />
+          </div>
+        </>
       )}
-      <div className="flex flex-wrap gap-2 mt-4">
-        <StatChip
-          value={s.unsupported}
-          label="unsupported macOS"
-          tone="red"
-          link={href("/system", { os: "unsupported" })}
-        />
-        <StatChip
-          value={s.win10}
-          label="Windows 10"
-          tone="orange"
-          link={href("/system", { os: "windows10" })}
-        />
-      </div>
     </InsightCard>
   );
 }
 
-// MARK: - 8 Software risk
+// MARK: - 8 Software Risk
 
-function SoftwareRiskCard({ ctx }: { ctx: InsightContext }) {
-  const sec = source(ctx, "security");
-  const inst = source(ctx, "installFilters");
-  const { rows } = sec;
-  const isVisible = ctx.isPlatformVisible;
-  const json = inst.json;
-  const cves = useMemo(
-    () => ({
-      critical: rows.filter(SECURITY_PARAM_RULES.cve.critical).length,
-      exploited: rows.filter(SECURITY_PARAM_RULES.cve.exploited).length,
-    }),
-    [rows],
-  );
-  const behind = useMemo(() => {
-    if (!json) return null;
-    const counts = new Map<string, number>();
-    for (const d of Array.isArray(json.devices) ? json.devices : []) {
-      if (d.archived === true || !isVisible(installPlatform(d))) continue;
-      for (const item of getDeviceInstallItems(d)) {
-        const have = String(item.installedVersion || "").trim();
-        const want = String(item.latestVersion || "").trim();
-        const name = item.itemName || item.name;
-        if (name && have && want && have !== want)
-          counts.set(name, (counts.get(name) || 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 5);
-  }, [json, isVisible]);
+function SoftwareRisk({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "softwareRisk");
+  const d: SoftwareRiskCard | null = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
       title="Software Risk"
       subtitle="Vulnerable devices and lagging managed items"
       link="/security"
       tone="red"
-      loading={sec.loading}
-      error={sec.error}
-      empty={rows.length === 0}
       icon={<Icon d={ICONS.warning} />}
+      card={card}
     >
-      <div className="flex gap-2">
-        <BigStat
-          value={cves.critical}
-          label="with critical CVEs"
-          tone="red"
-          link={href("/security", { cve: "critical" })}
-        />
-        <BigStat
-          value={cves.exploited}
-          label="actively exploited"
-          tone="orange"
-          link={href("/security", { cve: "exploited" })}
-        />
-      </div>
-      <div className="mt-4">
-        <SectionLabel>Managed items behind</SectionLabel>
-        {behind ? (
-          behind.length ? (
-            <BarList
-              color={TONES.orange.hex}
-              labelWidth="w-32"
-              items={behind.map(([name, count]) => ({
-                label: name,
-                count,
-                link: href("/installs", { item: name }),
+      {d && (
+        <>
+          <div className="flex gap-2">
+            <BigStat value={d.criticalCves.count} label="with critical CVEs" tone="red" link={linkHref(d.criticalCves.link)} />
+            <BigStat value={d.exploitedCves.count} label="actively exploited" tone="orange" link={linkHref(d.exploitedCves.link)} />
+          </div>
+          <div className="mt-4">
+            <SectionLabel>Managed items behind</SectionLabel>
+            {d.itemsBehind.length ? (
+              <BarList
+                color={TONES.orange.hex}
+                labelWidth="w-32"
+                items={d.itemsBehind.map((i) => ({ label: i.name, count: i.devices, link: linkHref(i.link) }))}
+              />
+            ) : (
+              <p className="text-sm text-gray-400 dark:text-gray-500">Every managed item is on its latest version</p>
+            )}
+          </div>
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - 9 Expiring Certificates
+
+function ExpiringCertificates({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "expiringCertificates");
+  const d: ExpiringCertificatesCard | null = card.status === "ready" ? card.data : null;
+  return (
+    <InsightCard
+      title="Expiring Certificates"
+      subtitle={`Expiring within ${d?.windowDays ?? 30} days, and expired`}
+      link="/security"
+      tone="yellow"
+      icon={<Icon d={ICONS.certificate} />}
+      card={card}
+    >
+      {d && (
+        <>
+          <div className="flex gap-2">
+            <BigStat
+              value={d.expiring.certificates}
+              label={`expiring on ${plural(d.expiring.devices, "device")}`}
+              tone="yellow"
+              link={linkHref(d.expiring.link)}
+            />
+            <BigStat value={d.expiredUser.devices} label="devices with expired user certs" tone="red" link={linkHref(d.expiredUser.link)} />
+          </div>
+          {d.soonest.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Expiring soonest</SectionLabel>
+              <DeviceList
+                items={d.soonest.map((c) => ({
+                  key: c.commonName,
+                  name: c.commonName,
+                  detail: c.daysUntilExpiry <= 0 ? "today" : plural(c.daysUntilExpiry, "day"),
+                  urgent: c.daysUntilExpiry <= 7,
+                  link: linkHref(c.link),
+                }))}
+              />
+            </div>
+          )}
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - 10 Local Admin Exposure
+
+function LocalAdminExposure({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "localAdminExposure");
+  const d: LocalAdminExposureCard | null = card.status === "ready" ? card.data : null;
+  return (
+    <InsightCard
+      title="Local Admin Exposure"
+      subtitle="Extra local admins and unjoined devices"
+      link="/identity"
+      tone="purple"
+      icon={<Icon d={ICONS.users} />}
+      card={card}
+    >
+      {d && (
+        <>
+          <div className="flex gap-2">
+            <BigStat value={d.extraAdmins.count} label={`with extra local admins, of ${d.devices}`} tone="orange" link={linkHref(d.extraAdmins.link)} />
+            <BigStat value={d.workgroup.count} label="not Entra or domain joined" tone="red" link={linkHref(d.workgroup.link)} />
+          </div>
+          {d.byAdminCount.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Admins per device</SectionLabel>
+              <BarList
+                color={TONES.orange.hex}
+                labelWidth="w-32"
+                items={d.byAdminCount.map((b) => ({ label: b.label, count: b.count, link: linkHref(b.link) }))}
+              />
+            </div>
+          )}
+          {d.topDevices.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Most admins</SectionLabel>
+              <DeviceList items={d.topDevices.map((t) => ({ key: t.serialNumber, name: t.name, detail: plural(t.admins, "admin"), link: linkHref(t.link) }))} />
+            </div>
+          )}
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - 11 Unused Software
+
+function UnusedSoftware({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "unusedSoftware");
+  const d: UnusedSoftwareCard | null = card.status === "ready" ? card.data : null;
+  const hours = (h: number) => (h >= 1000 ? `${Math.round(h / 1000)}k h` : `${Math.round(h)} h`);
+  return (
+    <InsightCard
+      title="Unused Software"
+      subtitle={`Installed widely, rarely opened · last ${d?.days ?? 30} days${ctx.platformFilter !== "all" ? " · All platforms" : ""}`}
+      link={`/applications?type=usage&period=${d?.days ?? 30}`}
+      tone="teal"
+      icon={<Icon d={ICONS.apps} />}
+      card={card}
+    >
+      {d && (
+        <>
+          <SectionLabel>Least used, on {d.minInstalls}+ devices</SectionLabel>
+          {d.leastUsed.length ? (
+            <DeviceList
+              items={d.leastUsed.map((a) => ({
+                key: a.name,
+                name: a.name,
+                detail: `${a.activeDevices} of ${a.installedDevices} devices`,
+                link: linkHref(a.link),
               }))}
             />
           ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">
-              Every managed item is on its latest version
-            </p>
-          )
-        ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            {inst.loading
-              ? "Loading install details…"
-              : "Install details unavailable"}
-          </p>
-        )}
-      </div>
-    </InsightCard>
-  );
-}
-
-// MARK: - 9 Certificates
-
-const CERT_WINDOW_DAYS = 30;
-
-function CertificatesCard({ ctx }: { ctx: InsightContext }) {
-  const certs = source(ctx, "certs");
-  const sec = source(ctx, "security");
-  const certRows = certs.rows;
-  const secRows = sec.rows;
-  const s = useMemo(() => {
-    const expiring = certRows.filter((c) => {
-      const d = num(c.daysUntilExpiry);
-      return !boolish(c.isExpired) && d >= 0 && d <= CERT_WINDOW_DAYS;
-    });
-    const soonest = new Map<string, number>();
-    for (const c of [...expiring].sort(
-      (a, b) => num(a.daysUntilExpiry) - num(b.daysUntilExpiry),
-    )) {
-      const cn = String(c.commonName || c.subject || "").trim();
-      if (cn && !soonest.has(cn)) soonest.set(cn, num(c.daysUntilExpiry));
-    }
-    return {
-      certCount: expiring.length,
-      deviceCount: new Set(expiring.map((c) => c.serialNumber || c.deviceName))
-        .size,
-      expiredDevices: secRows.filter((r) => expiredCerts(r) > 0).length,
-      soonest: [...soonest.entries()].slice(0, 5),
-    };
-  }, [certRows, secRows]);
-  return (
-    <InsightCard
-      title="Certificates"
-      subtitle={`Expiring within ${CERT_WINDOW_DAYS} days`}
-      link="/security"
-      tone="yellow"
-      loading={certs.loading || sec.loading}
-      error={certs.error && sec.error ? certs.error : undefined}
-      empty={certRows.length === 0 && secRows.length === 0}
-      icon={<Icon d={ICONS.certificate} />}
-    >
-      <div className="flex gap-2">
-        {certs.json ? (
-          <BigStat
-            value={s.certCount}
-            label={`certificates on ${plural(s.deviceCount, "device")}`}
-            tone="yellow"
-            link={href("/security", { certs: "expiring" })}
-          />
-        ) : (
-          <BigStat
-            value="–"
-            label={certs.loading ? "loading certificates…" : "certificate list unavailable"}
-            tone="gray"
-            link={href("/security", { certs: "expiring" })}
-          />
-        )}
-        {sec.json ? (
-          <BigStat
-            value={s.expiredDevices}
-            label="devices with expired certs"
-            tone="red"
-            link={href("/security", { certs: "expired" })}
-          />
-        ) : (
-          <BigStat
-            value="–"
-            label={sec.loading ? "loading security…" : "security report unavailable"}
-            tone="gray"
-            link={href("/security", { certs: "expired" })}
-          />
-        )}
-      </div>
-      {s.soonest.length > 0 && (
-        <div className="mt-4">
-          <SectionLabel>Expiring soonest</SectionLabel>
-          <ul className="space-y-0.5">
-            {s.soonest.map(([cn, days]) => (
-              <li key={cn}>
-                <Link
-                  href={href("/security", {
-                    certSearch: cn,
-                    certStatus: "expiring",
-                  })}
-                  className={`flex items-center gap-2 text-sm py-0.5 ${ROW_LINK}`}
-                >
-                  <span className="flex-1 truncate text-gray-900 dark:text-gray-100">
-                    {cn}
-                  </span>
-                  <span
-                    className={`text-xs tabular-nums ${days <= 7 ? TONES.red.text : "text-gray-500 dark:text-gray-400"}`}
-                  >
-                    {days === 0 ? "today" : plural(Math.round(days), "day")}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </InsightCard>
-  );
-}
-
-// MARK: - 10 Identity
-
-const JOIN_COLORS: Record<JoinType, string> = {
-  entra: "#3b82f6",
-  domain: "#6366f1",
-  hybrid: "#14b8a6",
-  workgroup: "#9ca3af",
-};
-
-function IdentityCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "identity");
-  const { rows } = src;
-  const s = useMemo(() => {
-    const joins = new Map<JoinType, number>();
-    for (const r of rows) {
-      const j = joinType(r);
-      joins.set(j, (joins.get(j) || 0) + 1);
-    }
-    return {
-      joins: (Object.keys(JOIN_LABELS) as JoinType[])
-        .filter((k) => joins.get(k))
-        .map((k) => ({
-          label: JOIN_LABELS[k],
-          count: joins.get(k) || 0,
-          color: JOIN_COLORS[k],
-          link: href("/identity", { join: k }),
-        })),
-      extraAdmins: rows.filter(hasExtraAdmins).length,
-      shared: rows.filter((r) => usageKind(r) === "shared").length,
-      assigned: rows.filter((r) => usageKind(r) === "assigned").length,
-    };
-  }, [rows]);
-  return (
-    <InsightCard
-      title="Identity"
-      subtitle="Directory join, admins and usage"
-      link="/identity"
-      tone="purple"
-      loading={src.loading}
-      error={src.error}
-      empty={rows.length === 0}
-      icon={<Icon d={ICONS.users} />}
-    >
-      <Donut data={s.joins} center={String(rows.length)} />
-      <div className="flex flex-wrap gap-2 mt-4">
-        <StatChip
-          value={s.extraAdmins}
-          label="with extra local admins"
-          tone="orange"
-          link={href("/identity", { admins: "extra" })}
-        />
-        <StatChip
-          value={s.shared}
-          label="shared"
-          tone="blue"
-          link={href("/identity", { usage: "shared" })}
-        />
-        <StatChip
-          value={s.assigned}
-          label="assigned"
-          tone="teal"
-          link={href("/identity", { usage: "assigned" })}
-        />
-      </div>
-    </InsightCard>
-  );
-}
-
-// MARK: - 11 App usage
-
-const MIN_INSTALLS_FOR_LEAST_USED = 10;
-const appHref = (name: string) =>
-  href(`/applications/usage/${encodeURIComponent(name)}`, { days: 30 });
-const hours = (h: number) =>
-  h >= 1000 ? `${Math.round(h / 1000)}k h` : `${Math.round(h)} h`;
-
-function AppUsageCard({ ctx }: { ctx: InsightContext }) {
-  const src = source(ctx, "usage");
-  const apps: Row[] = useMemo(
-    () => (Array.isArray(src.json?.applications) ? src.json.applications : []),
-    [src.json],
-  );
-  const s = useMemo(() => {
-    const top = [...apps]
-      .sort((a, b) => num(b.totalHours) - num(a.totalHours))
-      .slice(0, 5);
-    const least = apps
-      .filter((a) => num(a.installedDeviceCount) >= MIN_INSTALLS_FOR_LEAST_USED)
-      .map((a) => ({
-        a,
-        ratio:
-          num(a.activeDeviceCount ?? a.deviceCount) /
-          num(a.installedDeviceCount),
-      }))
-      .sort(
-        (x, y) =>
-          x.ratio - y.ratio ||
-          num(y.a.installedDeviceCount) - num(x.a.installedDeviceCount),
-      )
-      .slice(0, 5);
-    return { top, least };
-  }, [apps]);
-  return (
-    <InsightCard
-      title="App Usage"
-      subtitle={
-        ctx.platformFilter === "all" ? "Last 30 days" : "Last 30 days · All platforms"
-      }
-      link={href("/applications", { type: "usage", period: 30 })}
-      tone="teal"
-      loading={src.loading}
-      error={src.error}
-      empty={apps.length === 0}
-      icon={<Icon d={ICONS.apps} />}
-    >
-      <SectionLabel>Most used</SectionLabel>
-      <BarList
-        color={TONES.teal.hex}
-        labelWidth="w-32"
-        items={s.top.map((a) => ({
-          label: a.name,
-          count: num(a.totalHours),
-          detail: hours(num(a.totalHours)),
-          link: appHref(a.name),
-        }))}
-      />
-      {s.least.length > 0 && (
-        <div className="mt-4">
-          <SectionLabel>
-            Least used (installed on {MIN_INSTALLS_FOR_LEAST_USED}+ devices)
-          </SectionLabel>
-          <ul className="space-y-0.5">
-            {s.least.map(({ a }) => (
-              <li key={a.name}>
-                <Link
-                  href={appHref(a.name)}
-                  className={`flex items-center gap-2 text-sm py-0.5 ${ROW_LINK}`}
-                >
-                  <span className="flex-1 truncate text-gray-900 dark:text-gray-100">
-                    {a.name}
-                  </span>
-                  <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                    {num(a.activeDeviceCount ?? a.deviceCount)} of{" "}
-                    {num(a.installedDeviceCount)} devices
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </InsightCard>
-  );
-}
-
-// MARK: - 12 Network & peripherals
-
-function NetworkPeripheralsCard({ ctx }: { ctx: InsightContext }) {
-  const net = source(ctx, "network");
-  const per = source(ctx, "peripherals");
-  const netRows = net.rows;
-  const perRows = per.rows;
-  const n = useMemo(
-    () => ({
-      wired: netRows.filter((r) => connectionKind(r) === "wired").length,
-      wifi: netRows.filter((r) => connectionKind(r) === "wifi").length,
-      weak: netRows.filter(isWeakSignal).length,
-    }),
-    [netRows],
-  );
-  const p = useMemo(() => {
-    const rooms = new Map<string, number>();
-    let printers = 0,
-      displays = 0;
-    for (const r of perRows) {
-      const pc = printerCount(r);
-      printers += pc;
-      displays += displayCount(r);
-      const room = deviceRoom(r);
-      if (pc && room) rooms.set(room, (rooms.get(room) || 0) + pc);
-    }
-    return {
-      printers,
-      displays,
-      rooms: [...rooms.entries()]
-        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .slice(0, 3),
-    };
-  }, [perRows]);
-  return (
-    <InsightCard
-      title="Network & Peripherals"
-      subtitle="Connections, signal, printers and displays"
-      link="/network"
-      tone="blue"
-      loading={net.loading || per.loading}
-      error={net.error && per.error ? net.error : undefined}
-      empty={netRows.length === 0 && perRows.length === 0}
-      icon={<Icon d={ICONS.network} />}
-    >
-      {netRows.length > 0 ? (
-        <>
-          <Donut
-            center={String(n.wired + n.wifi)}
-            data={[
-              {
-                label: "Wired",
-                count: n.wired,
-                color: TONES.indigo.hex,
-                link: href("/network", { connection: "wired" }),
-              },
-              {
-                label: "Wi-Fi",
-                count: n.wifi,
-                color: TONES.teal.hex,
-                link: href("/network", { connection: "wifi" }),
-              },
-            ]}
-          />
-          <div className="flex flex-wrap gap-2 mt-4">
-            <StatChip
-              value={n.weak}
-              label="weak Wi-Fi signal"
-              tone="orange"
-              link={href("/network", { signal: "weak" })}
-            />
-          </div>
-        </>
-      ) : (
-        <p className="text-sm text-gray-400 dark:text-gray-500">
-          {net.loading ? "Loading network…" : "Network report unavailable"}
-        </p>
-      )}
-      <div className="mt-4">
-        <SectionLabel>Peripherals</SectionLabel>
-        {perRows.length > 0 ? (
-          <>
-            <div className="flex gap-2">
-              <BigStat
-                value={p.printers}
-                label="printers"
-                tone="purple"
-                link={href("/peripherals", { kind: "printers" })}
-              />
-              <BigStat
-                value={p.displays}
-                label="displays"
-                tone="blue"
-                link={href("/peripherals", { kind: "displays" })}
+            <p className="text-sm text-gray-400 dark:text-gray-500">Nothing installed widely goes unused</p>
+          )}
+          {d.mostUsed.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Most used</SectionLabel>
+              <BarList
+                color={TONES.teal.hex}
+                labelWidth="w-32"
+                items={d.mostUsed.map((a) => ({ label: a.name, count: a.totalHours, detail: hours(a.totalHours), link: linkHref(a.link) }))}
               />
             </div>
-            {p.rooms.length > 0 && (
-              <div className="mt-3">
-                <BarList
-                  color="rgba(168,85,247,0.55)"
-                  items={p.rooms.map(([room, count]) => ({
-                    label: room,
-                    count,
-                    detail: plural(count, "printer"),
-                    link: href("/peripherals", { kind: "printers", room }),
-                  }))}
-                />
-              </div>
-            )}
-          </>
-        ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            {per.loading
-              ? "Loading peripherals…"
-              : "Peripherals report unavailable"}
-          </p>
-        )}
-      </div>
+          )}
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - 12 Connectivity Problems
+
+function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "connectivityProblems");
+  const d: ConnectivityProblemsCard | null = card.status === "ready" ? card.data : null;
+  return (
+    <InsightCard
+      title="Connectivity Problems"
+      subtitle="Weak Wi-Fi, poor network quality, VPN"
+      link="/network"
+      tone="blue"
+      icon={<Icon d={ICONS.network} />}
+      card={card}
+    >
+      {d && (
+        <div className="grid grid-cols-3 gap-2">
+          <BigStat value={d.weakSignal.count} label="weak Wi-Fi signal" tone="orange" link={linkHref(d.weakSignal.link)} />
+          <BigStat
+            value={d.poorQuality.count}
+            label={`poor quality, of ${d.poorQuality.measured} measured`}
+            tone="red"
+            link={linkHref(withDefaultParams(d.poorQuality.link, "/network", { quality: "poor" }))}
+          />
+          <BigStat
+            value={d.onVpn.count}
+            label="on VPN"
+            tone="blue"
+            link={linkHref(withDefaultParams(d.onVpn.link, "/network", { vpn: "1" }))}
+          />
+        </div>
+      )}
     </InsightCard>
   );
 }
 
 // MARK: - The twelve cards, in spec order
 
-const CARDS: { id: string; Card: React.FC<{ ctx: InsightContext }> }[] = [
-  { id: "system-health", Card: SystemHealthCard },
-  { id: "security-posture", Card: SecurityPostureCard },
-  { id: "management", Card: ManagementCard },
-  { id: "hardware", Card: HardwareCard },
-  { id: "install-health", Card: InstallHealthCard },
-  { id: "check-in-gaps", Card: CheckInGapsCard },
-  { id: "os-currency", Card: OSCurrencyCard },
-  { id: "software-risk", Card: SoftwareRiskCard },
-  { id: "certificates", Card: CertificatesCard },
-  { id: "identity", Card: IdentityCard },
-  { id: "app-usage", Card: AppUsageCard },
-  { id: "network-peripherals", Card: NetworkPeripheralsCard },
+const CARDS: { id: InsightCardKey; Card: React.FC<{ ctx: InsightContext }> }[] = [
+  { id: "rebootDebt", Card: RebootDebt },
+  { id: "protectionGaps", Card: ProtectionGaps },
+  { id: "unmanagedDevices", Card: UnmanagedDevices },
+  { id: "hardwareAtRisk", Card: HardwareAtRisk },
+  { id: "installHealth", Card: InstallHealth },
+  { id: "checkinGaps", Card: CheckinGaps },
+  { id: "osCurrency", Card: OSCurrency },
+  { id: "softwareRisk", Card: SoftwareRisk },
+  { id: "expiringCertificates", Card: ExpiringCertificates },
+  { id: "localAdminExposure", Card: LocalAdminExposure },
+  { id: "unusedSoftware", Card: UnusedSoftware },
+  { id: "connectivityProblems", Card: ConnectivityProblems },
 ];
 
 export const INSIGHT_CARD_COUNT = CARDS.length;
