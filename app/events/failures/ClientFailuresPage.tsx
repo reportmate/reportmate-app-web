@@ -7,7 +7,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { Search, X } from 'lucide-react'
-import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../../src/lib/data-cache"
+import { cachedAt, findNearestCached, peekCached, rememberCached, trackedFetch } from "../../../src/lib/data-cache"
 import { RefreshErrorBanner } from "../../../src/components/ui/RefreshErrorBanner"
 
 interface IngestFailure {
@@ -135,6 +135,25 @@ function failuresUrl(hours: number, outcome: Outcome, reason: string | null): st
   return `/api/events/failures?${params.toString()}`
 }
 
+/**
+ * The cached answer closest to a filter combination: the exact one; else the
+ * same window and outcome without a reason, narrowed to that reason here;
+ * else whatever this page loaded most recently. Shown while the exact answer
+ * loads, so changing a filter never drops back to a skeleton.
+ */
+function nearestFailures(hours: number, outcome: Outcome, reason: string | null): FailuresPayload | undefined {
+  const exact = peekCached<FailuresPayload>(failuresUrl(hours, outcome, reason))
+  if (exact) return exact
+  if (reason) {
+    const broad = peekCached<FailuresPayload>(failuresUrl(hours, outcome, null))
+    if (broad) {
+      const failures = broad.failures.filter(f => f.reason === reason)
+      return { ...broad, failures, total: failures.length }
+    }
+  }
+  return findNearestCached<FailuresPayload>('/api/events/failures?')?.data
+}
+
 interface FailuresPayload {
   failures: IngestFailure[]
   summary: ReasonSummary[]
@@ -169,11 +188,11 @@ function ClientFailuresPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [initialCache] = useState(() => peekCached<FailuresPayload>(failuresUrl(
+  const [initialCache] = useState(() => nearestFailures(
     parseHours(searchParams.get('hours')),
     parseOutcome(searchParams.get('outcome')),
     searchParams.get('reason') || null,
-  )))
+  ))
   const [failures, setFailures] = useState<IngestFailure[]>(initialCache?.failures ?? [])
   const [summary, setSummary] = useState<ReasonSummary[]>(initialCache?.summary ?? [])
   const [total, setTotal] = useState(initialCache?.total ?? 0)
@@ -232,8 +251,8 @@ function ClientFailuresPageContent() {
       setError(null)
       setRefreshError(null)
     } catch (e) {
-      // Keep the last answer on screen when a background refresh fails.
-      if (peekCached(url) !== undefined) {
+      // Keep whatever answer is on screen (exact or nearest) when a refresh fails.
+      if (nearestFailures(hours, outcome, reasonFilter) !== undefined) {
         console.error('Failed to refresh failures:', e)
         setRefreshError(e instanceof Error ? e.message : String(e))
       } else setError(e instanceof Error ? e.message : 'Failed to load failures')
@@ -244,15 +263,17 @@ function ClientFailuresPageContent() {
   }, [hours, reasonFilter, outcome, applyPayload])
 
   useEffect(() => {
-    // A filter combination seen before shows its last answer at once.
-    const cached = peekCached<FailuresPayload>(failuresUrl(hours, outcome, reasonFilter))
-    if (cached) {
-      applyPayload(cached)
+    // A filter combination seen before shows its last answer at once; a new
+    // one shows the nearest cached answer, or keeps what is on screen, while
+    // its own answer loads. The skeleton is only for a page with no data at all.
+    const nearest = nearestFailures(hours, outcome, reasonFilter)
+    if (nearest) {
+      applyPayload(nearest)
       setError(null)
+      setLoading(false)
     }
     // A banner from another filter combination does not apply to this one.
     setRefreshError(null)
-    setLoading(cached === undefined)
     fetchFailures()
     const interval = setInterval(fetchFailures, 30000)
     return () => clearInterval(interval)

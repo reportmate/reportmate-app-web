@@ -12,6 +12,13 @@ import { usePlatformFilterSafe } from '@/src/providers/PlatformFilterProvider'
 import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
+import { peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
+
+/** The filters payload, kept for the tab so a return to this page renders at once. */
+const APPLICATIONS_FILTERS_URL = '/api/v1/applications/filters'
+/** Cache key for one generated report: its type plus every input that shapes it. */
+const reportCacheKey = (type: 'usage' | 'versions', inputs: Record<string, unknown>) =>
+  `applications:${type}:${JSON.stringify(inputs)}`
 
 interface ApplicationItem {
   id: string
@@ -547,7 +554,7 @@ function ApplicationsPageContent() {
     devicesWithData: 0
   })
   const [loading, setLoading] = useState(false)
-  const [filtersLoading, setFiltersLoading] = useState(true)
+  const [filtersLoading, setFiltersLoading] = useState(() => peekCached(APPLICATIONS_FILTERS_URL) === undefined)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
@@ -808,48 +815,48 @@ function ApplicationsPageContent() {
     selectedLocations, selectedRooms, selectedFleets, selectedAreas, selectedVersions,
   ])
 
+  // Filter options and the device list for the missing report, from one filters payload
+  const applyFiltersPayload = (data: any) => {
+    setFilterOptions({
+      applicationNames: data.applicationNames || [],
+      windowsApplicationNames: data.windowsApplicationNames,
+      macApplicationNames: data.macApplicationNames,
+      usages: data.usages || [],
+      catalogs: data.catalogs || [],
+      locations: data.locations || [],
+      rooms: data.rooms || [],
+      fleets: data.fleets || [],
+      areas: data.areas || [],
+      devicesWithData: data.devices?.length || 0
+    })
+    if (data.devices && Array.isArray(data.devices)) {
+      setAllDevices(data.devices.map((d: any) => ({
+        serialNumber: d.serialNumber,
+        name: d.name || d.serialNumber,
+        usage: d.usage,
+        catalog: d.catalog,
+        location: d.location,
+        room: d.room || d.location
+      })))
+    }
+  }
+
   // Load ALL applications data on mount with progressive loading
   useEffect(() => {
     const fetchAllData = async () => {
       let progressInterval: NodeJS.Timeout | null = null
       try {
-        setFiltersLoading(true)
-        setLoading(true)
-        setError(null)
-        
-        // Check if we have cached data in sessionStorage
-        const cachedData = sessionStorage.getItem('applications-all-data')
-        const cachedTimestamp = sessionStorage.getItem('applications-all-timestamp')
-        const cacheExpiry = 5 * 60 * 1000 // 5 minutes
-        
-        if (cachedData && cachedTimestamp) {
-          const age = Date.now() - parseInt(cachedTimestamp)
-          if (age < cacheExpiry) {
-                        const data = JSON.parse(cachedData)
-            
-            setFilterOptions({
-              applicationNames: data.applicationNames || [],
-              windowsApplicationNames: data.windowsApplicationNames,
-              macApplicationNames: data.macApplicationNames,
-              usages: data.usages || [],
-              catalogs: data.catalogs || [],
-              locations: data.locations || [],
-              rooms: data.rooms || [],
-              fleets: data.fleets || [],
-              areas: data.areas || [],
-              devicesWithData: data.devices?.length || 0
-            })
-            
-            // Don't auto-load applications from cache - let user filter first
-                        
-            setLoadingMessage('Loaded from cache')
-            setLoadingProgress({ current: data.devices?.length || 0, total: data.devices?.length || 0 })
-            setFiltersLoading(false)
-            setLoading(false)
-            return
-          } else {
-                      }
+        // A return visit renders the last filters payload at once and
+        // refreshes it in the background; only a first load shows progress.
+        const cachedFilters = peekCached<any>(APPLICATIONS_FILTERS_URL)
+        if (cachedFilters) {
+          applyFiltersPayload(cachedFilters)
+          setFiltersLoading(false)
+        } else {
+          setFiltersLoading(true)
+          setLoading(true)
         }
+        setError(null)
         
         // Show loading state without specific numbers initially
         setLoadingProgress({ current: 0, total: 0 })
@@ -872,14 +879,14 @@ function ApplicationsPageContent() {
           setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
         }, 200)
         
-        const response = await fetch('/api/v1/applications/filters', {
+        const response = await trackedFetch(APPLICATIONS_FILTERS_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: cachedFilters !== undefined })
         
         if (!response.ok) {
           console.error('[APPLICATIONS PAGE] Filters API failed:', response.status, response.statusText)
@@ -898,42 +905,9 @@ function ApplicationsPageContent() {
           progressInterval = null
         }
         
-        // Get the actual device count from the response
+        rememberCached(APPLICATIONS_FILTERS_URL, data)
+        applyFiltersPayload(data)
         const actualDeviceCount = data.devices?.length || 0
-        
-        // Use inventory filters directly from API response (already extracted from applications data)
-        const usages = data.usages || []
-        const catalogs = data.catalogs || []
-        const locations = data.locations || []
-        const rooms = data.rooms || []
-        const fleets = data.fleets || []
-        const areas = data.areas || []
-
-
-        setFilterOptions({
-          applicationNames: data.applicationNames || [],
-          windowsApplicationNames: data.windowsApplicationNames,
-          macApplicationNames: data.macApplicationNames,
-          usages,
-          catalogs,
-          locations,
-          rooms,
-          fleets,
-          areas,
-          devicesWithData: actualDeviceCount
-        })
-        
-        // Store all devices for computing missing report
-        if (data.devices && Array.isArray(data.devices)) {
-          setAllDevices(data.devices.map((d: any) => ({
-            serialNumber: d.serialNumber,
-            name: d.name || d.serialNumber,
-            usage: d.usage,
-            catalog: d.catalog,
-            location: d.location,
-            room: d.room || d.location
-          })))
-        }
         
         // Set progress to complete and show UI immediately
         setLoadingMessage('Complete!')
@@ -944,7 +918,10 @@ function ApplicationsPageContent() {
                         
       } catch (error) {
         console.error('[APPLICATIONS PAGE] Error fetching filter options:', error)
-        setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
+        // Filters already on screen from the cache stay; the error is for a first load
+        if (peekCached(APPLICATIONS_FILTERS_URL) === undefined) {
+          setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
+        }
         setLoadingProgress({ current: 0, total: 0 })
       } finally {
         if (progressInterval) {
@@ -1064,8 +1041,26 @@ function ApplicationsPageContent() {
     // actually queried, not whatever platform the user may have flipped to
     // mid-flight.
     const fetchPlatform = platformFilter
+    // The same report generated before in this tab shows at once; the fetch
+    // below refreshes it in the background without the loading view.
+    const usageKey = reportCacheKey('usage', {
+      days: effectiveDays, apps: selectedApplications, usages: selectedUsages, catalogs: selectedCatalogs,
+      locations: selectedLocations, areas: selectedAreas, fleets: selectedFleets, rooms: selectedRooms,
+      platform: fetchPlatform,
+    })
+    const cachedUsage = peekCached<{ utilization: UtilizationData; inventory: ApplicationItem[] | null }>(usageKey)
     try {
-      setLoading(true)
+      if (cachedUsage) {
+        reportPlatformRef.current = fetchPlatform
+        if (cachedUsage.inventory) setApplications(cachedUsage.inventory)
+        setUtilizationData(cachedUsage.utilization)
+        setReportType('usage')
+        setWidgetsExpanded(true)
+        setSelectionsExpanded(false)
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
       setError(null)
       
       // Clear search field when generating report
@@ -1081,6 +1076,7 @@ function ApplicationsPageContent() {
         : ''
       
       // Load inventory data first (for version analysis) - 0-30%
+      let inventoryForCache: ApplicationItem[] | null = null
       if (selectedApplications.length > 0) {
         setLoadingMessage('Loading inventory data for version analysis...')
         setLoadingProgress({ current: 10, total: 100 })
@@ -1090,10 +1086,10 @@ function ApplicationsPageContent() {
         const inventoryUrl = `/api/v1/applications?${inventoryParams.toString()}`
                 
         try {
-          const inventoryResponse = await fetch(inventoryUrl, {
+          const inventoryResponse = await trackedFetch(inventoryUrl, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache' }
-          })
+          }, { background: !!cachedUsage })
           
           setLoadingProgress({ current: 25, total: 100 })
           
@@ -1101,7 +1097,8 @@ function ApplicationsPageContent() {
             const inventoryData = await inventoryResponse.json()
             if (Array.isArray(inventoryData)) {
               setApplications(inventoryData)
-                          }
+              inventoryForCache = inventoryData
+            }
           }
         } catch (invError) {
           console.warn('Failed to load inventory data:', invError)
@@ -1145,13 +1142,13 @@ function ApplicationsPageContent() {
             
       setLoadingProgress({ current: 40, total: 100 })
       
-      const response = await fetch(url, {
+      const response = await trackedFetch(url, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
-      })
+      }, { background: !!cachedUsage })
       
       setLoadingProgress({ current: 80, total: 100 })
       
@@ -1172,6 +1169,7 @@ function ApplicationsPageContent() {
         // load completes. Use the captured fetchPlatform (not current
         // platformFilter) in case the user flipped while the fetch was in flight.
         reportPlatformRef.current = fetchPlatform
+        rememberCached(usageKey, { utilization: data, inventory: inventoryForCache ?? cachedUsage?.inventory ?? null })
         setUtilizationData(data)
         setReportType('usage')
         setWidgetsExpanded(true)
@@ -1196,7 +1194,8 @@ function ApplicationsPageContent() {
     } catch (error) {
       console.error('Failed to load utilization data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      setError(errorMessage)
+      // A cached report stays on screen when its refresh fails
+      if (!cachedUsage) setError(errorMessage)
     } finally {
       setLoading(false)
       setFiltersExpanded(false) // Collapse accordion after report loads
@@ -1208,8 +1207,23 @@ function ApplicationsPageContent() {
   // Load versions-only report (inventory data with version distribution, no usage analytics)
   const handleLoadVersionsReport = async () => {
     const fetchPlatform = platformFilter
+    const versionsKey = reportCacheKey('versions', {
+      apps: selectedApplications, usages: selectedUsages, catalogs: selectedCatalogs, locations: selectedLocations,
+      areas: selectedAreas, fleets: selectedFleets, rooms: selectedRooms, platform: fetchPlatform,
+    })
+    const cachedVersions = peekCached<{ inventory: ApplicationItem[]; distribution: typeof versionDistributionServer }>(versionsKey)
     try {
-      setLoading(true)
+      if (cachedVersions) {
+        reportPlatformRef.current = fetchPlatform
+        setApplications(cachedVersions.inventory)
+        setVersionDistributionServer(cachedVersions.distribution)
+        setReportType('versions')
+        setSelectionsExpanded(false)
+        setUtilizationData(null)
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
       setError(null)
       setSearchQuery('')
       
@@ -1259,9 +1273,9 @@ function ApplicationsPageContent() {
         : null
 
       const [inventoryResponse, distributionResponse] = await Promise.all([
-        fetch(inventoryUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }),
+        trackedFetch(inventoryUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }, { background: !!cachedVersions }),
         distributionUrl
-          ? fetch(distributionUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } })
+          ? trackedFetch(distributionUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }, { background: !!cachedVersions })
           : Promise.resolve(null),
       ])
 
@@ -1315,6 +1329,7 @@ function ApplicationsPageContent() {
         // Pin the platform the data was fetched for so the refetch-on-platform
         // effect doesn't fire immediately after this load completes.
         reportPlatformRef.current = fetchPlatform
+        rememberCached(versionsKey, { inventory: inventoryData, distribution: distributionData })
         setApplications(inventoryData)
         setVersionDistributionServer(distributionData)
         setReportType('versions')
@@ -1338,6 +1353,7 @@ function ApplicationsPageContent() {
     } catch (error) {
       console.error('Failed to load versions data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      if (cachedVersions) return
       setError(errorMessage)
     } finally {
       setLoading(false)

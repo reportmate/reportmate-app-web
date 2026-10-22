@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import {
   cachedAt,
   clearCache,
+  findNearestCached,
   peekCached,
   rememberCached,
   trackedFetch,
@@ -123,3 +124,24 @@ describe("data-cache", () => {
     });
   });
 });
+
+describe('findNearestCached', () => {
+  beforeEach(() => clearCache())
+
+  it('returns the most recently stored entry under a prefix that passes the filter', () => {
+    const now = jest.spyOn(Date, 'now')
+    now.mockReturnValue(1000)
+    rememberCached('/api/events/failures?hours=24&outcome=rejected', { n: 1 })
+    now.mockReturnValue(2000)
+    rememberCached('/api/events/failures?hours=168&outcome=retried', { n: 2 })
+    now.mockReturnValue(3000)
+    rememberCached('/api/v1/security', { n: 3 })
+    now.mockRestore()
+
+    expect(findNearestCached('/api/events/failures?')).toEqual({
+      key: '/api/events/failures?hours=168&outcome=retried', data: { n: 2 },
+    })
+    expect(findNearestCached('/api/events/failures?', k => k.includes('rejected'))?.data).toEqual({ n: 1 })
+    expect(findNearestCached('/api/v1/identity')).toBeUndefined()
+  })
+})

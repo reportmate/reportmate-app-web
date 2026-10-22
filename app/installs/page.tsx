@@ -21,6 +21,114 @@ import { RefreshErrorBanner } from '@/src/components/ui/RefreshErrorBanner'
 // The filters payload (~17 MB) is kept parsed in memory for the tab, so a
 // return visit seeds from it instantly. Never stringified, never retried.
 const INSTALLS_FILTERS_URL = '/api/v1/installs/filters'
+// Helper function to classify item status
+const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
+  const status = (item.currentStatus || item.status || '').toLowerCase()
+  
+  // Check for errors first
+  if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
+    return 'error'
+  }
+  // Check for warnings
+  if (status.includes('warning') || status === 'needs-attention') {
+    return 'warning'
+  }
+  // Check for pending removals (separate from other pending)
+  if (status.includes('will-be-removed') || status.includes('removal-requested')) {
+    return 'removed'
+  }
+  // Check for other pending statuses
+  if (status.includes('will-be-installed') || status.includes('update-available') || 
+      status.includes('update_available') || status.includes('pending') || status.includes('scheduled') || 
+      status === 'managed-update-available') {
+    return 'pending'
+  }
+  // Everything else is installed
+  return 'installed'
+}
+
+/**
+ * One Config Report row per device with Munki or Cimian data. Pure, so a
+ * background refresh of the devices can rebuild the report without resetting
+ * the page.
+ */
+function buildConfigReport(devices: any[]): any[] {
+  return devices.map((device: any) => {
+    const cimianConfig = device.modules?.installs?.cimian
+    const munkiConfig = device.modules?.installs?.munki
+    
+    // Prefer Cimian over Munki
+    const config = cimianConfig || munkiConfig
+    const isCimian = !!cimianConfig
+    
+    // Use pre-computed item counts from API (falls back to counting items if available)
+    const counts = config?.itemCounts
+    let installedCount = 0
+    let pendingCount = 0
+    let errorCount = 0
+    let warningCount = 0
+    let removedCount = 0
+    let totalPackages = 0
+    
+    if (counts) {
+      // Use server-side pre-computed counts
+      installedCount = counts.installed || 0
+      pendingCount = counts.pending || 0
+      errorCount = counts.error || 0
+      warningCount = counts.warning || 0
+      removedCount = counts.removed || 0
+      totalPackages = counts.total || 0
+    } else if (config?.items) {
+      // Fallback: count from items array (legacy responses)
+      const items = config.items || []
+      totalPackages = items.length
+      items.forEach((item: any) => {
+        const classification = classifyItemStatus(item)
+        switch (classification) {
+          case 'installed': installedCount++; break
+          case 'pending': pendingCount++; break
+          case 'error': errorCount++; break
+          case 'warning': warningCount++; break
+          case 'removed': removedCount++; break
+        }
+      })
+    }
+    
+    // Get most recent session
+    const sessions = config?.sessions || []
+    const latestSession = sessions.length > 0 ? sessions[0] : null
+    
+    return {
+      deviceId: device.deviceId,
+      serialNumber: device.serialNumber,
+      deviceName: device.modules?.inventory?.deviceName || device.serialNumber,
+      assetTag: device.modules?.inventory?.assetTag || '',
+      usage: device.modules?.inventory?.usage || 'Unknown',
+      catalog: device.modules?.inventory?.catalog || 'Unknown',
+      room: device.modules?.inventory?.location || 'Unknown',
+      location: device.modules?.inventory?.location || 'Unknown',
+      fleet: device.modules?.inventory?.fleet || 'Unknown',
+      // Platform detection: use device.platform first, then derive from configType (Cimian=Windows, Munki=macOS)
+      platform: device.platform || (isCimian ? 'Windows' : munkiConfig ? 'macOS' : 'Unknown'),
+      lastSeen: device.lastSeen,
+      inventoryState: device.inventoryState ?? null,
+      // Config data - Cimian has config sub-object, Munki has fields at root
+      configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
+      clientIdentifier: cimianConfig?.config?.ClientIdentifier || munkiConfig?.clientIdentifier || 'N/A',
+      softwareRepoUrl: cimianConfig?.config?.SoftwareRepoURL || munkiConfig?.softwareRepoURL || 'N/A',
+      version: config?.version || 'N/A',
+      lastSessionStatus: latestSession?.status || 'N/A',
+      totalPackagesManaged: totalPackages,
+      // Item counts by status
+      installedCount,
+      pendingCount,
+      errorCount,
+      warningCount,
+      removedCount
+    }
+  }).filter(d => d.configType !== 'None')
+}
+
 const cachedFilters = () => peekCached<any>(INSTALLS_FILTERS_URL)
 
 // Force dynamic rendering
@@ -627,32 +735,6 @@ function InstallsPageContent() {
            !arraysEqual(selectedPlatforms, lastAppliedFilters.platforms)
   }, [selectedInstalls, selectedUsages, selectedCatalogs, selectedRooms, selectedFleets, selectedAreas, selectedPlatforms, lastAppliedFilters, installs.length])
   
-  // Helper function to classify item status
-  const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
-    const status = (item.currentStatus || item.status || '').toLowerCase()
-    
-    // Check for errors first
-    if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
-      return 'error'
-    }
-    // Check for warnings
-    if (status.includes('warning') || status === 'needs-attention') {
-      return 'warning'
-    }
-    // Check for pending removals (separate from other pending)
-    if (status.includes('will-be-removed') || status.includes('removal-requested')) {
-      return 'removed'
-    }
-    // Check for other pending statuses
-    if (status.includes('will-be-installed') || status.includes('update-available') || 
-        status.includes('update_available') || status.includes('pending') || status.includes('scheduled') || 
-        status === 'managed-update-available') {
-      return 'pending'
-    }
-    // Everything else is installed
-    return 'installed'
-  }
-
   // Config Report handler - now the default view
   const handleConfigReport = useCallback(async () => {
     if (platformFilteredDevices.length === 0) return // Guard against empty devices
@@ -663,81 +745,7 @@ function InstallsPageContent() {
       setFiltersExpanded(false)
       setSearchQuery('')
       
-      // Process devices to extract config data with item counts
-      const configData = platformFilteredDevices.map(device => {
-        const cimianConfig = device.modules?.installs?.cimian
-        const munkiConfig = device.modules?.installs?.munki
-        
-        // Prefer Cimian over Munki
-        const config = cimianConfig || munkiConfig
-        const isCimian = !!cimianConfig
-        
-        // Use pre-computed item counts from API (falls back to counting items if available)
-        const counts = config?.itemCounts
-        let installedCount = 0
-        let pendingCount = 0
-        let errorCount = 0
-        let warningCount = 0
-        let removedCount = 0
-        let totalPackages = 0
-        
-        if (counts) {
-          // Use server-side pre-computed counts
-          installedCount = counts.installed || 0
-          pendingCount = counts.pending || 0
-          errorCount = counts.error || 0
-          warningCount = counts.warning || 0
-          removedCount = counts.removed || 0
-          totalPackages = counts.total || 0
-        } else if (config?.items) {
-          // Fallback: count from items array (legacy responses)
-          const items = config.items || []
-          totalPackages = items.length
-          items.forEach((item: any) => {
-            const classification = classifyItemStatus(item)
-            switch (classification) {
-              case 'installed': installedCount++; break
-              case 'pending': pendingCount++; break
-              case 'error': errorCount++; break
-              case 'warning': warningCount++; break
-              case 'removed': removedCount++; break
-            }
-          })
-        }
-        
-        // Get most recent session
-        const sessions = config?.sessions || []
-        const latestSession = sessions.length > 0 ? sessions[0] : null
-        
-        return {
-          deviceId: device.deviceId,
-          serialNumber: device.serialNumber,
-          deviceName: device.modules?.inventory?.deviceName || device.serialNumber,
-          assetTag: device.modules?.inventory?.assetTag || '',
-          usage: device.modules?.inventory?.usage || 'Unknown',
-          catalog: device.modules?.inventory?.catalog || 'Unknown',
-          room: device.modules?.inventory?.location || 'Unknown',
-          location: device.modules?.inventory?.location || 'Unknown',
-          fleet: device.modules?.inventory?.fleet || 'Unknown',
-          // Platform detection: use device.platform first, then derive from configType (Cimian=Windows, Munki=macOS)
-          platform: device.platform || (isCimian ? 'Windows' : munkiConfig ? 'macOS' : 'Unknown'),
-          lastSeen: device.lastSeen,
-          inventoryState: device.inventoryState ?? null,
-          // Config data - Cimian has config sub-object, Munki has fields at root
-          configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
-          clientIdentifier: cimianConfig?.config?.ClientIdentifier || munkiConfig?.clientIdentifier || 'N/A',
-          softwareRepoUrl: cimianConfig?.config?.SoftwareRepoURL || munkiConfig?.softwareRepoURL || 'N/A',
-          version: config?.version || 'N/A',
-          lastSessionStatus: latestSession?.status || 'N/A',
-          totalPackagesManaged: totalPackages,
-          // Item counts by status
-          installedCount,
-          pendingCount,
-          errorCount,
-          warningCount,
-          removedCount
-        }
-      }).filter(d => d.configType !== 'None')
+      const configData = buildConfigReport(platformFilteredDevices)
       
       setConfigReportData(configData)
       setIsConfigReport(true)
@@ -1047,6 +1055,14 @@ function InstallsPageContent() {
       return () => clearTimeout(timeoutId)
     }
   }, [platformFilteredDevices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter, handleConfigReport])
+
+  // A background refresh of the devices rebuilds the Config Report in place,
+  // without the reset handleConfigReport does (search, filters, loading state).
+  useEffect(() => {
+    if (!isConfigReport || platformFilteredDevices.length === 0) return
+    setConfigReportData(buildConfigReport(platformFilteredDevices))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformFilteredDevices])
 
   // Re-generate config report when platform filter changes
   useEffect(() => {

@@ -24,6 +24,22 @@ export function peekCached<T>(key: string): T | undefined {
   return store.get(key)?.data as T | undefined;
 }
 
+/**
+ * The most recently stored entry whose key starts with `prefix` and passes
+ * `accept`, for showing the nearest cached answer while an exact one loads.
+ */
+export function findNearestCached<T>(
+  prefix: string,
+  accept: (key: string) => boolean = () => true,
+): { key: string; data: T } | undefined {
+  let best: { key: string; entry: Entry } | undefined;
+  for (const [key, entry] of store) {
+    if (!key.startsWith(prefix) || !accept(key)) continue;
+    if (!best || entry.at > best.entry.at) best = { key, entry };
+  }
+  return best ? { key: best.key, data: best.entry.data as T } : undefined;
+}
+
 /** When `key` was last stored (epoch ms), or 0. */
 export function cachedAt(key: string): number {
   return store.get(key)?.at ?? 0;
