@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState } from "react";
 import { SKELETON_LIMIT_MS } from "../../data-cache";
+import { barWidth, compactHours, countOf, fmtBytes, fmtCount, fmtNumber, fmtPercent, fmtPercentOf, fmtPlural, MISSING } from "../../dashboard/format";
 import { DIRECTORY_SERVICE_COLORS } from "../../dashboard/reportRules";
 import Link from "next/link";
 import {
@@ -78,8 +79,7 @@ function slot<K extends InsightCardKey>(
   };
 }
 
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${n} ${n === 1 ? one : many}`;
+const plural = fmtPlural;
 
 // MARK: - Layout
 
@@ -285,8 +285,8 @@ function GapRow({
   total: number;
   link: string;
 }) {
-  const pct = total === 0 ? 0 : count / total;
-  const tone: Tone = count === 0 ? "green" : pct >= 0.3 ? "red" : pct >= 0.1 ? "orange" : "yellow";
+  const pct = barWidth(count, total) / 100;
+  const tone: Tone = countOf(count) === null ? "gray" : count === 0 ? "green" : pct >= 0.3 ? "red" : pct >= 0.1 ? "orange" : "yellow";
   return (
     <Link href={link} className={`block py-0.5 ${ROW_LINK}`}>
       <div className="flex items-center gap-2 text-sm">
@@ -294,12 +294,12 @@ function GapRow({
           {label}
         </span>
         <span
-          className={`font-medium tabular-nums ${count === 0 ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
+          className={`font-medium tabular-nums ${!countOf(count) ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
         >
-          {count}
+          {fmtCount(count)}
         </span>
         <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums w-16 text-right">
-          of {total}
+          of {fmtCount(total)}
         </span>
       </div>
       <div className="mt-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
@@ -329,9 +329,9 @@ function StatChip({
       className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors"
     >
       <span
-        className={`text-sm font-semibold tabular-nums ${value === 0 ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
+        className={`text-sm font-semibold tabular-nums ${!countOf(value) ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
       >
-        {value}
+        {fmtCount(value)}
       </span>
       <span className="text-xs text-gray-600 dark:text-gray-400">{label}</span>
     </Link>
@@ -350,7 +350,7 @@ function BigStat({
   tone: Tone;
   link: string;
 }) {
-  const zero = value === 0;
+  const zero = typeof value === "number" ? !countOf(value) : value === MISSING;
   return (
     <Link
       href={link}
@@ -359,7 +359,7 @@ function BigStat({
       <div
         className={`text-2xl font-semibold tabular-nums ${zero ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
       >
-        {value}
+        {typeof value === "number" ? fmtCount(value) : value}
       </div>
       <div className="text-xs leading-snug text-gray-600 dark:text-gray-400">
         {label}
@@ -385,7 +385,7 @@ function BarList({
   color: string;
   labelWidth?: string;
 }) {
-  const max = Math.max(1, ...items.map((i) => i.count));
+  const max = Math.max(1, ...items.map((i) => countOf(i.count) ?? 0));
   return (
     <ul className="space-y-1">
       {items.map((b) => (
@@ -404,13 +404,13 @@ function BarList({
               <span
                 className="block h-full rounded-full"
                 style={{
-                  width: `${(b.count / max) * 100}%`,
+                  width: `${barWidth(b.count, max)}%`,
                   backgroundColor: color,
                 }}
               />
             </span>
             <span className="min-w-12 shrink-0 whitespace-nowrap text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">
-              {b.detail ?? b.count}
+              {b.detail ?? fmtCount(b.count)}
             </span>
           </Link>
         </li>
@@ -427,7 +427,7 @@ interface DonutSlice {
 }
 
 function Donut({ data, center }: { data: DonutSlice[]; center?: string }) {
-  const total = data.reduce((s, d) => s + d.count, 0);
+  const total = data.reduce((s, d) => s + (countOf(d.count) ?? 0), 0);
   const r = 38,
     c = 2 * Math.PI * r;
   let offset = 0;
@@ -445,7 +445,7 @@ function Donut({ data, center }: { data: DonutSlice[]; center?: string }) {
           />
           {total > 0 &&
             data.map((d) => {
-              const len = (d.count / total) * c;
+              const len = (barWidth(d.count, total) / 100) * c;
               const el = (
                 <circle
                   key={d.label}
@@ -484,10 +484,10 @@ function Donut({ data, center }: { data: DonutSlice[]; center?: string }) {
                 {d.label}
               </span>
               <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                {d.count}
+                {fmtCount(d.count)}
               </span>
               <span className="text-xs text-gray-400 tabular-nums w-9 text-right">
-                {total ? `${Math.round((d.count / total) * 100)}%` : ""}
+                {fmtPercentOf(d.count, total)}
               </span>
             </Link>
           </li>
@@ -634,9 +634,9 @@ function HeroStat({
       className="flex-1 min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
     >
       <div
-        className={`text-6xl font-bold leading-none tabular-nums tracking-tight ${value === 0 ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
+        className={`text-6xl font-bold leading-none tabular-nums tracking-tight ${!countOf(value) ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
       >
-        {value}
+        {fmtCount(value)}
       </div>
       <div className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
         {label}
@@ -683,7 +683,7 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
                 {agents.map((a) => (
                   <tr key={a.agent} className="border-t border-gray-100 dark:border-gray-700/60">
                     <td className="py-1 text-gray-900 dark:text-gray-100">
-                      {a.name} <span className="text-xs text-gray-400">{a.devices}</span>
+                      {a.name} <span className="text-xs text-gray-400">{fmtCount(a.devices)}</span>
                     </td>
                     {[
                       { c: a.withErrors.count, l: a.withErrors.link, t: "red" as Tone, title: "devices with errors" },
@@ -694,10 +694,10 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
                       <td key={i} className="py-1 text-right">
                         <Link
                           href={linkHref(cell.l)}
-                          title={`${cell.c} ${cell.title}`}
-                          className={`tabular-nums font-medium hover:underline ${cell.c ? TONES[cell.t].text : "text-gray-400 dark:text-gray-500"}`}
+                          title={`${fmtCount(cell.c)} ${cell.title}`}
+                          className={`tabular-nums font-medium hover:underline ${countOf(cell.c) ? TONES[cell.t].text : "text-gray-400 dark:text-gray-500"}`}
                         >
-                          {cell.c}
+                          {fmtCount(cell.c)}
                         </Link>
                       </td>
                     ))}
@@ -810,7 +810,7 @@ function UpdateDebt({ ctx }: { ctx: InsightContext }) {
       {d && (
         <>
           <Donut
-            center={`${d.pctOnLatest}%`}
+            center={fmtPercent(d.pctOnLatest)}
             data={[
               { label: "On latest patch", count: d.onLatest, color: TONES.green.hex, link: "/system" },
               { label: "Behind", count: d.behind.count, color: TONES.orange.hex, link: linkHref(d.behind.link) },
@@ -997,20 +997,20 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
                   </Link>
                   <Link
                     href={linkHref(t.link)}
-                    title={`${t.devicesWithErrors} of ${t.devices} devices with errors`}
+                    title={`${fmtCount(t.devicesWithErrors)} of ${fmtCount(t.devices)} devices with errors`}
                     className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithErrors ? TONES.red.text : "text-gray-400 dark:text-gray-500"}`}
                   >
-                    {t.devicesWithErrors}
+                    {fmtCount(t.devicesWithErrors)}
                   </Link>
                   <Link
                     href={linkHref(t.warningsLink)}
-                    title={`${t.devicesWithWarnings} of ${t.devices} devices with warnings`}
+                    title={`${fmtCount(t.devicesWithWarnings)} of ${fmtCount(t.devices)} devices with warnings`}
                     className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithWarnings ? TONES.yellow.text : "text-gray-400 dark:text-gray-500"}`}
                   >
-                    {t.devicesWithWarnings}
+                    {fmtCount(t.devicesWithWarnings)}
                   </Link>
                   <span className="w-14 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400" title="Error lines">
-                    {t.errorLines}
+                    {fmtCount(t.errorLines)}
                   </span>
                 </li>
               ))}
@@ -1048,8 +1048,7 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
 
 // MARK: - Storage
 
-const gb = (bytes: number) =>
-  bytes >= 1e12 ? `${(bytes / 1e12).toFixed(1)} TB` : `${Math.round(bytes / 1e9)} GB`;
+const gb = fmtBytes;
 
 function Storage({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "storage");
@@ -1067,7 +1066,7 @@ function Storage({ ctx }: { ctx: InsightContext }) {
       {d && (
         <>
           <Donut
-            center={String(d.devices)}
+            center={fmtCount(d.devices)}
             data={d.freeSpace.map((b, i) => ({
               label: b.label,
               count: b.count,
@@ -1096,8 +1095,8 @@ function Storage({ ctx }: { ctx: InsightContext }) {
                 items={d.fullest.map((f) => ({
                   key: f.serialNumber,
                   name: f.name,
-                  detail: `${f.freePct}% free · ${gb(f.freeBytes)} of ${gb(f.totalBytes)}`,
-                  urgent: f.freePct < 5,
+                  detail: `${fmtNumber(f.freePct)}% free · ${gb(f.freeBytes)} of ${gb(f.totalBytes)}`,
+                  urgent: (countOf(f.freePct) ?? 100) < 5,
                   link: linkHref(f.link),
                 }))}
               />
@@ -1133,7 +1132,7 @@ function DirectoryServices({ ctx }: { ctx: InsightContext }) {
       {d && (
         <>
           <Donut
-            center={String(d.devices)}
+            center={fmtCount(d.devices)}
             data={d.segments.map((s) => ({
               label: s.label,
               count: s.count,
@@ -1156,7 +1155,7 @@ function DirectoryServices({ ctx }: { ctx: InsightContext }) {
                         <span className="flex-1 truncate text-gray-600 dark:text-gray-300">
                           {s.label}: {c.label}
                         </span>
-                        <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">{c.count}</span>
+                        <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">{fmtCount(c.count)}</span>
                       </Link>
                     </li>
                   )),
@@ -1222,14 +1221,7 @@ function ChipRow({
 /** App Usage's columns: name (the rest) | 60px bar | hours | devices. */
 const APP_USAGE_ROW = "grid grid-cols-[minmax(0,1fr)_60px_3.75rem_3.5rem] items-center gap-2";
 
-/** Hours in a narrow column: 950 h, 12.4k h, 328k h, 1.2M h. */
-export function compactHours(h: number): string {
-  const n = Math.max(0, h);
-  if (n < 1000) return `${Math.round(n)} h`;
-  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k h`;
-  if (n < 999_500) return `${Math.round(n / 1000)}k h`;
-  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M h`;
-}
+export { compactHours };
 
 /**
  * The ten most-used apps, with Usage and Catalog chips that filter the card
@@ -1294,7 +1286,7 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
                 <span className="text-right">Devices</span>
               </li>
               {d.apps.map((a) => {
-                const max = Math.max(1, ...d.apps.map((x) => x.totalHours));
+                const max = Math.max(1, ...d.apps.map((x) => countOf(x.totalHours) ?? 0));
                 return (
                   <li key={a.name}>
                     <Link
@@ -1303,16 +1295,16 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
                     >
                       <span className="truncate text-gray-900 dark:text-gray-100" title={a.name}>{a.name}</span>
                       <span className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-                        <span className="block h-full rounded-full" style={{ width: `${(a.totalHours / max) * 100}%`, backgroundColor: TONES.teal.hex }} />
+                        <span className="block h-full rounded-full" style={{ width: `${barWidth(a.totalHours, max)}%`, backgroundColor: TONES.teal.hex }} />
                       </span>
                       <span
                         className="text-right tabular-nums font-medium text-gray-900 dark:text-gray-100"
-                        title={`${Math.round(a.totalHours).toLocaleString("en-US")} hours`}
+                        title={`${fmtCount(a.totalHours)} hours`}
                       >
                         {hours(a.totalHours)}
                       </span>
-                      <span className="text-right tabular-nums text-gray-500 dark:text-gray-400" title={`${a.devices} devices`}>
-                        {a.devices.toLocaleString("en-US")}
+                      <span className="text-right tabular-nums text-gray-500 dark:text-gray-400" title={`${fmtCount(a.devices)} devices`}>
+                        {fmtCount(a.devices)}
                       </span>
                     </Link>
                   </li>
@@ -1347,7 +1339,7 @@ function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
           <BigStat value={d.weakSignal.count} label="weak Wi-Fi signal" tone="orange" link={linkHref(d.weakSignal.link)} />
           <BigStat
             value={d.poorQuality.count}
-            label={`poor quality, of ${d.poorQuality.measured} measured`}
+            label={`poor quality, of ${fmtCount(d.poorQuality.measured)} measured`}
             tone="red"
             link={linkHref(withDefaultParams(d.poorQuality.link, "/network", { quality: "poor" }))}
           />

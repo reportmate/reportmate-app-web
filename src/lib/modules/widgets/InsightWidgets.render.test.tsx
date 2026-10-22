@@ -227,3 +227,19 @@ describe('compactHours', () => {
     expect(compactHours(1_240_000)).toBe('1.2M h')
   })
 })
+
+describe('cards with bad numbers', () => {
+  it('render a dash, never NaN or Infinity', () => {
+    const cards = JSON.parse(JSON.stringify(doc.cards))
+    cards.rebootDebt.uptime30dPlus.count = NaN
+    cards.rebootDebt.uptimeBuckets[0].count = Infinity
+    cards.storage.fullest[0].freePct = -3
+    cards.storage.devices = 'many'
+    cards.updateDebt.pctOnLatest = NaN
+    cards.installHealth.withErrors.count = -1
+    render(<Dashboard c={ctx({ data: { ...doc, cards } })} />)
+    const text = document.body.textContent || ''
+    expect(text).not.toMatch(/NaN|Infinity/)
+    expect(screen.getAllByText('—').length).toBeGreaterThan(3)
+  })
+})
