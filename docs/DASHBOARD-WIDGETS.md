@@ -249,6 +249,42 @@ Card changes:
 - **OS Currency → Update Debt.** It takes over the "with pending updates" and "with deferred updates" counts and links (`/system?pending=…`, `/system?deferred=1`). Server key `updateDebt`; keep `osCurrency` as an alias for one release.
 - **Reboot & Update Debt → Reboot Debt.** Uptime only: the 30+ days and 2–4 weeks hero figures plus the uptime buckets. The pending and deferred chips move to Update Debt. Server key `rebootDebt` stays.
 
+## Revision 6: Rod, 2026-10-22 afternoon
+
+### Rename
+- **Reboot Debt → "Uptime Overview"**, same content (uptime only). Server key `rebootDebt` stays.
+
+### New card: User Accounts (column 2, directly under Directory Services)
+Account-focused, built from the Identity report's own data and rules (its Authentication donut and Administrator Accounts widget):
+- **Authentication** donut, Modern vs Standard, using the identity report's rule. Each segment links to `/identity?auth=modern|standard`, the identity report's own param.
+- **Administrator accounts**: the top 5 admin account names by device count (`admin`, `macadmins`, `winadmins`, `Intune`, …). Each links to `/identity?admin=<name>`.
+- **Devices with extra local admins** (more than the expected managed admin accounts, using the identity report's rule), linking to `/identity?admins=extra`.
+- The **extra local admins** chip moves here from Directory Services. Directory Services keeps shared and assigned.
+- Server key: `userAccounts`. It follows the global platform toggle.
+
+### Fleet Management Tools report (new, all apps)
+Today `/management` is the MDM enrollment report only. Nothing shows the management tools' logs across the fleet. Build it:
+- Route `/management/logs`, linked from the `/management` page header as a second view: "Enrollment | Tools Logs".
+- Per tool: devices with errors and with warnings, lines, last seen, and trend over the window (24h / 7d selector). Excludes the MDM agent (same rule as the card).
+- Common messages: normalised, with tool, devices, lines and last seen. Clicking one lists the devices that logged it.
+- Devices table: device, tool, errors, warnings, last at. Each row opens `/device/<serial>?tab=management&tool=<tool>&level=error`.
+- Filters (URL params): `tool`, `level=error|warning`, `hours=24|168`, `message=<normalised id>`, `platform`. Rows are sortable, with CSV export like the other reports.
+- The Management Tools Logs card's links (tool rows, messages, header) point here, not to `/devices?tool=`.
+- Server: extend the existing level-summary SQL. Use a fleet endpoint such as `/api/v1/management/logs/fleet?hours=&tool=&level=&message=&platform=`, plus the devices-by-tool and devices-by-message lists. Cache it like the cards.
+
+### Deep links: full audit
+Every clickable or countable thing on the dashboard in all three apps must deep-link to its filtered destination:
+- every insight card item and header
+- Fleet Status legend rows and the centre count
+- the Installs per-agent rows
+- New Clients rows, to the device
+- Recent Events rows (to the device or event) and their filter
+- Platform Distribution rows and chips
+- OS version bars
+
+Fix every dead or unfiltered link, and every target page that ignores its params. Each app reports its audit table: item → link → verified.
+- **Management Tools Logs icon:** replace the red warning triangle with the Management report's own icon, the shield, in the Management yellow. Use exactly the glyph and colour the nav and the /management report use in each app. The /management/logs report uses it too.
+
 ## Web notes (2026-10-22)
 
 - The web app reads the endpoint through `app/api/v1/dashboard/insights/route.ts` and renders
@@ -341,3 +377,17 @@ Card changes:
   - A truncated name shows in full as a tooltip, and the exact hours show on hover.
 - New Clients sizes to its rows, up to 600px. No card in columns 1–3 has a fixed height; only
   Recent Events keeps one, for its scrolling feed.
+- Card numbers go through `src/lib/dashboard/format.ts`. NaN, Infinity, negative values and
+  non-numbers render as "—"; bars draw at 0.
+- Revision 6 on web:
+  - Uptime Overview (key `rebootDebt`).
+  - User Accounts (key `userAccounts`) sits under Directory Services. The API card hasn't
+    shipped, so the client reads an assumed shape: `{total|devices, authentication[] (or
+    auth / auth.segments) {key, label, count, link?}, admins[] (or adminAccounts / topAdmins)
+    {name, devices, link?}, extraAdmins}`. Missing links are built as `/identity?auth=<key>`
+    and `/identity?admin=<name>`.
+  - Any card answering 404 says "Not available on this server yet."
+  - `/identity` reads `auth=modern|legacy|standard` and `admin=<account>`.
+  - Management Tools Logs uses the Management shield in yellow. Its header, tool rows and
+    messages link to `/management/logs?tool=&level=[&platform=][&message=<normalised text>]`.
+
