@@ -7,7 +7,7 @@ import { NOT_DEPLOYED, ToolLogsReport } from './ToolLogsReport'
 let mockSearch = new URLSearchParams()
 const mockReplace = jest.fn()
 jest.mock('next/navigation', () => ({
-  usePathname: () => '/management/logs',
+  usePathname: () => '/management',
   useRouter: () => ({ replace: mockReplace }),
   useSearchParams: () => mockSearch,
 }))
@@ -17,7 +17,7 @@ const json = (status: number, body: unknown) =>
 
 const setUrl = (qs: string) => {
   mockSearch = new URLSearchParams(qs)
-  window.history.replaceState(null, '', qs ? `/management/logs?${qs}` : '/management/logs')
+  window.history.replaceState(null, '', qs ? `/management?${qs}` : '/management')
 }
 
 beforeEach(() => {
@@ -35,7 +35,7 @@ describe('ToolLogsReport', () => {
     expect(screen.getByTestId('tool-logs-skeleton')).toBeTruthy()
     await screen.findByText('Sample Mac 1')
     expect(global.fetch).toHaveBeenCalledWith('/api/v1/management/logs/fleet?hours=24', expect.anything())
-    expect(screen.getByRole('heading', { name: 'Management Tools Logs' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Management Tools Logs' }).getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('button', { name: 'Munki' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Cimian' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'MDM' })).toBeNull()
@@ -60,14 +60,14 @@ describe('ToolLogsReport', () => {
     expect(screen.getByText('Message: Failed to download catalog production')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'Devices that logged this message' })).toBeTruthy()
     // hours=24 is the default, so writing the URL back drops it.
-    await waitFor(() => expect(lastReplace()).toBe('/management/logs?platform=macOS&tool=installs&level=error&message=a1b2c3d4e5f6'))
+    await waitFor(() => expect(lastReplace()).toBe('/management?platform=macOS&tool=installs&level=error&message=a1b2c3d4e5f6'))
   })
 
   it('turns a message given as text into its id', async () => {
     setUrl('tool=installs&message=Failed%20to%20download%20catalog%20production')
     render(<ToolLogsReport />)
     await screen.findByText('Sample Mac 1')
-    await waitFor(() => expect(lastReplace()).toBe('/management/logs?tool=installs&message=a1b2c3d4e5f6'))
+    await waitFor(() => expect(lastReplace()).toBe('/management?tool=installs&message=a1b2c3d4e5f6'))
     await waitFor(() => expect(global.fetch).toHaveBeenLastCalledWith('/api/v1/management/logs/fleet?hours=24&tool=installs&message=a1b2c3d4e5f6', expect.anything()))
   })
 
@@ -96,10 +96,10 @@ describe('ToolLogsReport', () => {
     expect(screen.queryByText('Sample PC 2')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove filter Errors only' }))
-    await waitFor(() => expect(lastReplace()).toBe('/management/logs?platform=mac&tool=installs&hours=168'))
+    await waitFor(() => expect(lastReplace()).toBe('/management?platform=mac&tool=installs&hours=168'))
 
     fireEvent.click(screen.getByRole('button', { name: /Clear all/ }))
-    await waitFor(() => expect(lastReplace()).toBe('/management/logs?platform=mac'))
+    await waitFor(() => expect(lastReplace()).toBe('/management?platform=mac'))
     expect(screen.queryByText('Filters Active')).toBeNull()
   })
 
@@ -108,7 +108,7 @@ describe('ToolLogsReport', () => {
     const narrowed = { ...fixture, devices: fixture.devices.filter(d => d.serialNumber === 'SAMPLE-WIN-0001') }
     ;(global.fetch as jest.Mock).mockImplementation((url: string) => json(200, url.includes('message=') ? narrowed : fixture))
     fireEvent.click(await screen.findByRole('button', { name: /Package hash mismatch for Firefox/ }))
-    await waitFor(() => expect(lastReplace()).toBe('/management/logs?tool=installs&message=0f9e8d7c6b5a'))
+    await waitFor(() => expect(lastReplace()).toBe('/management?tool=installs&message=0f9e8d7c6b5a'))
     expect(global.fetch).toHaveBeenLastCalledWith('/api/v1/management/logs/fleet?hours=24&tool=installs&message=0f9e8d7c6b5a', expect.anything())
     expect(screen.getByRole('heading', { name: 'Devices that logged this message' })).toBeTruthy()
     expect(screen.getByText('Message: Package hash mismatch for Firefox')).toBeTruthy()

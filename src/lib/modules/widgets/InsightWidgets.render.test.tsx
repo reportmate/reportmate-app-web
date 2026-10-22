@@ -273,14 +273,14 @@ describe('revision 6', () => {
     expect(screen.getByText('Not available on this server yet.')).toBeTruthy()
   })
 
-  it('points Management Tools Logs at the Fleet Management Tools report', () => {
+  it("points Management Tools Logs at the Management report's Logs tab", () => {
     render(<ManagementToolLogs ctx={ctx({ data: doc })} />)
     expect(hrefs()).toEqual(expect.arrayContaining([
-      '/management/logs',
-      '/management/logs?hours=24&tool=installs&level=error&platform=macOS',
-      '/management/logs?hours=24&tool=installs&level=warning&platform=Windows',
-      '/management/logs?hours=24&tool=reports&level=error',
-      '/management/logs?hours=24&tool=installs&level=error&message=msg000000000',
+      '/management?tab=logs',
+      '/management?tab=logs&hours=24&tool=installs&level=error&platform=macOS',
+      '/management?tab=logs&hours=24&tool=installs&level=warning&platform=Windows',
+      '/management?tab=logs&hours=24&tool=reports&level=error',
+      '/management?tab=logs&hours=24&tool=installs&level=error&message=msg000000000',
     ]))
     expect(hrefs().some(h => h?.startsWith('/devices?tool='))).toBe(false)
   })
@@ -291,7 +291,7 @@ describe('Management Tools Logs links before API #163', () => {
     const cards = JSON.parse(JSON.stringify(doc.cards))
     for (const t of cards.managementToolLogs.tools) t.link = { path: '/devices', params: { tool: t.tool, level: 'error' } }
     render(<ManagementToolLogs ctx={ctx({ data: { ...doc, cards } })} />)
-    expect(hrefs()).toContain('/management/logs?tool=reports&level=error')
+    expect(hrefs()).toContain('/management?tab=logs&tool=reports&level=error')
   })
 })
 

@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Fleet Management Tools Logs report, /management/logs
+ * Fleet Management Tools Logs report, the Logs tab of /management (?tab=logs)
  * (docs/DASHBOARD-WIDGETS.md, revision 6): per tool, common messages and
  * devices with error and warning lines over a 24-hour or 7-day window. Every
  * filter lives in the URL (URL_STATE_CONVENTIONS.md); `platform` belongs to
@@ -394,7 +394,6 @@ export function ToolLogsReport() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
                   <ManagementShieldIcon />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</h2>
                   <ManagementViewSwitch current="logs" />
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">

@@ -17,6 +17,7 @@ import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { ManagementShieldIcon, ManagementViewSwitch } from "@/src/components/management/ManagementViewSwitch"
 import { csvCell } from "@/src/lib/csv"
+import { ToolLogsReport } from "@/src/components/management/ToolLogsReport"
 
 const MANAGEMENT_URL = '/api/v1/management'
 
@@ -914,7 +915,6 @@ function ManagementPageContent() {
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <ManagementShieldIcon />
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management Service</h2>
                   <ManagementViewSwitch current="enrollment" />
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -1384,10 +1384,16 @@ function ManagementPageContent() {
   )
 }
 
+/** `tab=logs` is the Logs tab (the Fleet Management Tools report); otherwise Enrollment. */
+function ManagementTabs() {
+  const searchParams = useSearchParams()
+  return searchParams.get('tab') === 'logs' ? <ToolLogsReport /> : <ManagementPageContent />
+}
+
 export default function ManagementPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
-      <ManagementPageContent />
+      <ManagementTabs />
     </Suspense>
   )
 }

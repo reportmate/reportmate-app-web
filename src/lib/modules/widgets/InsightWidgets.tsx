@@ -1023,15 +1023,15 @@ export function groupToolErrors(errors: ManagementToolErrorsCard["topErrors"]): 
 }
 
 /**
- * The Fleet Management Tools report (/management/logs) filtered to a tool,
+ * The Management report's Logs tab (/management?tab=logs) filtered to a tool,
  * level and optionally one normalised message. The card links there rather
  * than to the server's /devices?tool= links (revision 6).
  */
 export function toolLogsHref(tool: string, level: "error" | "warning", platform?: string | null, message?: string): string {
-  const params = new URLSearchParams({ tool, level });
+  const params = new URLSearchParams({ tab: "logs", tool, level });
   if (platform === "macOS" || platform === "Windows") params.set("platform", platform);
   if (message) params.set("message", message);
-  return `/management/logs?${params.toString()}`;
+  return `/management?${params.toString()}`;
 }
 
 /**
@@ -1039,7 +1039,10 @@ export function toolLogsHref(tool: string, level: "error" | "warning", platform?
  * otherwise the report filtered to the tool and level.
  */
 function logsLink(link: InsightLink | undefined, tool: string, level: "error" | "warning", platform?: string | null): string {
-  return link?.path === "/management/logs" ? linkHref(link) : toolLogsHref(tool, level, platform);
+  // The API links /management/logs; the Logs tab is /management?tab=logs
+  return link?.path === "/management/logs"
+    ? linkHref({ path: "/management", params: { tab: "logs", ...link.params } })
+    : toolLogsHref(tool, level, platform);
 }
 
 /** The MDM agent's own logs (log root `mdm`) are left out; the card is about the management tools. */
@@ -1056,7 +1059,7 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
     <InsightCard
       title="Management Tools Logs"
       subtitle={`Errors and warnings in the tools' logs · last ${d?.windowHours ?? 24} h`}
-      link="/management/logs"
+      link="/management?tab=logs"
       tone="yellow"
       icon={<Icon d={ICONS.shield} />}
       card={card}

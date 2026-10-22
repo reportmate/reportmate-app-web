@@ -13,19 +13,25 @@ export function ManagementShieldIcon({ className = "w-5 h-5" }: { className?: st
 }
 
 /**
- * "Enrollment | Tools Logs": the two Management views, /management and
- * /management/logs. The global `platform` parameter carries across.
+ * The Management report's header: the title is itself the switch between its
+ * two tabs, "Device Management Service | Management Tools Logs", at title size.
+ * /management and /management?tab=logs; the global `platform` carries across.
  */
 export function ManagementViewSwitch({ current }: { current: "enrollment" | "logs" }) {
   const searchParams = useSearchParams()
   const platform = searchParams?.get("platform")
-  const withPlatform = (path: string) => (platform ? `${path}?platform=${encodeURIComponent(platform)}` : path)
+  const withPlatform = (query: string) => {
+    const params = new URLSearchParams(query)
+    if (platform) params.set("platform", platform)
+    const qs = params.toString()
+    return qs ? `/management?${qs}` : "/management"
+  }
   const items = [
-    { key: "enrollment", label: "Enrollment", href: withPlatform("/management") },
-    { key: "logs", label: "Tools Logs", href: withPlatform("/management/logs") },
+    { key: "enrollment", label: "Device Management Service", href: withPlatform("") },
+    { key: "logs", label: "Management Tools Logs", href: withPlatform("tab=logs") },
   ] as const
   return (
-    <nav aria-label="Management views" className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-900 text-sm">
+    <nav aria-label="Management tabs" className="inline-flex flex-wrap rounded-lg border border-gray-300 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-900">
       {items.map(item => {
         const active = item.key === current
         return (
@@ -33,10 +39,10 @@ export function ManagementViewSwitch({ current }: { current: "enrollment" | "log
             key={item.key}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`px-3 py-1 rounded-md font-medium transition-colors ${
+            className={`px-3 py-0.5 rounded-md text-lg font-semibold transition-colors ${
               active
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
             }`}
           >
             {item.label}
