@@ -8,6 +8,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { SKELETON_LIMIT_MS } from "../../data-cache";
 import Link from "next/link";
 import {
   type CheckinGapsCard,
@@ -34,7 +35,7 @@ export { useDashboardInsights } from "../../dashboard/insights";
 
 /** What one card has to show: skeleton, error with Retry, or its section. */
 type CardSlot<T> =
-  | { status: "loading" }
+  | { status: "loading"; retry: () => void }
   | { status: "error"; error: string; retry: () => void; retrying: boolean }
   | { status: "ready"; data: T };
 
@@ -48,10 +49,12 @@ function slot<K extends InsightCardKey>(
   ctx: InsightContext,
   key: K,
 ): CardSlot<Exclude<InsightCardData[K], { error: string }>> {
-  const { data, loading, error, refresh } = ctx.insights;
+  const { data, loading, error, refresh, pending } = ctx.insights;
   const section = data?.cards?.[key];
+  // Per-card loading: a card still on its way shows its skeleton
+  if (!section && pending?.has(key)) return { status: "loading", retry: refresh };
   if (!data) {
-    if (loading) return { status: "loading" };
+    if (loading) return { status: "loading", retry: refresh };
     return {
       status: "error",
       error: error || "No answer from the server",
@@ -199,11 +202,7 @@ function InsightCard({
       </Link>
       <div className="p-6">
         {card.status === "loading" ? (
-          <div className="space-y-3 animate-pulse" data-testid="insight-skeleton">
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
-            <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
-          </div>
+          <CardSkeleton retry={card.retry} />
         ) : card.status === "error" ? (
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -222,6 +221,43 @@ function InsightCard({
           children
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The card's skeleton, for at most SKELETON_LIMIT_MS: after that it says the
+ * card is still loading and offers Retry instead of pulsing on indefinitely.
+ */
+function CardSkeleton({ retry }: { retry: () => void }) {
+  const [stalled, setStalled] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const timer = setTimeout(() => setStalled(true), SKELETON_LIMIT_MS);
+    return () => clearTimeout(timer);
+  }, [attempt]);
+  if (stalled)
+    return (
+      <div className="flex items-center justify-between gap-3" data-testid="insight-stalled">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Still loading…</p>
+        <button
+          type="button"
+          onClick={() => {
+            setStalled(false);
+            setAttempt((a) => a + 1);
+            retry();
+          }}
+          className="shrink-0 px-2.5 py-1 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  return (
+    <div className="space-y-3 animate-pulse" data-testid="insight-skeleton">
+      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+      <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
     </div>
   );
 }

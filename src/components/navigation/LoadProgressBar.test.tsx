@@ -37,3 +37,19 @@ describe('LoadProgressBar', () => {
     await act(async () => { resolve(); await p })
   })
 })
+
+describe('LoadProgressBar after 10 seconds', () => {
+  const realFetch = global.fetch
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => { jest.useRealTimers(); global.fetch = realFetch })
+
+  it('says Still loading with Retry when a first load runs past the limit', () => {
+    global.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch
+    render(<LoadProgressBar />)
+    act(() => { void trackedFetch('/slow') })
+    expect(screen.getByText('Loading 0 of 1')).toBeTruthy()
+    act(() => { jest.advanceTimersByTime(10_000) })
+    expect(screen.getByText(/Still loading/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+})

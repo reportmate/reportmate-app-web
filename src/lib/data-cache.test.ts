@@ -70,7 +70,7 @@ describe("data-cache", () => {
           background: true,
         });
       });
-      expect(result.current).toEqual({ total: 2, done: 0, background: false });
+      expect(result.current).toMatchObject({ total: 2, done: 0, background: false });
       expect(global.fetch).toHaveBeenCalledWith("/api/v1/security", {
         credentials: "include",
       });
@@ -100,7 +100,7 @@ describe("data-cache", () => {
           background: true,
         });
       });
-      expect(result.current).toEqual({ total: 1, done: 0, background: true });
+      expect(result.current).toMatchObject({ total: 1, done: 0, background: true });
 
       await act(async () => {
         resolvers[0]({ ok: true } as Response);

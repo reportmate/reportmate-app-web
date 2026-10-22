@@ -39,7 +39,19 @@ export async function GET(request: Request) {
       signal: AbortSignal.timeout(90000),
     })
     if (!response.ok) {
-      throw new Error(`FastAPI error: ${response.status} ${response.statusText}`)
+      // Pass the API's status through (a 404 means the endpoint isn't deployed),
+      // so the cards show the real reason at once instead of a generic 503.
+      let detail = `${response.status} ${response.statusText}`
+      try {
+        const body = await response.json()
+        detail = body?.detail || body?.error || detail
+      } catch {
+        // not JSON
+      }
+      return NextResponse.json({
+        error: response.status === 404 ? 'Dashboard insights endpoint not found' : 'Dashboard insights not available',
+        details: String(detail),
+      }, { status: response.status, headers: NO_STORE })
     }
     const data = await response.json()
     return NextResponse.json(data, {

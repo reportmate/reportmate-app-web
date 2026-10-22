@@ -196,3 +196,13 @@ shows its error state; the rest render.
   - A refresh that fails with data on screen keeps the data and shows `RefreshErrorBanner`
     ("Couldn't refresh · Retry · Last updated …").
   - The web device page already uses the same toolbar as every other page, so it needed no change.
+- Skeleton limit (10 seconds):
+  - A card skeleton turns into "Still loading… · Retry" after 10 seconds.
+  - Every page's first load does the same in the bar under the toolbar.
+  - An error that comes back, including a 404 from an endpoint that isn't deployed, shows at
+    once with Retry. The Next proxies pass the API's status and reason through.
+- Per-card loading is ready behind `NEXT_PUBLIC_INSIGHTS_PER_CARD=true`:
+  - It calls `GET /api/v1/dashboard/insights/{card}` for every card in parallel, through
+    `app/api/v1/dashboard/insights/[card]/route.ts`, and paints each card as it lands.
+  - It accepts the section bare or wrapped as `{card}`, `{data}` or `{cards: {key}}`.
+  - The card keys in `INSIGHT_CARD_KEYS` are placeholders until the API's final keys land.

@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import fixture from '../../dashboard/__fixtures__/insights.json'
 import partial from '../../dashboard/__fixtures__/insights-partial.json'
 import type { InsightsDocument, InsightsState } from '../../dashboard/insights'
@@ -9,7 +9,7 @@ const all = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
 
 const ctx = (insights: Partial<InsightsState>, platformFilter = 'all'): InsightContext => ({
   platformFilter,
-  insights: { data: null, loading: false, error: null, refresh: jest.fn(), ...insights },
+  insights: { data: null, loading: false, error: null, pending: new Set(), refresh: jest.fn(), ...insights },
 })
 
 /** The grid cards plus the two with fixed places (column 1 and the events column). */
@@ -92,5 +92,23 @@ describe('a failed background refresh', () => {
     expect(screen.queryAllByRole('button', { name: 'Retry' })).toHaveLength(0)
     expect(screen.queryAllByTestId('insight-skeleton')).toHaveLength(0)
     expect(screen.getByRole('heading', { name: 'Protection Gaps' })).toBeTruthy()
+  })
+})
+
+describe('the 10-second skeleton limit', () => {
+  beforeEach(() => jest.useFakeTimers())
+  afterEach(() => jest.useRealTimers())
+
+  it('replaces a card skeleton with Still loading and Retry after 10 seconds', () => {
+    const refresh = jest.fn()
+    render(<InsightCards ctx={ctx({ loading: true, refresh })} positions={[0]} />)
+    expect(screen.getByTestId('insight-skeleton')).toBeTruthy()
+    act(() => { jest.advanceTimersByTime(9_999) })
+    expect(screen.queryByTestId('insight-stalled')).toBeNull()
+    act(() => { jest.advanceTimersByTime(1) })
+    expect(screen.getByText('Still loading…')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('insight-skeleton')).toBeTruthy()
   })
 })

@@ -65,20 +65,23 @@ interface Progress {
   done: number;
   /** True when every request in this batch is a background refresh. */
   background: boolean;
+  /** When this batch started (epoch ms), for the 10-second skeleton limit. */
+  startedAt: number;
 }
 
-let progress: Progress = { total: 0, done: 0, background: true };
+let progress: Progress = { total: 0, done: 0, background: true, startedAt: 0 };
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
 function begin(background: boolean) {
   progress =
     progress.done === progress.total
-      ? { total: 1, done: 0, background }
+      ? { total: 1, done: 0, background, startedAt: Date.now() }
       : {
           total: progress.total + 1,
           done: progress.done,
           background: progress.background && background,
+          startedAt: progress.startedAt,
         };
   emit();
 }
@@ -110,13 +113,13 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 const snapshot = () => progress;
-const serverSnapshot = (): Progress => ({
-  total: 0,
-  done: 0,
-  background: true,
-});
+const idle: Progress = { total: 0, done: 0, background: true, startedAt: 0 };
+const serverSnapshot = (): Progress => idle;
 
-/** Requests in flight, as `{total, done, background}`. Idle when done === total. */
+/** Rod's rule: a skeleton never lasts longer than this before saying so. */
+export const SKELETON_LIMIT_MS = 10_000;
+
+/** Requests in flight, as `{total, done, background, startedAt}`. Idle when done === total. */
 export function useLoadProgress(): Progress {
   return useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 }

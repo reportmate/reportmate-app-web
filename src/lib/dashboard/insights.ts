@@ -229,62 +229,186 @@ export function withDefaultParams(
 }
 
 export interface InsightsState {
+  /** Every card received so far (from the cache, the document or per-card calls). */
   data: InsightsDocument | null;
   loading: boolean;
   /** The last request's failure; the last good document stays in `data`. */
   error: string | null;
+  /** Cards whose own request is still in flight (per-card loading only). */
+  pending: ReadonlySet<InsightCardKey>;
   refresh: () => void;
 }
 
+/** The card keys, in spec order. The API's final per-card keys replace these. */
+export const INSIGHT_CARD_KEYS: InsightCardKey[] = [
+  "rebootDebt",
+  "protectionGaps",
+  "unmanagedDevices",
+  "hardwareAtRisk",
+  "installHealth",
+  "checkinGaps",
+  "osCurrency",
+  "softwareRisk",
+  "expiringCertificates",
+  "localAdminExposure",
+  "unusedSoftware",
+  "connectivityProblems",
+];
+
 /**
- * One request for every card, re-sent every five minutes and whenever the
- * platform toggle changes. A failed refresh keeps the last good answer for
- * that platform on screen.
+ * Per-card loading: `GET /api/v1/dashboard/insights/{card}`, every card in
+ * parallel so they paint as they land. Off until the API ships those routes;
+ * set NEXT_PUBLIC_INSIGHTS_PER_CARD=true to switch.
  */
-export function useDashboardInsights(platform: string): InsightsState {
+export const INSIGHTS_PER_CARD =
+  process.env.NEXT_PUBLIC_INSIGHTS_PER_CARD === "true";
+
+const cardUrl = (key: string, scope: string) =>
+  `/api/v1/dashboard/insights/${encodeURIComponent(key)}?platform=${encodeURIComponent(scope)}`;
+
+/** A failed response as a short reason: the body's `error` when it has one. */
+async function failureText(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    const text = body?.error || body?.detail || body?.message;
+    if (typeof text === "string" && text) return `${text} (HTTP ${res.status})`;
+  } catch {
+    // not JSON
+  }
+  return `HTTP ${res.status}`;
+}
+
+/**
+ * A per-card answer: the section itself, or wrapped as `{card}`, `{data}` or
+ * `{cards: {key: …}}`, whichever the API settles on.
+ */
+export function unwrapCard(key: string, body: any): unknown {
+  if (body && typeof body === "object") {
+    if (body.cards && typeof body.cards === "object" && key in body.cards)
+      return body.cards[key];
+    if (body.card && typeof body.card === "object") return body.card;
+    if (body.data && typeof body.data === "object" && !Array.isArray(body.data))
+      return body.data;
+  }
+  return body;
+}
+
+const emptyDocument = (scope: string): InsightsDocument => ({
+  generatedAt: new Date().toISOString(),
+  platform: scope,
+  includeArchived: false,
+  cards: {},
+});
+
+/**
+ * The insight cards for one platform: one document request, or one request
+ * per card in parallel (INSIGHTS_PER_CARD). Re-sent every five minutes and
+ * when the platform toggle changes. The last answer for the platform shows
+ * at once on return; a failed refresh keeps it on screen.
+ */
+export function useDashboardInsights(
+  platform: string,
+  options: { perCard?: boolean } = {},
+): InsightsState {
+  const perCard = options.perCard ?? INSIGHTS_PER_CARD;
   const scope =
     platform === "macOS" || platform === "Windows" ? platform : "all";
-  // The last answer for this platform shows instantly when the dashboard is
-  // opened again; the request below refreshes it in the background.
+  const cached = useCallback(
+    () => peekCached<InsightsDocument>(insightsUrl(scope)) ?? null,
+    [scope],
+  );
   const [state, setState] = useState<Omit<InsightsState, "refresh">>(() => ({
-    data: peekCached<InsightsDocument>(insightsUrl(scope)) ?? null,
+    data: cached(),
     loading: true,
     error: null,
+    pending: new Set(),
   }));
   const latest = useRef(0);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
+    const hadCache = peekCached(insightsUrl(scope)) !== undefined;
     setState((s) => ({
       ...s,
       loading: true,
-      data:
-        s.data && s.data.platform === scope
-          ? s.data
-          : (peekCached<InsightsDocument>(insightsUrl(scope)) ?? null),
+      data: s.data && s.data.platform === scope ? s.data : cached(),
+      pending: perCard ? new Set(INSIGHT_CARD_KEYS) : new Set(),
     }));
-    try {
-      const res = await trackedFetch(
-        insightsUrl(scope),
-        { cache: "no-store", credentials: "include" },
-        { background: peekCached(insightsUrl(scope)) !== undefined },
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as InsightsDocument;
-      if (!json || typeof json.cards !== "object")
-        throw new Error("Unexpected response");
-      rememberCached(insightsUrl(scope), json);
-      if (id === latest.current)
-        setState({ data: json, loading: false, error: null });
-    } catch (err) {
-      if (id === latest.current)
-        setState((s) => ({
-          data: s.data && s.data.platform === scope ? s.data : null,
-          loading: false,
-          error: err instanceof Error ? err.message : "Failed to load",
-        }));
+
+    if (!perCard) {
+      try {
+        const res = await trackedFetch(
+          insightsUrl(scope),
+          { cache: "no-store", credentials: "include" },
+          { background: hadCache },
+        );
+        if (!res.ok) throw new Error(await failureText(res));
+        const json = (await res.json()) as InsightsDocument;
+        if (!json || typeof json.cards !== "object")
+          throw new Error("Unexpected response");
+        rememberCached(insightsUrl(scope), json);
+        if (id === latest.current)
+          setState({ data: json, loading: false, error: null, pending: new Set() });
+      } catch (err) {
+        if (id === latest.current)
+          setState((s) => ({
+            data: s.data && s.data.platform === scope ? s.data : null,
+            loading: false,
+            error: err instanceof Error ? err.message : "Failed to load",
+            pending: new Set(),
+          }));
+      }
+      return;
     }
-  }, [scope]);
+
+    // Per card: each lands on its own and the cached document is updated as it does.
+    let failures = 0;
+    let lastError: string | null = null;
+    await Promise.all(
+      INSIGHT_CARD_KEYS.map(async (key) => {
+        let section: unknown;
+        try {
+          const res = await trackedFetch(
+            cardUrl(key, scope),
+            { cache: "no-store", credentials: "include" },
+            { background: hadCache },
+          );
+          if (!res.ok) throw new Error(await failureText(res));
+          section = unwrapCard(key, await res.json());
+          const doc = peekCached<InsightsDocument>(insightsUrl(scope)) ?? emptyDocument(scope);
+          rememberCached(insightsUrl(scope), {
+            ...doc,
+            generatedAt: new Date().toISOString(),
+            cards: { ...doc.cards, [key]: section },
+          });
+        } catch (err) {
+          failures++;
+          lastError = err instanceof Error ? err.message : "Failed to load";
+          // A card already on screen keeps its last answer; a new one shows the error.
+          const prior = peekCached<InsightsDocument>(insightsUrl(scope))?.cards?.[key];
+          section = prior && !isCardError(prior) ? prior : { error: lastError };
+        }
+        if (id !== latest.current) return;
+        setState((s) => {
+          const base = s.data && s.data.platform === scope ? s.data : emptyDocument(scope);
+          const pending = new Set(s.pending);
+          pending.delete(key);
+          return {
+            ...s,
+            data: { ...base, cards: { ...base.cards, [key]: section } } as InsightsDocument,
+            pending,
+          };
+        });
+      }),
+    );
+    if (id === latest.current)
+      setState((s) => ({
+        ...s,
+        loading: false,
+        pending: new Set(),
+        error: failures ? lastError : null,
+      }));
+  }, [scope, perCard, cached]);
 
   useEffect(() => {
     load();
