@@ -310,3 +310,20 @@ describe('zero-count breakdown rows', () => {
     expect(screen.getByText('< 1 day')).toBeTruthy()
   })
 })
+
+describe('revision 7 card icons', () => {
+  const iconOf = (title: string) => {
+    const card = screen.getByRole('heading', { name: title }).closest('.rounded-xl') as HTMLElement
+    const svg = card.querySelector('svg') as SVGElement
+    return { path: svg.querySelector('path')?.getAttribute('d'), colour: svg.getAttribute('class') }
+  }
+  it("use each target module's glyph and colour, and Directory Services differs from User Accounts", () => {
+    render(<Dashboard c={ctx({ data: doc })} />)
+    expect(iconOf('Installs').colour).toContain('text-emerald-600')
+    expect(iconOf('Storage').colour).toContain('text-orange-600')
+    expect(iconOf('User Accounts').colour).toContain('text-indigo-600')
+    expect(iconOf('Directory Services').path).not.toBe(iconOf('User Accounts').path)
+    expect(iconOf('Uptime Overview').path).not.toBe(iconOf('Update Debt').path)
+    expect(iconOf('Management Tools Logs').colour).toContain('text-yellow-600')
+  })
+})

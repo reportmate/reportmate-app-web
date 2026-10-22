@@ -285,6 +285,21 @@ Every clickable or countable thing on the dashboard in all three apps must deep-
 Fix every dead or unfiltered link, and every target page that ignores its params. Each app reports its audit table: item → link → verified.
 - **Management Tools Logs icon:** replace the red warning triangle with the Management report's own icon, the shield, in the Management yellow. Use exactly the glyph and colour the nav and the /management report use in each app. The /management/logs report uses it too.
 
+## Revision 7: Rod, icons and navigation
+
+### Navigation is not ours to change
+The top nav and the Reports menu are fixed. Never add, remove, rename or reorder an entry without Rod's explicit approval. Management Tools Logs is a **tab inside /management** (Enrollment | Tools Logs) and NOT a Reports menu entry; remove any such entry in every app. The route can stay `/management/logs` or become `/management?tab=logs`, but the nav highlights Management.
+
+### Card icons and colours match their module
+- **Installs:** the Installs module's download icon, in the module's **green**.
+- **App Usage:** the Applications module's icon, in the module's **blue**.
+- **Storage:** an **orange** hard-disk icon (a drive glyph, not a chip).
+- **Uptime Overview:** a new icon (a clock or power glyph), not Update Debt's circular arrows.
+- **Directory Services vs User Accounts:** they must differ.
+  - User Accounts uses the Identity module's people icon in Identity purple.
+  - Directory Services uses a directory or building glyph (building, server stack or tree) in the same purple family.
+- Every other card follows the same rule: its target module's nav glyph and colour, unless two cards would collide.
+
 ## Web notes (2026-10-22)
 
 - The web app reads the endpoint through `app/api/v1/dashboard/insights/route.ts` and renders
@@ -407,3 +422,17 @@ Fix every dead or unfiltered link, and every target page that ignores its params
   reasons, top failing items, lagging versions, items behind, and low storage by platform.
   Fixed buckets where a zero is information stay: uptime, storage free space and capacity,
   and protection gaps.
+- Revision 7 on web:
+  - The Reports menu is byte-identical to main; the Management Tools Logs entry is removed.
+  - The /management header is the tab switch, "Device Management Service | Management Tools
+    Logs", at title size with the shield. The Logs tab is `/management?tab=logs`, and
+    `/management/logs?…` redirects there with its filters.
+  - Card icons:
+    - Installs: emerald download.
+    - App Usage: blue Applications glyph.
+    - Storage: orange drive.
+    - Uptime Overview: purple clock (System).
+    - Directory Services: purple building.
+    - User Accounts: indigo Identity glyph, as in the Reports menu.
+    - Management Tools Logs: yellow shield.
+
