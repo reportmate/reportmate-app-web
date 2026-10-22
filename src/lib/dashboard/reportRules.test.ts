@@ -215,3 +215,42 @@ describe("management tool logs", () => {
     expect(toolProductLabel("mdm", "macOS")).toBe("MDM");
   });
 });
+
+describe('Directory Services (/identity?directory=)', () => {
+  const {
+    directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService,
+  } = require('./reportRules') as typeof import('./reportRules')
+
+  it('reads every key the API links with, and the labels', () => {
+    expect(directoryServiceFromParam('cloud')).toBe('Cloud Joined')
+    expect(directoryServiceFromParam('domain')).toBe('Domain Joined')
+    expect(directoryServiceFromParam('trusted')).toBe('Trusted')
+    expect(directoryServiceFromParam('unconfirmed')).toBe('Unconfirmed')
+    expect(directoryServiceFromParam('broken')).toBe('Broken')
+    expect(directoryServiceFromParam('standard')).toBe('Standard')
+    expect(directoryServiceFromParam('unjoined')).toBe('Unjoined')
+    expect(directoryServiceFromParam('Cloud Joined')).toBe('Cloud Joined')
+    expect(directoryServiceFromParam('psso')).toBeNull()
+    expect(directoryServiceFromParam(null)).toBeNull()
+  })
+
+  it('writes the key back', () => {
+    expect(directoryServiceToParam('Domain Joined')).toBe('domain')
+    expect(directoryServiceToParam('Unconfirmed')).toBe('unconfirmed')
+    expect(directoryServiceToParam(null)).toBeNull()
+  })
+
+  it('classifies rows as the Identity report does', () => {
+    const domain = (trustStatus: string | null) => ({ enrollmentType: 'Domain Joined', trustStatus })
+    expect(matchesDirectoryService({ enrollmentType: 'Cloud Joined' }, 'Cloud Joined')).toBe(true)
+    expect(matchesDirectoryService({ enrollmentType: 'Standard' }, 'Cloud Joined')).toBe(false)
+    expect(matchesDirectoryService(domain('Healthy'), 'Domain Joined')).toBe(true)
+    expect(matchesDirectoryService(domain('Healthy'), 'Trusted')).toBe(true)
+    expect(matchesDirectoryService(domain('Broken'), 'Broken')).toBe(true)
+    expect(matchesDirectoryService(domain('Broken'), 'Trusted')).toBe(false)
+    expect(matchesDirectoryService(domain(null), 'Unconfirmed')).toBe(true)
+    expect(matchesDirectoryService(domain('Unknown'), 'Unconfirmed')).toBe(true)
+    expect(matchesDirectoryService({ enrollmentType: 'Cloud Joined', trustStatus: null }, 'Unconfirmed')).toBe(false)
+    expect(matchesDirectoryService({ enrollmentType: 'Unjoined' }, 'Unjoined')).toBe(true)
+  })
+})

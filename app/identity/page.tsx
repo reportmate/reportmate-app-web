@@ -11,7 +11,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
-import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam } from "@/src/lib/dashboard/reportRules"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
@@ -377,21 +377,9 @@ function IdentityPageContent() {
       if (!dir || !macDirectoryFilter.includes(dir)) return false
     }
     
-    // Widget click: directory filter
-    if (directoryFilter) {
-      // Trust sub-statuses for domain joined / hybrid
-      if (directoryFilter === 'Broken') {
-        if (d.enrollmentType !== 'Domain Joined' || d.trustStatus !== 'Broken') return false
-      } else if (directoryFilter === 'Unconfirmed') {
-        if (d.enrollmentType !== 'Domain Joined') return false
-        if (d.trustStatus === 'Healthy' || d.trustStatus === 'Broken') return false
-      } else if (directoryFilter === 'Trusted') {
-        if (d.enrollmentType !== 'Domain Joined' || d.trustStatus !== 'Healthy') return false
-      } else {
-        if (d.enrollmentType !== directoryFilter) return false
-      }
-    }
-    
+    // Widget click or `directory=`: a Directory Services class (reportRules)
+    if (directoryFilter && !matchesDirectoryService(d, directoryFilter)) return false
+
     // Widget click: admin account filter
     if (adminAccountFilter) {
       if (!matchesAdminFilter(d, adminAccountFilter)) return false

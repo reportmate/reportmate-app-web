@@ -865,3 +865,18 @@ export function directoryServiceToParam(label: string | null): string | null {
   const hit = Object.entries(DIRECTORY_SERVICE_LABELS).find(([, l]) => l === label);
   return hit ? hit[0] : null;
 }
+
+/**
+ * Whether an identity row is in a Directory Services class, by the Identity
+ * report's own rules: the route's `enrollmentType` (Cloud Joined, Domain
+ * Joined, Standard, Unjoined), and for domain-joined devices `trustStatus`
+ * (Healthy = Trusted, Broken = Broken, anything else = Unconfirmed).
+ */
+export function matchesDirectoryService(r: Row, label: string): boolean {
+  const domain = r.enrollmentType === "Domain Joined";
+  if (label === DIRECTORY_SERVICE_LABELS.broken) return domain && r.trustStatus === "Broken";
+  if (label === DIRECTORY_SERVICE_LABELS.trusted) return domain && r.trustStatus === "Healthy";
+  if (label === DIRECTORY_SERVICE_LABELS.unconfirmed)
+    return domain && r.trustStatus !== "Healthy" && r.trustStatus !== "Broken";
+  return r.enrollmentType === label;
+}

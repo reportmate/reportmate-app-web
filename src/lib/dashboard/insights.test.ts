@@ -113,3 +113,16 @@ describe('the API fixture links', () => {
     }
   })
 })
+
+describe('normalizeCard (directoryServices)', () => {
+  it('reads the API count named total as devices and keeps the trust children', () => {
+    const { normalizeCard } = require('./insights') as typeof import('./insights')
+    const card = normalizeCard('directoryServices', {
+      total: 916,
+      segments: [{ key: 'domain', label: 'Domain Joined', count: 54, link: { path: '/identity', params: { directory: 'domain' } },
+        children: [{ key: 'broken', label: 'Broken', count: 4, link: { path: '/identity', params: { directory: 'broken', platform: 'Windows' } } }] }],
+    }, 'Windows')
+    expect(card.devices).toBe(916)
+    expect(card.segments[0].children[0].link.params).toEqual({ directory: 'broken', platform: 'Windows' })
+  })
+})

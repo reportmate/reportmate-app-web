@@ -311,6 +311,8 @@ export function normalizeCard(key: string, section: any, scope: string): any {
     }
     return {
       ...view,
+      // The API names the count `total` on this card
+      devices: view.devices ?? view.total ?? 0,
       segments: (Array.isArray(view.segments) ? view.segments : []).map((seg: any) => ({
         ...seg,
         children: seg.children ?? seg.breakdown ?? seg.trust ?? undefined,
