@@ -5,6 +5,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Page width. A laptop screen keeps the 80rem column; a desktop screen
+   (>= 1680px, the `desktop` breakpoint) widens it so pages can add columns. */
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-7xl;
+  }
+  @media (min-width: 1680px) {
+    .page-container {
+      max-width: min(96vw, 2400px);
+    }
+  }
+}
+
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;

@@ -264,7 +264,7 @@ const OSVersionWidgetSkeleton: React.FC<{ osType: 'macOS' | 'Windows' }> = ({ os
 export const DashboardSkeleton: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
         {/* Two-column layout: Column A (30%) + Column B (70%) */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
           {/* Column A (30% width) - Status Widget + Error/Warning Stats + New Clients Table */}

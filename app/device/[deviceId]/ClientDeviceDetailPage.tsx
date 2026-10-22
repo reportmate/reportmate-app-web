@@ -778,7 +778,7 @@ export default function ClientDeviceDetailPage() {
       <div className="sticky top-16 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         {/* Header Bar */}
         <div className="border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
@@ -1088,7 +1088,7 @@ export default function ClientDeviceDetailPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             {/* Desktop tabs - Icon + Hover Labels (always collapsed, expands on hover) */}
             <nav ref={tabsContainerRef} className="hidden sm:flex -mb-px space-x-2 md:space-x-4 lg:space-x-6 xl:space-x-8 justify-start items-center">
@@ -1167,7 +1167,7 @@ export default function ClientDeviceDetailPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
         {/* Info Tab - Always loaded fast */}
         {activeTab === 'info' && (
           <InfoTab device={deviceInfo} />

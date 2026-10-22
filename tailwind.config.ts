@@ -5,6 +5,12 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      // Desktop mode: past a laptop-width screen, pages widen and widgets
+      // move into extra columns instead of stacking below.
+      screens: {
+        desktop: '1680px',
+        wide: '2200px',
+      },
       colors: {
         primary: {
           50: '#eff6ff',
