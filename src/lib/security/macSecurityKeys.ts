@@ -9,6 +9,8 @@
  * - `firewall.allowSignedEnabled` or `firewall.allowSignedSoftware`
  */
 
+import { cveHref, safeHttpUrl } from './safeUrl'
+
 type Obj = Record<string, any>
 
 const first = (o: Obj | null | undefined, keys: string[]): any => {
@@ -51,7 +53,7 @@ export function unpatchedCves(security: Obj | null | undefined): MacCve[] {
     .map((entry: any): MacCve | null => {
       if (typeof entry === 'string') {
         const id = entry.trim()
-        return id ? { cve: id, osVersion: releaseOs, patchedVersion: '', activelyExploited: false, url: '' } : null
+        return id ? { cve: id, osVersion: releaseOs, patchedVersion: '', activelyExploited: false, url: cveHref(id) } : null
       }
       if (!entry || typeof entry !== 'object') return null
       return {
@@ -59,7 +61,8 @@ export function unpatchedCves(security: Obj | null | undefined): MacCve[] {
         osVersion: String(entry.os_version ?? entry.osVersion ?? releaseOs),
         patchedVersion: String(entry.patched_version ?? entry.patchedVersion ?? ''),
         activelyExploited: truthy(entry.actively_exploited ?? entry.activelyExploited),
-        url: String(entry.url ?? ''),
+        // Device-reported: only an http(s) URL survives, and a CVE ID builds its own link
+        url: cveHref(entry.cve ?? entry.cve_id ?? entry.cveId ?? entry.id, entry.url),
       }
     })
     .filter((c): c is MacCve => c !== null)
@@ -70,3 +73,9 @@ export const firewallStealthMode = (security: Obj | null | undefined): boolean =
 
 export const firewallAllowSigned = (security: Obj | null | undefined): boolean =>
   truthy(first(security?.firewall, ['allowSignedEnabled', 'allowSignedSoftware', 'allow_signed_enabled', 'allow_signed_software']))
+
+/** The release's security notes link, only when it is an http(s) URL. */
+export function securityInfoUrl(security: Obj | null | undefined): string {
+  const info = securityReleaseInfo(security)
+  return safeHttpUrl(info.security_info ?? info.securityInfo)
+}

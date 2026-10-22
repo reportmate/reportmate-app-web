@@ -232,7 +232,9 @@ export const isCardError = (card: unknown): card is CardError =>
 
 /** `{path, params}` → `/path?k=v`. Commas stay literal, as the reports write them. */
 export function linkHref(link: InsightLink | undefined | null): string {
-  if (!link?.path) return "/dashboard";
+  // Only an in-app path is followed: never "javascript:", another origin or "//host"
+  const path = link?.path;
+  if (!path || !path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return "/dashboard";
   const query = new URLSearchParams(link.params || {})
     .toString()
     .replace(/%2C/gi, ",");

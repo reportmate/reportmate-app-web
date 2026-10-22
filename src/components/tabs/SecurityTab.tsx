@@ -24,7 +24,8 @@ import { evaluateSecurity } from '../../lib/rules/evaluateSecurity'
 import { getDeviceInventoryContext } from '../../lib/rules/inventoryMapping'
 import type { Severity } from '../../lib/settings/types'
 import { ModuleSlot } from '../modules/ModuleSlot'
-import { firewallAllowSigned, firewallStealthMode, securityReleaseInfo, unpatchedCves as readUnpatchedCves } from '../../lib/security/macSecurityKeys'
+import { firewallAllowSigned, firewallStealthMode, securityInfoUrl, securityReleaseInfo, unpatchedCves as readUnpatchedCves } from '../../lib/security/macSecurityKeys'
+import { cveHref, safeHttpUrl } from '../../lib/security/safeUrl'
 
 interface SecurityTabProps {
   device: any
@@ -1673,7 +1674,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               patchedVersion: cve.kbArticle || cve.kb_article || cve.patchedVersion || '',
               activelyExploited: cve.activelyExploited === true || cve.actively_exploited === true,
               severity: cve.severity || '',
-              url: cveId.startsWith('CVE-') ? `https://msrc.microsoft.com/update-guide/vulnerability/${cveId}` : '',
+              url: cveHref(cveId, cve.url, 'windows'),
               source: 'windows',
               status: (cve.status || 'Unpatched') as 'Patched' | 'Unpatched' | 'Pending',
               installedDate: cve.installedDate || cve.installed_date || '',
@@ -1691,7 +1692,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 patchedVersion: update.kb_article || update.kbArticle || update.update_id || '',
                 activelyExploited: update.actively_exploited === true || update.exploited === true,
                 severity: update.severity || update.msrc_severity || '',
-                url: cveId ? `https://msrc.microsoft.com/update-guide/vulnerability/${cveId}` : '',
+                url: cveHref(cveId, undefined, 'windows'),
                 source: 'windows',
                 status: 'Unpatched'
               })
@@ -1814,9 +1815,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       <span className="font-medium">Days since last:</span> {sofaReleaseInfo.days_since_previous_release || sofaReleaseInfo.daysSincePreviousRelease}
                     </span>
                   )}
-                  {(sofaReleaseInfo.security_info || sofaReleaseInfo.securityInfo) && (
+                  {securityInfoUrl(security) && (
                     <a 
-                      href={sofaReleaseInfo.security_info || sofaReleaseInfo.securityInfo} 
+                      href={securityInfoUrl(security)} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -1851,7 +1852,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                         <td className="px-4 py-3">
                           {cve.url ? (
                             <a 
-                              href={cve.url} 
+                              href={safeHttpUrl(cve.url)} 
                               target="_blank" 
                               rel="noopener noreferrer"
                               className="font-mono text-blue-600 dark:text-blue-400 hover:underline"
