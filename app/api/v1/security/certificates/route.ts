@@ -10,6 +10,10 @@ export async function GET(request: Request) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') || 'all'
     const includeArchived = searchParams.get('includeArchived') === 'true'
+    // Certificate class filter: actionable (API default), system-managed,
+    // trust-store, hidden or all. Forwarded as given; the API validates it.
+    const certClass = searchParams.get('class') || ''
+    const limit = searchParams.get('limit') || ''
     const timestamp = new Date().toISOString()
     
     const apiBaseUrl = process.env.API_BASE_URL
@@ -26,6 +30,8 @@ export async function GET(request: Request) {
       if (search) params.set('search', search)
       if (status) params.set('status', status)
       if (includeArchived) params.set('includeArchived', 'true')
+      if (certClass) params.set('class', certClass)
+      if (limit) params.set('limit', limit)
       
       const url = `${apiBaseUrl}/api/v1/security/certificates?${params.toString()}`
       console.log(`[CERT SEARCH API] ${timestamp} - Fetching from: ${url}`)
