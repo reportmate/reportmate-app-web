@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
+import { safeInternalPath } from "@/src/lib/security/safeUrl"
 
 interface DeviceRow {
   serialNumber: string
@@ -68,7 +69,8 @@ export default function ApplicationUsageByDevicePage() {
   // Back link honors ?from= if supplied (drill-down convention); otherwise
   // returns to the bare Applications page.
   const fromParam = searchParams.get('from')
-  const backHref = fromParam || '/applications'
+  // `from=` comes from the URL: only a same-site path is followed
+  const backHref = safeInternalPath(fromParam, '/applications')
   const backLabel = fromParam ? '← Back to Report' : '← Applications'
 
   const [days, setDays] = useState<number>(parseInt(searchParams.get('days') || '30', 10))

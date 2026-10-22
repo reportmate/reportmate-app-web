@@ -26,6 +26,7 @@ import {
 } from "../../../src/components/tabs"
 import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
 import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
+import { safeHost } from "@/src/lib/security/safeUrl"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
@@ -952,7 +953,8 @@ export default function ClientDeviceDetailPage() {
                           return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
                         }
                         
-                        const ipAddress = getActiveIPAddress()
+                        // Device-reported: only a plain IP address or host name is used in the link
+                        const ipAddress = safeHost(getActiveIPAddress())
                         if (!ipAddress) return null
                         
                         return (
@@ -999,7 +1001,7 @@ export default function ClientDeviceDetailPage() {
                           return null
                         }
                         
-                        const ipAddress = getActiveIPAddress()
+                        const ipAddress = safeHost(getActiveIPAddress())
                         const protocol = getRemoteProtocol()
                         
                         if (!ipAddress || !protocol) return null
