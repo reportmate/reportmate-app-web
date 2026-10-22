@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } from 'react'
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '@/src/lib/time'
@@ -14,6 +14,7 @@ import { getDevicePlatform, usePlatformFilterSafe } from '@/src/providers/Platfo
 import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
+import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS } from '@/src/lib/dashboard/reportRules'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -151,14 +152,24 @@ const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
   },
 }
 
+const URL_STATUS_FILTERS = ['errors', 'warnings', 'pending', 'success'] as const
+const urlStatusFilter = (value: string | null): ItemStatusFilter =>
+  (URL_STATUS_FILTERS as readonly string[]).includes(value || '') ? (value as ItemStatusFilter) : 'all'
+
 function InstallsPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  // Deep-link state read once for the initial render, so the state->URL sync
+  // below starts in agreement with the URL instead of rewriting it.
+  const initialFilter = urlStatusFilter(searchParams.get('filter'))
+  const initialItem = (searchParams.get('item') || '').trim()
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [filtersLoading, setFiltersLoading] = useState(true)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialFilter !== 'all' ? initialItem : '')
   const [filtersExpanded, setFiltersExpanded] = useState(false) // Collapsed by default since Config Report is default view
   const [devices, setDevices] = useState<any[]>([])
   const [, startTransition] = useTransition() // For non-blocking state updates
@@ -193,7 +204,13 @@ function InstallsPageContent() {
   }
   
   // Status filter state - items filter (errors, warnings, pending, successes)
-  const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>('all')
+  const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>(initialFilter)
+  // `item=<name>` without a status filter: devices that manage that item.
+  // With a status filter the item is the selected item, i.e. searchQuery.
+  const [itemFilter, setItemFilter] = useState(initialFilter === 'all' ? initialItem : '')
+  // `stale=1`: devices whose install agent has been silent > SILENT_AGENT_DAYS
+  const [staleOnly, setStaleOnly] = useState(searchParams.get('stale') === '1')
+  const [staleAgents, setStaleAgents] = useState<any[]>([])
   // Device status filter (active, stale, missing)
   const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | DeviceStatusFilterValue>('all')
   // Install status filter (installed, pending, warnings, errors, removed)
@@ -202,7 +219,7 @@ function InstallsPageContent() {
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   // How the errors/warnings drill-down is grouped: one row per device, or one
   // row per distinct message so every message is readable without drilling in
-  const [statusView, setStatusView] = useState<'devices' | 'messages'>('devices')
+  const [statusView, setStatusView] = useState<'devices' | 'messages'>(searchParams.get('view') === 'messages' ? 'messages' : 'devices')
   // Message rows cap their device list; this tracks the ones expanded in place
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
 
@@ -210,8 +227,6 @@ function InstallsPageContent() {
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading && !filtersLoading }
   )
-  const searchParams = useSearchParams()
-  const router = useRouter()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   // Apply global platform filter (?platform=mac or ?platform=win)
@@ -229,6 +244,20 @@ function InstallsPageContent() {
       return isPlatformVisible(platform)
     })
   }, [devices, platformFilter, isPlatformVisible])
+
+  // Serials of the devices the `item` and `stale` deep links keep
+  const itemFilterSerials = useMemo(() => {
+    if (!itemFilter) return null
+    return new Set(platformFilteredDevices
+      .filter((d: any) => hasManagedItem(getDeviceInstallItems(d), itemFilter))
+      .map((d: any) => d.serialNumber))
+  }, [platformFilteredDevices, itemFilter])
+  const staleSerials = useMemo(() => {
+    if (!staleOnly) return null
+    // Platform comes from the device list; staleAgents[].platform is often empty
+    const visible = new Set(platformFilteredDevices.map((d: any) => d.serialNumber))
+    return new Set(staleAgents.filter(isSilentAgent).map((a: any) => a.serialNumber).filter((sn: string) => visible.has(sn)))
+  }, [staleAgents, staleOnly, platformFilteredDevices])
 
   // Filter state
   const [selectedInstalls, setSelectedInstalls] = useState<string[]>([])
@@ -323,6 +352,8 @@ function InstallsPageContent() {
     setSelectedPlatforms([])
     setSearchQuery('')
     setItemsStatusFilter('all')
+    setItemFilter('')
+    setStaleOnly(false)
     setWidgetsExpanded(true)
   }
 
@@ -411,6 +442,7 @@ function InstallsPageContent() {
       const _actualDeviceCount = data.devicesWithData || 0
       
       setFilterOptions(data)
+      setStaleAgents(Array.isArray(data.staleAgents) ? data.staleAgents : [])
       
       // Extract device data from same response (no second API call needed)
       // Use startTransition to make this non-blocking - allows UI to update while processing
@@ -711,6 +743,8 @@ function InstallsPageContent() {
     setLastAppliedFilters({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], areas: [], platforms: [] })
     setSearchQuery('')
     setItemsStatusFilter('all')
+    setItemFilter('')
+    setStaleOnly(false)
     setDeviceStatusFilter('all')
     setInstallStatusFilter('all')
     // Clear selected filters
@@ -741,6 +775,10 @@ function InstallsPageContent() {
   // Filter and sort config report data
   const filteredConfigData = useMemo(() => {
     let filtered = [...configReportData]
+
+    // Deep-link filters: managed item, silent install agent
+    if (itemFilterSerials) filtered = filtered.filter(device => itemFilterSerials.has(device.serialNumber))
+    if (staleSerials) filtered = filtered.filter(device => staleSerials.has(device.serialNumber))
     
     // Apply device status filter (Active/Stale/Missing based on lastSeen)
     if (deviceStatusFilter !== 'all') {
@@ -851,7 +889,7 @@ function InstallsPageContent() {
     })
     
     return filtered
-  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
+  }, [configReportData, itemFilterSerials, staleSerials, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
   
   // Filter installs based on search query AND inventory filters AND device status AND install status
   const filteredInstalls = useMemo(() => {
@@ -998,18 +1036,60 @@ function InstallsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platformFilter])
 
-  // Handle URL filter parameter (from dashboard click-through)
+  // URL is canonical for the drill-down (`filter`, `view`, `item`, `stale`);
+  // defaults are omitted and unrelated params (platform, from) are kept.
+  // Query strings this page wrote itself, so the URL->state effect does not
+  // feed an older write back over newer state (e.g. while typing a search).
+  const ownUrlWritesRef = useRef<Set<string>>(new Set())
+  const currentQuery = searchParams.toString()
+
+  // URL -> state: applies a URL that changed from outside (dashboard
+  // click-through, back/forward). The first render already read it.
+  const lastAppliedQueryRef = useRef(currentQuery)
   useEffect(() => {
-    const filterParam = searchParams.get('filter')
-    if (filterParam === 'errors' || filterParam === 'warnings' || filterParam === 'pending' || filterParam === 'success') {
-      setItemsStatusFilter(filterParam)
-      // Collapse regular filters when viewing status-filtered view
-      setFiltersExpanded(false)
-    } else {
-      setItemsStatusFilter('all')
-    }
+    if (lastAppliedQueryRef.current === currentQuery) return
+    lastAppliedQueryRef.current = currentQuery
+    if (ownUrlWritesRef.current.delete(currentQuery)) return
+    const filterParam = urlStatusFilter(searchParams.get('filter'))
+    const itemParam = (searchParams.get('item') || '').trim()
+    setItemsStatusFilter(filterParam)
+    // Collapse regular filters when viewing status-filtered view
+    if (filterParam !== 'all') setFiltersExpanded(false)
     setStatusView(searchParams.get('view') === 'messages' ? 'messages' : 'devices')
-  }, [searchParams])
+    if (filterParam !== 'all') {
+      setSearchQuery(itemParam)
+      setItemFilter('')
+    } else {
+      setItemFilter(itemParam)
+    }
+    setStaleOnly(searchParams.get('stale') === '1')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuery])
+
+  // Collapse the regular filters when the page opens on a status view
+  useEffect(() => {
+    if (initialFilter !== 'all') setFiltersExpanded(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // state -> URL
+  const urlItem = itemsStatusFilter !== 'all' ? searchQuery.trim() : itemFilter
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const set = (key: string, value: string | null) => {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    set('filter', itemsStatusFilter !== 'all' ? itemsStatusFilter : null)
+    set('view', statusView === 'messages' ? 'messages' : null)
+    set('item', urlItem || null)
+    set('stale', staleOnly ? '1' : null)
+    const next = params.toString()
+    if (next === searchParams.toString()) return
+    ownUrlWritesRef.current.add(next)
+    router.replace(next ? `/installs?${next}` : '/installs', { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsStatusFilter, statusView, urlItem, staleOnly])
 
   const toggleExpandedMessage = useCallback((key: string) => {
     setExpandedMessages(prev => {
@@ -1020,29 +1100,16 @@ function InstallsPageContent() {
     })
   }, [])
 
-  // URL is canonical for the drill-down; defaults are omitted
-  const replaceInstallsUrl = useCallback((mutate: (params: URLSearchParams) => void) => {
-    const params = new URLSearchParams(searchParams.toString())
-    mutate(params)
-    const query = params.toString()
-    router.replace(query ? `/installs?${query}` : '/installs', { scroll: false })
-  }, [router, searchParams])
-
+  // The state -> URL effect above writes `view` and `filter`
   const selectStatusView = useCallback((view: 'devices' | 'messages') => {
     setStatusView(view)
-    replaceInstallsUrl(params => {
-      if (view === 'messages') params.set('view', 'messages')
-      else params.delete('view')
-    })
-  }, [replaceInstallsUrl])
+  }, [])
 
   const selectStatusFilter = useCallback((status: ItemStatusFilter) => {
     setItemsStatusFilter(status)
-    replaceInstallsUrl(params => {
-      if (status === 'all') params.delete('filter')
-      else params.set('filter', status)
-    })
-  }, [replaceInstallsUrl])
+    // A status view selects its item through the search box instead
+    if (status !== 'all') setItemFilter('')
+  }, [])
 
   // Categorize devices by install status (for filtered views)
   const { devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess } = useMemo(() => {
@@ -1506,6 +1573,8 @@ function InstallsPageContent() {
     else if (itemsStatusFilter === 'warnings') filtered = devicesWithWarnings
     else if (itemsStatusFilter === 'pending') filtered = devicesWithPending
     else if (itemsStatusFilter === 'success') filtered = devicesWithSuccess
+
+    if (staleSerials) filtered = filtered.filter((device: any) => staleSerials.has(device.serialNumber))
     
     // Filter by device status (active/stale/missing)
     if (deviceStatusFilter !== 'all') {
@@ -1596,7 +1665,7 @@ function InstallsPageContent() {
     }
     
     return filtered
-  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
+  }, [itemsStatusFilter, staleSerials, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
 
   // Distinct error/warning messages across the drill-down's devices, for the
   // "By message" grouping. Pending items carry no message, so the grouping is
@@ -3497,6 +3566,40 @@ function InstallsPageContent() {
             </div>
           </CollapsibleSection>
           </div>
+          )}
+
+          {/* Deep-link filters (dashboard Install Health card): clearable */}
+          {!filtersLoading && !isGeneratingReport && ((itemFilter && itemsStatusFilter === 'all') || staleOnly) && (
+            <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="font-medium">Filters Active</span>
+                {itemFilter && itemsStatusFilter === 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    Item: {itemFilter} ({itemFilterSerials?.size ?? 0})
+                    <button onClick={() => setItemFilter('')} className="hover:text-yellow-950 dark:hover:text-white" title="Clear item filter" aria-label="Clear item filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+                {staleOnly && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    Install agent silent &gt; {SILENT_AGENT_DAYS} days ({staleSerials?.size ?? 0})
+                    <button onClick={() => setStaleOnly(false)} className="hover:text-yellow-950 dark:hover:text-white" title="Clear silent-agent filter" aria-label="Clear silent-agent filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => { setItemFilter(''); setStaleOnly(false) }}
+                className="px-3 py-1 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Clear Filters
+              </button>
+            </div>
           )}
 
           {/* Search Input - Below Filters, connected to the table */}

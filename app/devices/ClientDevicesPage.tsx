@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState, useMemo, Suspense } from "react"
+import { useEffect, useState, useMemo, useRef, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 import { calculateDeviceStatus, isStored } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
@@ -61,6 +61,13 @@ function DevicesPageContent() {
   const [sortColumn, setSortColumn] = useState<string>('deviceName')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // The query string this page last wrote, so the URL→state effect can tell
+  // its own router.replace apart from an outside navigation.
+  const lastWrittenQuery = useRef<string | null>(null)
+  const hydrated = useRef(false)
+  const skipNextWrite = useRef(false)
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   const { tableContainerRef, effectiveFiltersExpanded } = useScrollCollapse(
@@ -83,34 +90,53 @@ function DevicesPageContent() {
     setSelectedAreas([]); setSelectedLocations([]); setSelectedFleets([])
   }
 
-  // Initialize search query and selections from URL parameters. Each dimension
-  // accepts a comma-separated list so deep links can preselect more than one pill.
+  // URL → state. Runs on mount and whenever the URL changes from outside (a
+  // dashboard deep link, Back). Each dimension accepts a comma-separated list
+  // so deep links can preselect more than one pill; an absent parameter
+  // clears its selection so the page always matches the URL.
   useEffect(() => {
     try {
-      const urlSearch = searchParams.get('search')
-      if (urlSearch) {
-        setSearchQuery(urlSearch)
-      }
-
+      if (hydrated.current && searchParams.toString() === lastWrittenQuery.current) return
       const list = (key: string) =>
         (searchParams.get(key) || '').split(',').map(v => v.trim()).filter(Boolean)
 
-      const status = list('status')
-      if (status.length) setSelectedStatuses(status)
-      const usage = list('usage')
-      if (usage.length) setSelectedUsages(usage)
-      const catalog = list('catalog')
-      if (catalog.length) setSelectedCatalogs(catalog)
-      const area = list('area')
-      if (area.length) setSelectedAreas(area)
-      const location = list('location')
-      if (location.length) setSelectedLocations(location)
-      const fleet = list('fleet')
-      if (fleet.length) setSelectedFleets(fleet)
+      setSearchQuery(searchParams.get('search') || '')
+      setSelectedStatuses(list('status'))
+      setSelectedUsages(list('usage'))
+      setSelectedCatalogs(list('catalog'))
+      setSelectedAreas(list('area'))
+      setSelectedLocations(list('location'))
+      setSelectedFleets(list('fleet'))
+      hydrated.current = true
+      skipNextWrite.current = true
     } catch (e) {
       console.warn('Failed to get search params:', e)
     }
   }, [searchParams])
+
+  // State → URL. Defaults are omitted, unrelated parameters (platform, from)
+  // are kept, and replace rather than push keeps filter toggles out of history.
+  useEffect(() => {
+    if (!hydrated.current) return
+    if (skipNextWrite.current) { skipNextWrite.current = false; return }
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      const put = (key: string, value: string) => (value ? params.set(key, value) : params.delete(key))
+      put('search', searchQuery.trim())
+      put('status', selectedStatuses.join(','))
+      put('usage', selectedUsages.join(','))
+      put('catalog', selectedCatalogs.join(','))
+      put('area', selectedAreas.join(','))
+      put('location', selectedLocations.join(','))
+      put('fleet', selectedFleets.join(','))
+      const next = params.toString().replace(/%2C/gi, ',')
+      if (next === window.location.search.replace(/^\?/, '')) return
+      lastWrittenQuery.current = next
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery, selectedStatuses, selectedUsages, selectedCatalogs, selectedAreas,
+      selectedLocations, selectedFleets, pathname, router])
 
   useEffect(() => {
     const fetchInventory = async () => {

@@ -166,21 +166,44 @@ export interface OSCurrency {
   versionKey: (r: Row) => string;
 }
 
+/** A version (or major) needs this many devices before it sets the bar. */
+export const OS_CURRENCY_MIN_DEVICES = 5;
+
 /**
- * The OS currency rules are relative to the fleet: the latest patch of each
- * macOS major (or Windows build) is the highest version seen, so pass every
- * row the report has, not a filtered subset.
+ * The OS currency rules are relative to the fleet, so pass every row the
+ * report has, not a filtered subset. The latest patch of each macOS major
+ * (or Windows build) is the highest version at least
+ * OS_CURRENCY_MIN_DEVICES devices report, so one beta Mac doesn't put the
+ * fleet behind; when no version of a train reaches that, the highest seen
+ * counts. "Unsupported" is measured from the newest macOS major that many
+ * devices report, with the same fallback.
  */
 export function osCurrency(rows: Row[]): OSCurrency {
-  const latest = new Map<string, number[]>();
-  let newestMac = 0;
+  const levels = new Map<string, Map<string, { level: number[]; count: number }>>();
+  const macMajors = new Map<number, number>();
   for (const r of rows) {
     const t = patchTrain(r);
     if (!t) continue;
-    const prev = latest.get(t.train);
-    if (!prev || compareParts(t.level, prev) > 0) latest.set(t.train, t.level);
-    if (isMac(r)) newestMac = Math.max(newestMac, macOrdinal(t.level[0]));
+    const train = levels.get(t.train) || new Map();
+    const key = t.level.join(".");
+    const entry = train.get(key) || { level: t.level, count: 0 };
+    entry.count++;
+    train.set(key, entry);
+    levels.set(t.train, train);
+    if (isMac(r)) {
+      const o = macOrdinal(t.level[0]);
+      macMajors.set(o, (macMajors.get(o) || 0) + 1);
+    }
   }
+  const latest = new Map<string, number[]>();
+  for (const [train, entries] of levels) {
+    const all = [...entries.values()].sort((x, y) => compareParts(y.level, x.level));
+    const pick = all.find((e) => e.count >= OS_CURRENCY_MIN_DEVICES) || all[0];
+    latest.set(train, pick.level);
+  }
+  const majors = [...macMajors.entries()].sort((x, y) => y[0] - x[0]);
+  const newestMac =
+    (majors.find(([, n]) => n >= OS_CURRENCY_MIN_DEVICES) || majors[0])?.[0] || 0;
   return {
     isBehind: (r) => {
       const t = patchTrain(r);
@@ -447,3 +470,27 @@ export const displayCount = (r: Row): number =>
   Array.isArray(r.displayDevices) ? r.displayDevices.length : 0;
 export const deviceRoom = (r: Row): string =>
   String(r.location || r.room || "").trim();
+
+// MARK: - /installs
+
+/**
+ * `stale=1`: an install agent (Munki or Cimian) silent more than this many
+ * days. The installs/filters payload's own staleAgentThresholdDays is 1; the
+ * dashboard card and the report both use this one instead.
+ */
+export const SILENT_AGENT_DAYS = 7;
+
+/** An entry of the installs/filters `staleAgents[]` past SILENT_AGENT_DAYS. */
+export const isSilentAgent = (a: Row): boolean =>
+  num(a.staleDays) > SILENT_AGENT_DAYS;
+
+/** `item=<name>`: the device manages that item (case-insensitive name match). */
+export const hasManagedItem = (items: Row[], name: string): boolean => {
+  const want = name.trim().toLowerCase();
+  return (
+    !!want &&
+    items.some(
+      (i) => String(i?.itemName || i?.name || "").toLowerCase() === want,
+    )
+  );
+};

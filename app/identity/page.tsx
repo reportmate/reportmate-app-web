@@ -4,13 +4,16 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType } from "@/src/lib/dashboard/reportRules"
+
+const JOIN_TYPES: JoinType[] = ['entra', 'domain', 'hybrid', 'workgroup']
 
 interface IdentityDevice {
   id: string
@@ -134,12 +137,19 @@ function LoadingSkeleton() {
 
 function IdentityPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const [adminFilter, setAdminFilter] = useState('all')
+  // `admins=extra` deep-links to the existing "more than one admin" filter.
+  const [adminFilter, setAdminFilter] = useState(() => searchParams.get('admins') === 'extra' ? 'multiple-admins' : 'all')
+  // `join=entra,hybrid,…`: join type exactly as reportRules.joinType reads it
+  // (the directory donut folds hybrid into Domain Joined; this does not).
+  const [joinFilter, setJoinFilter] = useState<JoinType[]>(() =>
+    paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
@@ -185,8 +195,9 @@ function IdentityPageContent() {
       return next
     })
   }
-  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
+  const hasActiveWidgetFilter = adminFilter !== 'all' || joinFilter.length > 0 || directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
   const clearWidgetFilters = () => {
+    setAdminFilter('all'); setJoinFilter([])
     setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null); setShowAdminsReport(false)
     setSecureTokenFilter(null); setBootstrapTokenFilter(null)
   }
@@ -240,6 +251,52 @@ function IdentityPageContent() {
     fetchIdentity()
   }, [])
 
+  // `usage=shared|assigned` names a usage kind; the Selections filter holds raw
+  // inventory values, so select every value of that kind once the rows are in.
+  // `usages=` carries raw values that have no kind.
+  const [urlHydrated, setUrlHydrated] = useState(false)
+  useEffect(() => {
+    if (loading || urlHydrated) return
+    setUrlHydrated(true)
+    const kinds = paramList(searchParams.get('usage')).map(v => v.toLowerCase())
+    const raw = paramList(searchParams.get('usages'))
+    if (kinds.length === 0 && raw.length === 0) return
+    const values = new Set(raw)
+    for (const d of identityDevices) {
+      const kind = usageKind(d)
+      if (d.usage && kind && kinds.includes(kind)) values.add(d.usage)
+    }
+    if (values.size > 0) setSelectedUsages(Array.from(values).sort())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, urlHydrated, identityDevices])
+
+  // Keep the deep-link filters in the URL. Waits for the usage hydration so
+  // the first write does not drop `usage=` before the rows arrive.
+  useEffect(() => {
+    if (!urlHydrated) return
+    const params = new URLSearchParams(searchParams.toString())
+    const set = (key: string, value: string | null) => {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    set('admins', adminFilter === 'multiple-admins' ? 'extra' : null)
+    set('join', joinFilter.length > 0 ? JOIN_TYPES.filter(j => joinFilter.includes(j)).join(',') : null)
+    const kinds = new Set<string>()
+    const raw: string[] = []
+    for (const u of selectedUsages) {
+      const kind = usageKind({ usage: u })
+      if (kind) kinds.add(kind)
+      else raw.push(u)
+    }
+    set('usage', kinds.size > 0 ? ['shared', 'assigned'].filter(k => kinds.has(k)).join(',') : null)
+    set('usages', raw.length > 0 ? raw.join(',') : null)
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlHydrated, adminFilter, joinFilter, selectedUsages])
+
   // Platform-filtered devices (for widgets — no search/admin filter)
   const platformFilteredDevices = identityDevices.filter(d => {
     if (globalPlatformFilter) {
@@ -265,6 +322,7 @@ function IdentityPageContent() {
     if (adminFilter === 'has-admins' && d.adminUsers === 0) return false
     if (adminFilter === 'no-admins' && d.adminUsers > 0) return false
     if (adminFilter === 'multiple-admins' && d.adminUsers <= 1) return false
+    if (joinFilter.length > 0 && !joinFilter.includes(joinType(d))) return false
     
     // Widget click: directory filter
     if (directoryFilter) {
@@ -573,6 +631,8 @@ function IdentityPageContent() {
                 <span className="font-medium">Filters Active</span>
                 <span className="text-yellow-600 dark:text-yellow-300">
                   {[
+                    adminFilter === 'multiple-admins' ? 'More than one admin' : adminFilter === 'no-admins' ? 'No admin users' : null,
+                    joinFilter.length > 0 ? `Join: ${joinFilter.map(j => JOIN_LABELS[j]).join(', ')}` : null,
                     directoryFilter,
                     authFilter,
                     adminAccountFilter ? `Admin: ${adminAccountFilter}` : null,

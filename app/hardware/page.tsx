@@ -2,9 +2,10 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import { archFamily, isLowMemory, isLowStorage, paramList } from "@/src/lib/dashboard/reportRules"
 import { HardwarePageSkeleton } from "@/src/components/skeleton/HardwarePageSkeleton"
 import { usePlatformFilterSafe, normalizePlatform, getDevicePlatformLabel } from "@/src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
@@ -63,6 +64,12 @@ function HardwarePageContent() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [processorFilter, setProcessorFilter] = useState<string>('all')
+  // Dashboard deep-link filters (?arch=, ?storage=low, ?memory=le8). They use
+  // the dashboard's own rules, so they sit beside the charts' buckets rather
+  // than in them, and show as removable pills under the search row.
+  const [selectedArchFamilies, setSelectedArchFamilies] = useState<string[]>([])
+  const [lowStorageOnly, setLowStorageOnly] = useState(false)
+  const [lowMemoryOnly, setLowMemoryOnly] = useState(false)
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Accordion states
@@ -208,7 +215,9 @@ function HardwarePageContent() {
     selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length +
     selectedGraphics.length + selectedPlatforms.length + selectedChipConfigs.length + selectedStatuses.length +
     selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
-    selectedAreas.length + selectedFleets.length
+    selectedAreas.length + selectedFleets.length +
+    selectedArchFamilies.length + (lowStorageOnly ? 1 : 0) + (lowMemoryOnly ? 1 : 0) +
+    (processorFilter !== 'all' ? 1 : 0)
 
   const clearAllFilters = () => {
     setSelectedModels([])
@@ -226,17 +235,60 @@ function HardwarePageContent() {
     setSelectedLocations([])
     setSelectedAreas([])
     setSelectedFleets([])
+    setSelectedArchFamilies([])
+    setLowStorageOnly(false)
+    setLowMemoryOnly(false)
+    setProcessorFilter('all')
     setSearchQuery('')
   }
   
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const lastWrittenQuery = useRef<string | null>(null)
+  const urlHydrated = useRef(false)
+  const skipNextUrlWrite = useRef(false)
 
+  // URL → state: on mount and when the URL changes from outside (a dashboard
+  // deep link, Back). The page's own writes are recognised and skipped.
   useEffect(() => {
-    const urlSearch = searchParams.get('search')
-    if (urlSearch) setSearchQuery(urlSearch)
-    const urlProcessor = searchParams.get('processor')
-    if (urlProcessor) setProcessorFilter(urlProcessor)
+    if (urlHydrated.current && searchParams.toString() === lastWrittenQuery.current) return
+    setSearchQuery(searchParams.get('search') || '')
+    setProcessorFilter(searchParams.get('processor') || 'all')
+    setSelectedArchFamilies(paramList(searchParams.get('arch')))
+    setLowStorageOnly(searchParams.get('storage') === 'low')
+    setLowMemoryOnly(searchParams.get('memory') === 'le8')
+    // type=laptop|desktop is the Device Type chart's own selection
+    const typeLabels: Record<string, string> = { laptop: 'Laptop', desktop: 'Desktop' }
+    setSelectedDeviceTypes(
+      paramList(searchParams.get('type')).map(t => typeLabels[t.toLowerCase()]).filter(Boolean)
+    )
+    urlHydrated.current = true
+    skipNextUrlWrite.current = true
   }, [searchParams])
+
+  // State → URL: defaults omitted, other parameters (platform, from) kept,
+  // replace rather than push so filter changes stay out of history.
+  useEffect(() => {
+    if (!urlHydrated.current) return
+    if (skipNextUrlWrite.current) { skipNextUrlWrite.current = false; return }
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      const put = (key: string, value: string | null) => (value ? params.set(key, value) : params.delete(key))
+      put('search', searchQuery.trim())
+      put('processor', processorFilter !== 'all' ? processorFilter : null)
+      put('arch', selectedArchFamilies.join(','))
+      put('storage', lowStorageOnly ? 'low' : null)
+      put('memory', lowMemoryOnly ? 'le8' : null)
+      put('type', selectedDeviceTypes.map(t => t.toLowerCase()).join(','))
+      const next = params.toString().replace(/%2C/gi, ',')
+      if (next === window.location.search.replace(/^\?/, '')) return
+      lastWrittenQuery.current = next
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery, processorFilter, selectedArchFamilies, lowStorageOnly, lowMemoryOnly,
+      selectedDeviceTypes, pathname, router])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -363,7 +415,12 @@ function HardwarePageContent() {
       performanceCores,
       efficiencyCores,
       graphicsCores,
-      graphicsMetalSupport
+      graphicsMetalSupport,
+      // Dashboard rules, read from the record as the API sent it (before the
+      // architecture normalisation above), the same object the card counts.
+      archFamily: archFamily(hardwareRecord),
+      lowStorage: isLowStorage(hardwareRecord),
+      lowMemory: isLowMemory(hardwareRecord),
     }
   })
 
@@ -674,6 +731,11 @@ function HardwarePageContent() {
     if (selectedGraphics.length > 0 && !selectedGraphics.includes(getGraphicsName(h))) return false
     if (selectedChipConfigs.length > 0 && !selectedChipConfigs.includes(getChipSku(h))) return false
 
+    // Dashboard deep-link filters
+    if (selectedArchFamilies.length > 0 && !selectedArchFamilies.some(a => a.toLowerCase() === h.archFamily.toLowerCase())) return false
+    if (lowStorageOnly && !h.lowStorage) return false
+    if (lowMemoryOnly && !h.lowMemory) return false
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const processorSearchStr = typeof h.processor === 'string' ? h.processor.toLowerCase() : 
@@ -782,6 +844,20 @@ function HardwarePageContent() {
     try { await navigator.clipboard.writeText(text) } catch { /* fallback */ }
   }
 
+  // Removable pills for the active filters that have no chart selection showing them
+  const deepLinkPills: { key: string; label: string; clear: () => void }[] = [
+    ...selectedArchFamilies.map(a => ({
+      key: `arch-${a}`,
+      label: a,
+      clear: () => setSelectedArchFamilies(prev => prev.filter(x => x !== a)),
+    })),
+    ...(lowStorageOnly ? [{ key: 'storage', label: 'Low storage', clear: () => setLowStorageOnly(false) }] : []),
+    ...(lowMemoryOnly ? [{ key: 'memory', label: '8 GB memory or less', clear: () => setLowMemoryOnly(false) }] : []),
+    ...(processorFilter !== 'all'
+      ? [{ key: 'processor', label: `Processor: ${processorFilter}`, clear: () => setProcessorFilter('all') }]
+      : []),
+  ]
+
   if (loading) return <HardwarePageSkeleton />
 
   return (
@@ -812,6 +888,28 @@ function HardwarePageContent() {
                 </button>
               </div>
             </div>
+            {deepLinkPills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {deepLinkPills.map(pill => (
+                  <span
+                    key={pill.key}
+                    className="inline-flex items-center gap-1 pl-3 pr-1 py-1 text-xs font-medium rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800"
+                  >
+                    {pill.label}
+                    <button
+                      type="button"
+                      onClick={pill.clear}
+                      aria-label={`Remove filter: ${pill.label}`}
+                      className="rounded-full p-0.5 hover:bg-orange-200 dark:hover:bg-orange-800"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Selections accordion (shared component) */}

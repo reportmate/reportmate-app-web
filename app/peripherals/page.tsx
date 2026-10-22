@@ -2,15 +2,16 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
+import { deviceRoom, paramList } from "@/src/lib/dashboard/reportRules"
 
 interface Peripheral {
   id: string
@@ -54,6 +55,10 @@ const PERIPHERAL_TYPES = [
 ] as const
 
 type PeripheralTypeKey = typeof PERIPHERAL_TYPES[number]['key']
+
+// `kind=printers,displays` maps onto the type pills; unknown keys are ignored.
+const typesFromParam = (value: string | null): PeripheralTypeKey[] =>
+  paramList(value).filter((k): k is PeripheralTypeKey => PERIPHERAL_TYPES.some(t => t.key === k))
 
 const countOf = (peripheral: Peripheral, field: string): number => {
   const value = (peripheral as any)[field]
@@ -142,7 +147,8 @@ function PeripheralsPageContent() {
   const [peripherals, setPeripherals] = useState<Peripheral[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // Multi-select peripheral-type pills, replacing the old dropdown
-  const [selectedTypes, setSelectedTypes] = useState<PeripheralTypeKey[]>([])
+  const [selectedTypes, setSelectedTypes] = useState<PeripheralTypeKey[]>(() => typesFromParam(searchParams.get('kind')))
+  const router = useRouter()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
@@ -157,7 +163,9 @@ function PeripheralsPageContent() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  // `room=<room>[,<room>]` is the Selections "Locations" pill, matched with
+  // reportRules' deviceRoom so the dashboard's count is the rows shown here.
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(() => paramList(searchParams.get('room')))
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   const toggleStatus = (s: string) => setSelectedStatuses(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
@@ -169,7 +177,34 @@ function PeripheralsPageContent() {
   const clearAllSelections = () => {
     setSelectedStatuses([]); setSelectedUsages([]); setSelectedCatalogs([])
     setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
+    setSelectedTypes([])
   }
+
+  // URL → state when the query changes from outside (a dashboard deep link
+  // while the page is open); this page's own writes are skipped.
+  const lastWrittenQuery = useRef<string | null>(null)
+  useEffect(() => {
+    if (searchParams.toString() === lastWrittenQuery.current) return
+    setSelectedTypes(typesFromParam(searchParams.get('kind')))
+    setSelectedLocations(paramList(searchParams.get('room')))
+  }, [searchParams])
+
+  // State → URL: defaults omitted, unrelated params (platform, from) kept,
+  // replaced only when something changed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const set = (key: string, values: string[]) => {
+      if (values.length) params.set(key, values.join(','))
+      else params.delete(key)
+    }
+    set('kind', selectedTypes)
+    set('room', selectedLocations)
+    // Commas stay literal so lists read `kind=printers,displays`, as the contract writes them.
+    const next = params.toString().replace(/%2C/gi, ',')
+    if (next === window.location.search.replace(/^\?/, '')) return
+    lastWrittenQuery.current = next
+    router.replace(next ? `${window.location.pathname}?${next}` : window.location.pathname, { scroll: false })
+  }, [selectedTypes, selectedLocations, router])
 
   // Status is derived from lastSeen, the same rule every other report uses
   const statusOf = (peripheral: Peripheral) =>
@@ -250,7 +285,7 @@ function PeripheralsPageContent() {
     if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(peripheral))) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(peripheral.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(peripheral.catalog || '')) return false
-    if (selectedLocations.length > 0 && !selectedLocations.includes(peripheral.location || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(deviceRoom(peripheral))) return false
     if (selectedAreas.length > 0 && !selectedAreas.includes(peripheral.area || peripheral.department || '')) return false
     if (selectedFleets.length > 0 && !selectedFleets.includes(peripheral.fleet || '')) return false
 
@@ -410,11 +445,11 @@ function PeripheralsPageContent() {
               usages: Array.from(new Set(peripherals.map(p => p.usage).filter(Boolean) as string[])).sort(),
               catalogs: Array.from(new Set(peripherals.map(p => p.catalog).filter(Boolean) as string[])).sort(),
               areas: Array.from(new Set(peripherals.map(p => p.area || p.department).filter(Boolean) as string[])).sort(),
-              locations: Array.from(new Set(peripherals.map(p => p.location).filter(Boolean) as string[])).sort(),
+              locations: Array.from(new Set(peripherals.map(p => deviceRoom(p)).filter(Boolean))).sort(),
               fleets: Array.from(new Set(peripherals.map(p => p.fleet).filter(Boolean) as string[])).sort(),
             }
             const locCounts: Record<string, number> = {}
-            peripherals.forEach(p => { if (p.location) locCounts[p.location] = (locCounts[p.location] || 0) + 1 })
+            peripherals.forEach(p => { const room = deviceRoom(p); if (room) locCounts[room] = (locCounts[room] || 0) + 1 })
             return (
               <DeviceFilters
                 filterOptions={sharedFilterOptions}

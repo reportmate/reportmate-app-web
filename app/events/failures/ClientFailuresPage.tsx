@@ -2,8 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { Search, X } from 'lucide-react'
 
@@ -111,17 +112,68 @@ function reasonBadgeClass(failureType: string, outcome: string): string {
     : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
 }
 
+const DEFAULT_HOURS = 168
+const DEFAULT_OUTCOME: Outcome = 'rejected'
+const OUTCOMES: Outcome[] = ['rejected', 'retried', 'accepted']
+
+function parseHours(value: string | null): number {
+  const n = value ? parseInt(value, 10) : NaN
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_HOURS
+}
+
+function parseOutcome(value: string | null): Outcome {
+  return OUTCOMES.includes(value as Outcome) ? (value as Outcome) : DEFAULT_OUTCOME
+}
+
+// `hours`, `outcome` and `reason` live in the URL, so the dashboard's
+// Check-in Gaps card can deep-link to e.g. `?hours=24&reason=<r>`.
 export default function ClientFailuresPage() {
+  return (
+    <Suspense fallback={<div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black" />}>
+      <ClientFailuresPageContent />
+    </Suspense>
+  )
+}
+
+function ClientFailuresPageContent() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [failures, setFailures] = useState<IngestFailure[]>([])
   const [summary, setSummary] = useState<ReasonSummary[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hours, setHours] = useState(168)
-  const [outcome, setOutcome] = useState<Outcome>('rejected')
+  const [hours, setHours] = useState(() => parseHours(searchParams.get('hours')))
+  const [outcome, setOutcome] = useState<Outcome>(() => parseOutcome(searchParams.get('outcome')))
   const [counts, setCounts] = useState<{ rejected: number; retried: number; accepted: number }>({ rejected: 0, retried: 0, accepted: 0 })
-  const [reasonFilter, setReasonFilter] = useState<string | null>(null)
+  const [reasonFilter, setReasonFilter] = useState<string | null>(() => searchParams.get('reason') || null)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Adopt URL changes made from outside (back/forward, a new deep link).
+  const urlHours = parseHours(searchParams.get('hours'))
+  const urlOutcome = parseOutcome(searchParams.get('outcome'))
+  const urlReason = searchParams.get('reason') || null
+  useEffect(() => { setHours(urlHours) }, [urlHours])
+  useEffect(() => { setOutcome(urlOutcome) }, [urlOutcome])
+  useEffect(() => { setReasonFilter(urlReason) }, [urlReason])
+
+  // Write the filters back, omitting defaults and keeping unrelated params.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const set = (key: string, value: string | null) => {
+      if (value === null) params.delete(key)
+      else params.set(key, value)
+    }
+    set('hours', hours === DEFAULT_HOURS ? null : String(hours))
+    set('outcome', outcome === DEFAULT_OUTCOME ? null : outcome)
+    set('reason', reasonFilter)
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hours, outcome, reasonFilter])
 
   const fetchFailures = useCallback(async () => {
     try {
@@ -236,6 +288,9 @@ export default function ClientFailuresPage() {
                 onChange={(e) => setHours(parseInt(e.target.value, 10))}
                 className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
+                {!HOURS_OPTIONS.some(o => o.value === hours) && (
+                  <option value={hours}>Last {hours} hours</option>
+                )}
                 {HOURS_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
