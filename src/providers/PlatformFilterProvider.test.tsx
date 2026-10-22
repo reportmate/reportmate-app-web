@@ -1,6 +1,6 @@
 import React from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
-import { PlatformFilterProvider, usePlatformFilter } from './PlatformFilterProvider'
+import { PlatformFilterProvider, platformFromParam, usePlatformFilter } from './PlatformFilterProvider'
 
 const mockReplace = jest.fn()
 let mockPathname = '/dashboard'
@@ -88,5 +88,33 @@ describe('PlatformFilterProvider URL synchronization', () => {
     expect(screen.getByText('Windows', { selector: 'output' })).toBeTruthy()
     expect(mockReplace).toHaveBeenCalledTimes(1)
     expect(mockReplace).toHaveBeenCalledWith('/dashboard?platform=win')
+  })
+
+  it('accepts the API spelling platform=macOS and rewrites it to the short form', () => {
+    mockPathname = '/management'
+    mockSearchParams = new URLSearchParams('platform=macOS&lastSeen=24h')
+
+    renderProvider()
+
+    expect(screen.getByText('macOS', { selector: 'output' })).toBeTruthy()
+    expect(localStorage.getItem('reportmate-platform-filter')).toBe('macOS')
+    expect(mockReplace).toHaveBeenCalledWith('/management?platform=mac&lastSeen=24h')
+  })
+
+  it('accepts platform=Windows', () => {
+    mockSearchParams = new URLSearchParams('platform=Windows')
+    renderProvider()
+    expect(screen.getByText('Windows', { selector: 'output' })).toBeTruthy()
+  })
+})
+
+describe('platformFromParam', () => {
+  it('reads both spellings and ignores anything else', () => {
+    expect(platformFromParam('mac')).toBe('macOS')
+    expect(platformFromParam('macOS')).toBe('macOS')
+    expect(platformFromParam('win')).toBe('Windows')
+    expect(platformFromParam('Windows')).toBe('Windows')
+    expect(platformFromParam('all')).toBeNull()
+    expect(platformFromParam(null)).toBeNull()
   })
 })

@@ -181,3 +181,9 @@ shows its error state; the rest render.
   drill-down bars link there; architecture opens `/hardware?arch=<family>`.
 - Report-side rules shared with the API's SQL live in `src/lib/dashboard/reportRules.ts`.
 
+- `/management` also reads `lastSeen=24h|1-7d|7d+`: under 24 hours, 24 hours to 7 days, or
+  over 7 days (or never seen) since `lastSeen`. These are the Unmanaged Devices buckets.
+- `platform=macOS|Windows` works on any page, `/management` included. The global toggle takes it
+  as an alias for `mac|win` and rewrites the URL to the short form.
+- `/identity?admins=` takes `extra` (more than one admin), or an exact admin-user count: `2`,
+  `3`, or `4+` for four or more.

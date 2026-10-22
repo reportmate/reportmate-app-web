@@ -1,6 +1,6 @@
 import fixture from './__fixtures__/insights.json'
 import { isCardError, linkHref, withDefaultParams, type InsightLink } from './insights'
-import { isPoorNetworkQuality } from './reportRules'
+import { adminsFromParam, isPoorNetworkQuality, lastSeenBucket, lastSeenFromParam, matchesAdmins } from './reportRules'
 
 /** Every `link` object anywhere in a document. */
 function collectLinks(value: unknown, out: InsightLink[] = []): InsightLink[] {
@@ -62,5 +62,54 @@ describe('isPoorNetworkQuality', () => {
     expect(isPoorNetworkQuality(row({ ulRating: 'low' }))).toBe(true)
     expect(isPoorNetworkQuality(row({}))).toBe(false)
     expect(isPoorNetworkQuality({})).toBe(false)
+  })
+})
+
+describe('lastSeenBucket (/management?lastSeen=)', () => {
+  const now = Date.parse('2026-10-22T12:00:00Z')
+  const ago = (h: number) => new Date(now - h * 3600000).toISOString()
+  it('buckets by age the way the API card does', () => {
+    expect(lastSeenBucket(ago(2), now)).toBe('24h')
+    expect(lastSeenBucket(ago(24), now)).toBe('1-7d')
+    expect(lastSeenBucket(ago(167), now)).toBe('1-7d')
+    expect(lastSeenBucket(ago(168), now)).toBe('7d+')
+    expect(lastSeenBucket(null, now)).toBe('7d+')
+  })
+  it('reads only the three parameter values', () => {
+    expect(lastSeenFromParam('24h')).toBe('24h')
+    expect(lastSeenFromParam('1-7d')).toBe('1-7d')
+    expect(lastSeenFromParam('7d+')).toBe('7d+')
+    expect(lastSeenFromParam('7d')).toBeNull()
+  })
+})
+
+describe('matchesAdmins (/identity?admins=)', () => {
+  const row = (adminUsers: number) => ({ adminUsers })
+  it('keeps admins=extra as more than one', () => {
+    expect(matchesAdmins(row(1), 'extra')).toBe(false)
+    expect(matchesAdmins(row(2), 'extra')).toBe(true)
+  })
+  it('matches exact counts, with 4+ meaning four or more', () => {
+    expect(matchesAdmins(row(2), '2')).toBe(true)
+    expect(matchesAdmins(row(3), '2')).toBe(false)
+    expect(matchesAdmins(row(3), '3')).toBe(true)
+    expect(matchesAdmins(row(4), '4+')).toBe(true)
+    expect(matchesAdmins(row(9), '4+')).toBe(true)
+    expect(matchesAdmins(row(3), '4+')).toBe(false)
+    expect(matchesAdmins({ summary: { adminUsers: 2 } }, '2')).toBe(true)
+  })
+  it('reads only known values', () => {
+    expect(adminsFromParam('4+')).toBe('4+')
+    expect(adminsFromParam('extra')).toBe('extra')
+    expect(adminsFromParam('5')).toBeNull()
+  })
+})
+
+describe('the API fixture links', () => {
+  it('uses only admins values the identity report reads', () => {
+    for (const link of collectLinks(fixture.cards)) {
+      const admins = (link.params as Record<string, string>).admins
+      if (admins !== undefined) expect(adminsFromParam(admins)).not.toBeNull()
+    }
   })
 })

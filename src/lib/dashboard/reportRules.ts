@@ -508,3 +508,54 @@ export function isPoorNetworkQuality(r: Row): boolean {
   if (rating) return low(rating);
   return low(nq.dlRating ?? nq.dl_rating) || low(nq.ulRating ?? nq.ul_rating);
 }
+
+// MARK: - Last seen (`/management?lastSeen=`)
+
+export type LastSeenBucket = "24h" | "1-7d" | "7d+";
+export const LAST_SEEN_LABELS: Record<LastSeenBucket, string> = {
+  "24h": "Seen in the last 24 hours",
+  "1-7d": "Seen 1-7 days ago",
+  "7d+": "Silent over 7 days",
+};
+
+export const lastSeenFromParam = (value: string | null): LastSeenBucket | null =>
+  value === "24h" || value === "1-7d" || value === "7d+" ? value : null;
+
+/**
+ * The API's Unmanaged Devices buckets: under 24 hours, 24 hours to 7 days,
+ * and over 7 days (or never seen) since `lastSeen`.
+ */
+export function lastSeenBucket(
+  lastSeen: string | null | undefined,
+  now: number = Date.now(),
+): LastSeenBucket {
+  const t = lastSeen ? new Date(lastSeen).getTime() : NaN;
+  if (!Number.isFinite(t)) return "7d+";
+  const hours = (now - t) / 3600000;
+  if (hours < 24) return "24h";
+  if (hours < 168) return "1-7d";
+  return "7d+";
+}
+
+// MARK: - Admin count (`/identity?admins=`)
+
+/** `extra` (more than one admin), or an exact count: `2`, `3`, `4+` (four or more). */
+export type AdminsParam = "extra" | "2" | "3" | "4+";
+export const ADMINS_LABELS: Record<AdminsParam, string> = {
+  extra: "More than one admin",
+  "2": "2 admins",
+  "3": "3 admins",
+  "4+": "4 or more admins",
+};
+
+export const adminsFromParam = (value: string | null): AdminsParam | null =>
+  value === "extra" || value === "2" || value === "3" || value === "4+"
+    ? value
+    : null;
+
+export function matchesAdmins(r: Row, admins: AdminsParam): boolean {
+  const n = num(r.adminUsers ?? r.summary?.adminUsers);
+  if (admins === "extra") return n > 1;
+  if (admins === "4+") return n >= 4;
+  return n === Number(admins);
+}

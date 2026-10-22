@@ -11,13 +11,16 @@ import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilt
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
-import { boolish, managementProvider, paramList } from "@/src/lib/dashboard/reportRules"
+import { LAST_SEEN_LABELS, type LastSeenBucket, boolish, lastSeenBucket, lastSeenFromParam, managementProvider, paramList } from "@/src/lib/dashboard/reportRules"
 
 // The dashboard deep-links here with `?provider=`, `?enrolled=0|1` and
 // `?enrollmentType=` (docs/DASHBOARD-WIDGETS.md). `provider` selects bars in the
 // Providers widget, grouped with managementProvider() exactly as the card
 // counts; the other two show as removable pills in the Filters Active bar.
-const OWNED_PARAMS = ['provider', 'enrolled', 'enrollmentType']
+// `lastSeen=24h|1-7d|7d+` buckets lastSeen age the way the API's Unmanaged
+// Devices card does. `platform` belongs to the global toggle, which also
+// accepts `platform=macOS|Windows`.
+const OWNED_PARAMS = ['provider', 'enrolled', 'enrollmentType', 'lastSeen']
 
 /** Query string with commas left readable (`provider=Unmanaged,Apple`). */
 const commaQuery = (qs: string) => qs.replace(/%2C/gi, ',')
@@ -28,6 +31,7 @@ function parseManagementParams(sp: URLSearchParams) {
     providers: paramList(sp.get('provider')),
     enrolled: enrolled === '0' || enrolled === '1' ? enrolled : '',
     enrollmentTypes: paramList(sp.get('enrollmentType')),
+    lastSeen: lastSeenFromParam(sp.get('lastSeen')),
   }
 }
 
@@ -159,6 +163,7 @@ function ManagementPageContent() {
   // `enrolled=0|1` and `enrollmentType=` (raw enrollmentType values)
   const [enrolledFilter, setEnrolledFilter] = useState(initialUrl.enrolled)
   const [enrollmentTypeFilters, setEnrollmentTypeFilters] = useState<string[]>(initialUrl.enrollmentTypes)
+  const [lastSeenFilter, setLastSeenFilter] = useState<LastSeenBucket | null>(initialUrl.lastSeen)
   // Clicking a bar selects just that provider; clicking a selected bar removes it.
   const selectProvider = (label: string) =>
     setProviderFilters(prev => (prev.includes(label) ? prev.filter(p => p !== label) : [label]))
@@ -249,6 +254,7 @@ function ManagementPageContent() {
     setProviderFilters([])
     setEnrolledFilter('')
     setEnrollmentTypeFilters([])
+    setLastSeenFilter(null)
     setEnrollmentStatusFilter('all')
     setTypeFilter('all')
     setSearchQuery('')
@@ -267,6 +273,7 @@ function ManagementPageContent() {
     setProviderFilters(parsed.providers)
     setEnrolledFilter(parsed.enrolled)
     setEnrollmentTypeFilters(parsed.enrollmentTypes)
+    setLastSeenFilter(parsed.lastSeen)
   }, [searchParams])
 
   useEffect(() => {
@@ -275,11 +282,12 @@ function ManagementPageContent() {
     if (providerFilters.length) params.set('provider', providerFilters.join(','))
     if (enrolledFilter) params.set('enrolled', enrolledFilter)
     if (enrollmentTypeFilters.length) params.set('enrollmentType', enrollmentTypeFilters.join(','))
+    if (lastSeenFilter) params.set('lastSeen', lastSeenFilter)
     const next = commaQuery(params.toString())
     if (next === commaQuery(window.location.search.replace(/^\?/, ''))) return
     lastUrlRef.current = next
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
-  }, [providerFilters, enrolledFilter, enrollmentTypeFilters, pathname, router])
+  }, [providerFilters, enrolledFilter, enrollmentTypeFilters, lastSeenFilter, pathname, router])
 
   // Handle column sort click
   const handleSort = (column: 'device' | 'provider' | 'status' | 'type' | 'deviceId') => {
@@ -461,6 +469,9 @@ function ManagementPageContent() {
 
     // `enrollmentType=` (raw values, comma-separated)
     if (enrollmentTypeFilters.length > 0 && !enrollmentTypeFilters.includes(m.enrollmentType)) return false
+
+    // `lastSeen=24h|1-7d|7d+`
+    if (lastSeenFilter && lastSeenBucket(m.lastSeen) !== lastSeenFilter) return false
     
     // Enrollment Status filter
     if (enrollmentStatusFilter !== 'all' && m.enrollmentStatus !== enrollmentStatusFilter) return false
@@ -968,6 +979,7 @@ function ManagementPageContent() {
           {(providerFilters.length > 0 ||
             enrolledFilter !== '' ||
             enrollmentTypeFilters.length > 0 || 
+            lastSeenFilter !== null ||
             enrollmentStatusFilter !== 'all' || 
             typeFilter !== 'all' || 
             searchQuery !== '' ||
@@ -989,6 +1001,9 @@ function ManagementPageContent() {
                 {[
                   ...(enrolledFilter
                     ? [{ key: 'enrolled', label: enrolledFilter === '1' ? 'Enrolled' : 'Not enrolled', clear: () => setEnrolledFilter('') }]
+                    : []),
+                  ...(lastSeenFilter
+                    ? [{ key: 'lastSeen', label: LAST_SEEN_LABELS[lastSeenFilter], clear: () => setLastSeenFilter(null) }]
                     : []),
                   ...enrollmentTypeFilters.map(t => ({
                     key: `enrollmentType=${t}`,
