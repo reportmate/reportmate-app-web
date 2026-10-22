@@ -16,6 +16,7 @@ import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/da
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { ManagementShieldIcon, ManagementViewSwitch } from "@/src/components/management/ManagementViewSwitch"
+import { csvCell } from "@/src/lib/csv"
 
 const MANAGEMENT_URL = '/api/v1/management'
 
@@ -976,7 +977,7 @@ function ManagementPageContent() {
                         m.usage || '',
                         m.catalog || '',
                         m.location || ''
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      ].map(csvCell).join(','))
                       
                       const csv = [headers.join(','), ...rows].join('\n')
                       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })

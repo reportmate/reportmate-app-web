@@ -23,6 +23,7 @@ import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-proce
 import { InstalledUpdate, matchesSystemSearch, updatesToDisplay } from "@/src/lib/system/installedUpdates"
 import { osCurrency, paramList, uptimeBucketKey, pendingBucketKey, hasDeferredUpdates, UPTIME_KEYS, PENDING_KEYS } from "@/src/lib/dashboard/reportRules"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
 
 interface SystemDevice {
   id: string
@@ -963,7 +964,7 @@ function SystemPageContent() {
                         uptimeStr,
                         s.bootTime || '',
                         s.lastSeen || ''
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                      ].map(csvCell).join(',')
                     })
                     
                     const csv = [headers.join(','), ...rows].join('\n')

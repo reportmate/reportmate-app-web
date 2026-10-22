@@ -18,6 +18,7 @@ import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS, installAgent, install
 import { cachedAt, peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
 import { RefreshErrorBanner } from '@/src/components/ui/RefreshErrorBanner'
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from '@/src/lib/csv'
 
 // The filters payload (~17 MB) is kept parsed in memory for the tab, so a
 // return visit seeds from it instantly. Never stringified, never retried.
@@ -2088,7 +2089,7 @@ function InstallsPageContent() {
                           device.warningCount,
                           device.removedCount,
                           device.lastSeen
-                        ].map(field => `\"${String(field).replace(/\"/g, '\"\"')}\"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2112,7 +2113,7 @@ function InstallsPageContent() {
                           install.fleet || '',
                           install.platform || '',
                           install.lastSeen
-                        ].map(field => `\"${String(field).replace(/\"/g, '\"\"')}\"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })

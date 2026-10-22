@@ -687,7 +687,9 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
                 {agents.map((a) => (
                   <tr key={a.agent} className="border-t border-gray-100 dark:border-gray-700/60">
                     <td className="py-1 text-gray-900 dark:text-gray-100">
-                      {a.name} <span className="text-xs text-gray-400">{fmtCount(a.devices)}</span>
+                      <Link href={`/installs?agent=${encodeURIComponent(a.agent)}`} className="hover:underline">
+                        {a.name} <span className="text-xs text-gray-400">{fmtCount(a.devices)}</span>
+                      </Link>
                     </td>
                     {[
                       { c: a.withErrors.count, l: a.withErrors.link, t: "red" as Tone, title: "devices with errors" },

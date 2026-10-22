@@ -15,6 +15,7 @@ import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABE
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
 
 const IDENTITY_URL = '/api/v1/identity'
 
@@ -628,7 +629,7 @@ function IdentityPageContent() {
                     d.adminUsers || 0,
                     d.currentlyLoggedIn || 0,
                     d.lastSeen || ''
-                  ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                  ].map(csvCell).join(','))
                   
                   const csv = [headers.join(','), ...rows].join('\n')
                   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -1108,7 +1109,7 @@ function IdentityPageContent() {
                     r.device.serialNumber || '',
                     r.device.platform || '',
                     r.device.lastSeen || '',
-                  ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                  ].map(csvCell).join(','))
                   const csv = [headers.join(','), ...csvRows].join('\n')
                   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
                   const url = URL.createObjectURL(blob)

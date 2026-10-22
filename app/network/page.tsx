@@ -17,6 +17,7 @@ import { connectionKind, isPoorNetworkQuality, signalPercent } from "@/src/lib/d
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
 
 const NETWORK_URL = '/api/v1/network'
 
@@ -763,7 +764,7 @@ function NetworkPageContent() {
                           nq?.downlinkCapacity ? parseFloat(nq.downlinkCapacity).toString() : '',
                           nq?.uplinkCapacity ? parseFloat(nq.uplinkCapacity).toString() : '',
                           nq?.idleLatency || ''
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                        ].map(csvCell).join(',')
                       })
                       
                       const csv = [headers.join(','), ...rows].join('\n')

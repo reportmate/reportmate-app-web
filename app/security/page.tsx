@@ -21,6 +21,7 @@ import {
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
 
 const SECURITY_URL = '/api/v1/security'
 
@@ -829,13 +830,13 @@ function SecurityPageContent() {
   // ============ CSV EXPORT ============
 
   const exportCSV = () => {
-    const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const headers = ['Device Name','Serial Number','Platform','Encryption','Protection Name','Protection Status','Detections','Tampering','Firewall','Access','Expired Certs','Expiring Certs','Vulnerabilities','Critical Vulnerabilities']
     const rows = filteredDevices.map(d => [
       esc(d.deviceName), esc(d.serialNumber), esc(normalizePlatform(d.platform)),
-      d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted',
-      esc(d.antivirusName), d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled',
-      d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : '',
+      esc(d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted'),
+      esc(d.antivirusName), esc(d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled'),
+      esc(d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : ''),
       esc((() => {
         const main = isWin(d)
           ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`
@@ -845,10 +846,10 @@ function SecurityPageContent() {
         if (fwStatus === 'Not Set') return `${main} / FW Off`
         return main
       })()),
-      d.firewallEnabled ? 'On' : 'Off',
-      [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
-      String(d.expiredCertCount), String(d.expiringSoonCertCount),
-      String(d.cveCount), String(d.criticalCveCount),
+      esc(d.firewallEnabled ? 'On' : 'Off'),
+      esc([d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None'),
+      esc(d.expiredCertCount), esc(d.expiringSoonCertCount),
+      esc(d.cveCount), esc(d.criticalCveCount),
     ].join(','))
     const csv = [headers.join(','), ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })

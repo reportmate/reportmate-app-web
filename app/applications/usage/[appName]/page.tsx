@@ -8,6 +8,7 @@ import { useParams, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { safeInternalPath } from "@/src/lib/security/safeUrl"
+import { csvCell } from "@/src/lib/csv"
 
 interface DeviceRow {
   serialNumber: string
@@ -248,7 +249,7 @@ export default function ApplicationUsageByDevicePage() {
       d.lastUsed || '',
     ])
     const csv = [header, ...rows]
-      .map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+      .map(row => row.map(csvCell).join(','))
       .join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)

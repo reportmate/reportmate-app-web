@@ -12,6 +12,7 @@
 import { normalizeLogMessage } from "../modules/widgets/InsightWidgets";
 import { paramList, toolProductLabel, type ToolLevel } from "../dashboard/reportRules";
 import { normalizePlatform } from "../../providers/PlatformFilterProvider";
+import { csvCell } from "../csv";
 
 export const TOOL_LOGS_PATH = "/management/logs";
 export const TOOL_LOGS_API = "/api/v1/management/logs/fleet";
@@ -422,7 +423,6 @@ export function trendBuckets(
   return buckets;
 }
 
-const csvCell = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 
 export function toolLogsDevicesCsv(devices: ToolLogsDevice[]): string {
   const header = ["Device Name", "Serial Number", "Platform", "Tool", "Tool Key", "Errors", "Warnings", "Last At"];

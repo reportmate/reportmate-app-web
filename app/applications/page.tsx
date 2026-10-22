@@ -13,6 +13,7 @@ import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
 import { peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
+import { csvCell } from "@/src/lib/csv"
 
 /** The filters payload, kept for the tab so a return to this page renders at once. */
 const APPLICATIONS_FILTERS_URL = '/api/v1/applications/filters'
@@ -2230,7 +2231,7 @@ function ApplicationsPageContent() {
                         app.userCount,
                         app.lastUsed || '',
                         app.isSingleUser ? 'Yes' : 'No'
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      ].map(csvCell).join(','))
                     ].join('\n')
                     
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2263,7 +2264,7 @@ function ApplicationsPageContent() {
                           device.location || '',
                           device.catalog || '',
                           appNames
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2285,7 +2286,7 @@ function ApplicationsPageContent() {
                           app.location || '',
                           app.deviceName || app.serialNumber,
                           app.serialNumber,
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
