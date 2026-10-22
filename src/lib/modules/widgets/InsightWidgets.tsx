@@ -436,9 +436,20 @@ interface DonutSlice {
   count: number;
   color: string;
   link: string;
+  /** A breakdown shown as a disclosure under this legend row, collapsed by default. */
+  children?: Omit<DonutSlice, "children">[];
 }
 
 function Donut({ data, center }: { data: DonutSlice[]; center?: string }) {
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const hasDisclosure = data.some((d) => d.children?.length);
+  const toggle = (label: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
   const total = data.reduce((s, d) => s + (countOf(d.count) ?? 0), 0);
   const r = 38,
     c = 2 * Math.PI * r;
@@ -482,28 +493,65 @@ function Donut({ data, center }: { data: DonutSlice[]; center?: string }) {
         )}
       </div>
       <ul className="flex-1 min-w-0 space-y-0.5">
-        {data.map((d) => (
-          <li key={d.label}>
-            <Link
-              href={d.link}
-              className={`flex items-center gap-2 text-sm py-0.5 ${ROW_LINK}`}
-            >
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: d.color }}
-              />
-              <span className="text-gray-900 dark:text-gray-100 truncate flex-1">
-                {d.label}
-              </span>
-              <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                {fmtCount(d.count)}
-              </span>
-              <span className="text-xs text-gray-400 tabular-nums w-9 text-right">
-                {fmtPercentOf(d.count, total)}
-              </span>
-            </Link>
-          </li>
-        ))}
+        {data.map((d) => {
+          const expandable = !!d.children?.length;
+          const isOpen = open.has(d.label);
+          return (
+            <li key={d.label}>
+              <div className="flex items-center gap-1">
+                {expandable ? (
+                  <button
+                    type="button"
+                    onClick={() => toggle(d.label)}
+                    aria-expanded={isOpen}
+                    aria-label={`${isOpen ? "Collapse" : "Expand"} ${d.label}`}
+                    className="w-4 h-4 shrink-0 flex items-center justify-center rounded text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <svg className={`w-3 h-3 transition-transform ${isOpen ? "rotate-90" : ""}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                ) : (
+                  hasDisclosure && <span className="w-4 shrink-0" />
+                )}
+                <Link
+                  href={d.link}
+                  className={`flex-1 min-w-0 flex items-center gap-2 text-sm py-0.5 ${ROW_LINK}`}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: d.color }}
+                  />
+                  <span className="text-gray-900 dark:text-gray-100 truncate flex-1">
+                    {d.label}
+                  </span>
+                  <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">
+                    {fmtCount(d.count)}
+                  </span>
+                  <span className="text-xs text-gray-400 tabular-nums w-9 text-right">
+                    {fmtPercentOf(d.count, total)}
+                  </span>
+                </Link>
+              </div>
+              {expandable && isOpen && (
+                <ul className="ml-6 mt-0.5 mb-1 pl-2 space-y-0.5 border-l-2 border-gray-200 dark:border-gray-600">
+                  {d.children!.map((c) => (
+                    <li key={c.label}>
+                      <Link
+                        href={c.link}
+                        className={`flex items-center gap-2 text-xs py-0.5 ${ROW_LINK}`}
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
+                        <span className="flex-1 truncate text-gray-600 dark:text-gray-300">{c.label}</span>
+                        <span className="font-medium tabular-nums text-gray-700 dark:text-gray-200">{fmtCount(c.count)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -1172,30 +1220,14 @@ function DirectoryServices({ ctx }: { ctx: InsightContext }) {
               count: s.count,
               color: DIRECTORY_COLORS[s.key] ?? TONES.gray.hex,
               link: linkHref(s.link),
+              children: shown(s.children, (c) => c.count).map((c) => ({
+                label: c.label,
+                count: c.count,
+                color: DIRECTORY_COLORS[c.key] ?? TONES.gray.hex,
+                link: linkHref(c.link),
+              })),
             }))}
           />
-          {d.segments.some((s) => shown(s.children, (c) => c.count).length) && (
-            <ul className="mt-3 space-y-0.5">
-              {d.segments
-                .filter((s) => s.children?.length)
-                .flatMap((s) =>
-                  shown(s.children, (c) => c.count).map((c) => (
-                    <li key={`${s.key}:${c.key}`}>
-                      <Link
-                        href={linkHref(c.link)}
-                        className={`flex items-center gap-2 text-sm py-0.5 pl-5 ${ROW_LINK}`}
-                      >
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: DIRECTORY_COLORS[c.key] ?? TONES.gray.hex }} />
-                        <span className="flex-1 truncate text-gray-600 dark:text-gray-300">
-                          {s.label}: {c.label}
-                        </span>
-                        <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">{fmtCount(c.count)}</span>
-                      </Link>
-                    </li>
-                  )),
-                )}
-            </ul>
-          )}
           <div className="flex flex-wrap gap-2 mt-4">
             <StatChip value={d.shared.count} label="shared" tone="blue" link={linkHref(d.shared.link)} />
             <StatChip value={d.assigned.count} label="assigned" tone="teal" link={linkHref(d.assigned.link)} />

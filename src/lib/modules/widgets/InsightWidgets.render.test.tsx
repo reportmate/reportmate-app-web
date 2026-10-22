@@ -63,6 +63,8 @@ describe('InsightCards', () => {
     // Services' extra-admins chip moved to User Accounts
     const expected = collectLinks(fixture.cards, p =>
       p[0] === 'managementToolLogs' || (p[0] === 'directoryServices' && p[1] === 'extraAdmins') ||
+      // the trust rows are collapsed until Domain Joined is expanded (tested below)
+      (p[0] === 'directoryServices' && p[3] === 'children') ||
       (p[0] === 'userAccounts' && p[1] === 'adminAccounts' && Number(p[2]) >= 5))
     // The MDM agent's own log root is left out on purpose
     const missing = expected.map(linkHref).filter(h => !h.includes('tool=mdm') && !rendered.has(h))
@@ -86,7 +88,15 @@ describe('InsightCards', () => {
     render(<InsightCards ctx={ctx({ data: doc }, 'macOS')} positions={[0]} />)
     expect(screen.queryByRole('radiogroup')).toBeNull()
     expect(screen.getByText('Cloud Joined')).toBeTruthy()
-    expect(screen.getByText('Domain Joined: Broken')).toBeTruthy()
+    // Trust rows are a disclosure under Domain Joined, collapsed by default
+    expect(screen.queryByText('Broken')).toBeNull()
+    const chevron = screen.getByRole('button', { name: 'Expand Domain Joined' })
+    expect(chevron.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(chevron)
+    expect(screen.getByRole('button', { name: 'Collapse Domain Joined' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('Broken').closest('a')?.getAttribute('href')).toBe('/identity?directory=broken')
+    expect(screen.getByText('Domain Joined').closest('a')?.getAttribute('href')).toBe('/identity?directory=domain')
+    expect(screen.queryByText(/Domain Joined: /)).toBeNull()
     const swatch = (label: string) =>
       (screen.getByText(label).previousElementSibling as HTMLElement).style.backgroundColor
     expect(swatch('Cloud Joined')).toBe('rgb(16, 185, 129)')
@@ -293,8 +303,9 @@ describe('zero-count breakdown rows', () => {
     cards.rebootDebt.uptimeBuckets[0].count = 0
     render(<InsightCards ctx={ctx({ data: { ...doc, cards } })} positions={[0, 1, 8]} />)
     expect(screen.queryByText('Legacy')).toBeNull()
-    expect(screen.queryByText('Domain Joined: Unconfirmed')).toBeNull()
-    expect(screen.getByText('Domain Joined: Trusted')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Domain Joined' }))
+    expect(screen.queryByText('Unconfirmed')).toBeNull()
+    expect(screen.getByText('Trusted')).toBeTruthy()
     expect(screen.getByText('Modern')).toBeTruthy()
     expect(screen.getByText('< 1 day')).toBeTruthy()
   })
