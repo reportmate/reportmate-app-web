@@ -195,6 +195,7 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 
 ## Support
 
+- [Development wiki](wiki/README.md)
 - [Documentation](https://docs.reportmate.io)
 - [Issues](https://github.com/reportmate/reportmate-app-web/issues)
 - [Discussions](https://github.com/reportmate/reportmate-app-web/discussions)
