@@ -208,7 +208,6 @@ describe('filters and links', () => {
 
 describe('toolLogsDevicesCsv formula safety', () => {
   it('neutralises device names and messages that start like formulas', () => {
-    const { toolLogsDevicesCsv } = require('./toolLogs') as typeof import('./toolLogs')
     const csv = toolLogsDevicesCsv([{ deviceName: '=1+1', serialNumber: 'SAMPLE1', platform: 'macOS', name: 'Munki', tool: 'installs', errors: 1, warnings: 0, lastAt: null } as any])
     expect(csv).toContain(`"'=1+1"`)
     expect(csv).not.toMatch(/(^|,)"=/m)

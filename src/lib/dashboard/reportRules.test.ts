@@ -1,4 +1,11 @@
 import {
+  DIRECTORY_SERVICE_COLORS,
+  authFromParam,
+  authToParam,
+  directoryServiceFromParam,
+  directoryServiceToParam,
+  matchesAuth,
+  matchesDirectoryService,
   installAgent,
   installAgentFromParam,
   internalStorage,
@@ -217,9 +224,6 @@ describe("management tool logs", () => {
 });
 
 describe('Directory Services (/identity?directory=)', () => {
-  const {
-    directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService,
-  } = require('./reportRules') as typeof import('./reportRules')
 
   it('reads every key the API links with, and the labels', () => {
     expect(directoryServiceFromParam('cloud')).toBe('Cloud Joined')
@@ -256,7 +260,7 @@ describe('Directory Services (/identity?directory=)', () => {
 })
 
 describe('Directory Services colours', () => {
-  const { DIRECTORY_SERVICE_COLORS: c } = require('./reportRules') as typeof import('./reportRules')
+  const c = DIRECTORY_SERVICE_COLORS
   it("match the Identity widget's colours, and no two classes share one", () => {
     expect(c).toMatchObject({
       cloud: '#10b981', domain: '#f59e0b', standard: '#3b82f6', unjoined: '#ef4444',
@@ -269,7 +273,6 @@ describe('Directory Services colours', () => {
 })
 
 describe('Authentication (/identity?auth=)', () => {
-  const { authFromParam, authToParam, matchesAuth } = require('./reportRules') as typeof import('./reportRules')
   it('reads and writes the keys', () => {
     expect(authFromParam('modern')).toBe('Modern')
     expect(authFromParam('Standard')).toBe('Standard')

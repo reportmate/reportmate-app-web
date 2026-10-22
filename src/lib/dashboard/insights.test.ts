@@ -1,5 +1,5 @@
 import fixture from './__fixtures__/insights.json'
-import { isCardError, linkHref, withDefaultParams, type InsightLink } from './insights'
+import { isCardError, linkHref, normalizeCard, withDefaultParams, type InsightLink } from './insights'
 import { adminsFromParam, isPoorNetworkQuality, lastSeenBucket, lastSeenFromParam, matchesAdmins } from './reportRules'
 
 /** Every `link` object anywhere in a document. */
@@ -116,7 +116,6 @@ describe('the API fixture links', () => {
 
 describe('normalizeCard (directoryServices)', () => {
   it('reads the API count named total as devices and keeps the trust children', () => {
-    const { normalizeCard } = require('./insights') as typeof import('./insights')
     const card = normalizeCard('directoryServices', {
       total: 916,
       segments: [{ key: 'domain', label: 'Domain Joined', count: 54, link: { path: '/identity', params: { directory: 'domain' } },
