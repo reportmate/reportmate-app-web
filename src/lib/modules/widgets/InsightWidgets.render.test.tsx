@@ -6,7 +6,7 @@ import appUsage from '../../dashboard/__fixtures__/app-usage.json'
 import appUsageShared from '../../dashboard/__fixtures__/app-usage-shared.json'
 import { linkHref, type InsightLink, type InsightsDocument, type InsightsState } from '../../dashboard/insights'
 import { clearCache } from '../../data-cache'
-import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, INSIGHT_CARD_COUNT, normalizeLogMessage, type InsightContext } from './InsightWidgets'
+import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, INSIGHT_CARD_COUNT, compactHours, normalizeLogMessage, type InsightContext } from './InsightWidgets'
 
 const all = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
 const doc = fixture as unknown as InsightsDocument
@@ -175,8 +175,10 @@ describe('AppUsageCard', () => {
     render(<AppUsageCard platformFilter="all" />)
     await waitFor(() => expect(screen.getByText('SampleApp 0')).toBeTruthy())
     expect(screen.getByText('SampleApp 9')).toBeTruthy()
-    expect(screen.getByText('1,200 h')).toBeTruthy()
-    expect(screen.getAllByText('40 devices').length).toBeGreaterThan(0)
+    expect(screen.getByText('1.2k h')).toBeTruthy()
+    expect(screen.getByText('Devices')).toBeTruthy()
+    expect(screen.getByText('40')).toBeTruthy()
+    expect(screen.getByText('SampleApp 0').getAttribute('title')).toBe('SampleApp 0')
     expect(screen.queryByText('SampleApp 10')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Shared' }))
@@ -212,5 +214,16 @@ describe('revision 5: Update Debt and Reboot Debt', () => {
     delete cards.updateDebt.deferredUpdates
     render(<InsightCards ctx={ctx({ data: { ...doc, cards } })} positions={[4]} />)
     expect(hrefs()).toEqual(expect.arrayContaining(['/system?pending=1-5,6-10,10%2B', '/system?deferred=1']))
+  })
+})
+
+describe('compactHours', () => {
+  it('keeps hours short enough for a narrow column', () => {
+    expect(compactHours(950.4)).toBe('950 h')
+    expect(compactHours(1200)).toBe('1.2k h')
+    expect(compactHours(3000)).toBe('3k h')
+    expect(compactHours(12_400)).toBe('12k h')
+    expect(compactHours(328_025)).toBe('328k h')
+    expect(compactHours(1_240_000)).toBe('1.2M h')
   })
 })

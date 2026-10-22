@@ -1219,6 +1219,18 @@ function ChipRow({
   );
 }
 
+/** App Usage's columns: name (the rest) | 60px bar | hours | devices. */
+const APP_USAGE_ROW = "grid grid-cols-[minmax(0,1fr)_60px_3.75rem_3.5rem] items-center gap-2";
+
+/** Hours in a narrow column: 950 h, 12.4k h, 328k h, 1.2M h. */
+export function compactHours(h: number): string {
+  const n = Math.max(0, h);
+  if (n < 1000) return `${Math.round(n)} h`;
+  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k h`;
+  if (n < 999_500) return `${Math.round(n / 1000)}k h`;
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M h`;
+}
+
 /**
  * The ten most-used apps, with Usage and Catalog chips that filter the card
  * in place; each app link carries the filters. Reads its own endpoint.
@@ -1235,7 +1247,7 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
     : state.error && !state.loading
       ? { status: "error", error: state.error, retry: state.refresh, retrying: state.loading }
       : { status: "loading", retry: state.refresh };
-  const hours = (h: number) => `${Math.round(h).toLocaleString("en-US")} h`;
+  const hours = compactHours;
   return (
     <InsightCard
       title="App Usage"
@@ -1271,21 +1283,37 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
           )}
           {d.apps.length ? (
             <ul className={state.loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
+              {/* Name takes the width; the bar is a fixed 60px, hours and devices are compact */}
+              <li
+                aria-hidden="true"
+                className={`${APP_USAGE_ROW} pb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400`}
+              >
+                <span>App</span>
+                <span />
+                <span className="text-right">Hours</span>
+                <span className="text-right">Devices</span>
+              </li>
               {d.apps.map((a) => {
                 const max = Math.max(1, ...d.apps.map((x) => x.totalHours));
                 return (
                   <li key={a.name}>
                     <Link
                       href={linkHref(a.link)}
-                      title={a.name}
-                      className={`grid grid-cols-[minmax(0,1fr)_minmax(2.5rem,8rem)_auto_6.5rem] items-center gap-3 text-sm py-1 ${ROW_LINK}`}
+                      className={`${APP_USAGE_ROW} text-sm py-1 ${ROW_LINK}`}
                     >
-                      <span className="truncate text-gray-900 dark:text-gray-100">{a.name}</span>
+                      <span className="truncate text-gray-900 dark:text-gray-100" title={a.name}>{a.name}</span>
                       <span className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
                         <span className="block h-full rounded-full" style={{ width: `${(a.totalHours / max) * 100}%`, backgroundColor: TONES.teal.hex }} />
                       </span>
-                      <span className="text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">{hours(a.totalHours)}</span>
-                      <span className="text-right tabular-nums text-gray-500 dark:text-gray-400">{plural(a.devices, "device")}</span>
+                      <span
+                        className="text-right tabular-nums font-medium text-gray-900 dark:text-gray-100"
+                        title={`${Math.round(a.totalHours).toLocaleString("en-US")} hours`}
+                      >
+                        {hours(a.totalHours)}
+                      </span>
+                      <span className="text-right tabular-nums text-gray-500 dark:text-gray-400" title={`${a.devices} devices`}>
+                        {a.devices.toLocaleString("en-US")}
+                      </span>
                     </Link>
                   </li>
                 );

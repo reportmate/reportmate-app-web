@@ -335,3 +335,9 @@ Card changes:
     has no `pendingUpdates` or `deferredUpdates` yet, it takes them from Reboot Debt.
   - Reboot Debt shows uptime only.
 
+- App Usage in column 3 (supersedes the revision 4 row format):
+  - Columns: name | 60px bar | compact hours (`328k h`, `1.2k h`) | device count, under one
+    header row (App · Hours · Devices).
+  - A truncated name shows in full as a tooltip, and the exact hours show on hover.
+- New Clients sizes to its rows, up to 600px. No card in columns 1–3 has a fixed height; only
+  Recent Events keeps one, for its scrolling feed.
