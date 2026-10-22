@@ -284,6 +284,7 @@ function IdentityPageContent() {
   // inventory values, so select every value of that kind once the rows are in.
   // `usages=` carries raw values that have no kind.
   const [urlHydrated, setUrlHydrated] = useState(false)
+  const unmatchedUsageKinds = useRef<string[]>([])
   // Query strings this page wrote itself, so the URL → state effect below skips them
   const ownUrlWrites = useRef<Set<string>>(new Set())
   useEffect(() => {
@@ -298,6 +299,8 @@ function IdentityPageContent() {
       if (d.usage && kind && kinds.includes(kind)) values.add(d.usage)
     }
     if (values.size > 0) setSelectedUsages(Array.from(values).sort())
+    // No row carries a requested kind yet: keep `usage=` in the URL rather than drop it
+    else unmatchedUsageKinds.current = kinds
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, urlHydrated, identityDevices])
 
@@ -322,7 +325,10 @@ function IdentityPageContent() {
       if (kind) kinds.add(kind)
       else raw.push(u)
     }
-    set('usage', kinds.size > 0 ? ['shared', 'assigned'].filter(k => kinds.has(k)).join(',') : null)
+    if (kinds.size > 0 || raw.length > 0) unmatchedUsageKinds.current = []
+    set('usage', kinds.size > 0
+      ? ['shared', 'assigned'].filter(k => kinds.has(k)).join(',')
+      : unmatchedUsageKinds.current.length ? unmatchedUsageKinds.current.join(',') : null)
     set('usages', raw.length > 0 ? raw.join(',') : null)
     const next = params.toString()
     if (next !== searchParams.toString()) {
