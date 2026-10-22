@@ -8,6 +8,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
+import { DashboardInsights, useDashboardInsights } from "../../src/lib/modules/widgets/InsightWidgets"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
@@ -113,6 +114,7 @@ export default function ClientDashboard() {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
+  const insights = useDashboardInsights()
   
   // Filter devices by platform
   const filteredDevices = useMemo(() => {
@@ -485,11 +487,12 @@ export default function ClientDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Two-column layout: Column A (30%) + Column B (70%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
-          {/* Column A (30% width) - Status Widget + Error/Warning Stats + New Clients Table */}
-          <div className="lg:col-span-3 space-y-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
+        {/* Laptop: two columns (30/70) with the insight cards in a row below.
+            Desktop (>= 1680px): three columns, insights in the middle. */}
+        <div className="grid grid-cols-1 lg:grid-cols-10 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8">
+          {/* Column A - Status Widget + Error/Warning Stats + New Clients Table */}
+          <div className="lg:col-span-3 desktop:col-span-1 space-y-8">
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
               <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
@@ -509,8 +512,11 @@ export default function ClientDashboard() {
             </ErrorBoundary>
           </div>
 
-          {/* Column B (70% width) - Recent Events + OS Version Charts */}
-          <div className="lg:col-span-7 space-y-8">
+          {/* Column B (desktop only) - insight cards */}
+          <DashboardInsights insights={insights} isPlatformVisible={isPlatformVisible} className="hidden desktop:block desktop:col-span-1 space-y-8" />
+
+          {/* Column C - Recent Events + Platform Distribution + OS Version Charts */}
+          <div className="lg:col-span-7 desktop:col-span-1 space-y-8">
             {/* Recent Events Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
               <RecentEventsTable
@@ -535,7 +541,7 @@ export default function ClientDashboard() {
               {(() => {
                 const showMac = platformFilter === 'all' || platformFilter === 'macOS'
                 const showWin = platformFilter === 'all' || platformFilter === 'Windows'
-                const gridCols = showMac && showWin ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
+                const gridCols = showMac && showWin ? 'lg:grid-cols-2 desktop:grid-cols-1 wide:grid-cols-2' : 'lg:grid-cols-1'
                 
                 return (
                   <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
@@ -554,6 +560,8 @@ export default function ClientDashboard() {
             </ErrorBoundary>
           </div>
         </div>
+        {/* Below desktop width the insight cards sit in a row under the columns */}
+        <DashboardInsights insights={insights} isPlatformVisible={isPlatformVisible} className="desktop:hidden mt-8 grid grid-cols-1 md:grid-cols-2 gap-8" />
       </div>
       
       {/* Performance monitors disabled for memory optimization */}
