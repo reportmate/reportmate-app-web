@@ -84,9 +84,7 @@ Shows rejected / retried / accepted in 24h, reasons as bars
 the existing status thresholds.
 
 **7 OS Currency** (`/system`). Data: the device list (OS name and version) or
-`/system` rows. For each major macOS version, the "latest patch" is the highest
-version seen in the fleet; a device below it is "behind". macOS more than two
-majors behind the newest seen is "unsupported", and Windows 10 is counted on its
+`/system` rows. For each major macOS version, the "latest patch" is the highest version reported by at least 5 devices (so one beta Mac does not make the whole fleet "behind"); a device below it is "behind". macOS more than two majors behind the newest major reported by at least 5 devices is "unsupported" (if no version reaches 5 devices, the highest seen counts), and Windows 10 is counted on its
 own. Shows: % on latest patch (donut), behind (→ `/system?patch=behind`),
 unsupported macOS (→ `/system?os=unsupported`), Windows 10 (→ `/system?os=windows10`),
 and the top 3 lagging versions (→ `/system?osVersion=<v>`).
@@ -131,3 +129,50 @@ and printers and displays counted fleet-wide, with the top 3 rooms
 
 No real device names or serials in fixtures, docs or screenshots in commits. Use
 `SAMPLE1`-style values.
+
+## Changes found while building the web app (2026-10-22)
+
+These amend the sections above. Swift and C# should follow them.
+
+- **Shared rules.** Web keeps every rule a card counts with and a report filters with in
+  `src/lib/dashboard/reportRules.ts`. Port that file rather than re-deriving the rules.
+- **`/devices?platform=`** is the global platform toggle (`mac` or `win`), not a devices-page
+  filter. The devices page also takes `usage`, `catalog`, `area`, `location` and `fleet`.
+- **Platform Distribution.** Clicking a platform still expands it in place. Its count opens
+  `/devices?platform=mac|win`. Drill-down bars open `/devices?platform=…&usage=…` (and the same
+  for `catalog`, and `area` for department). Architecture opens `/hardware?arch=<family>`.
+- **System Health.** The pending chip opens `/system?pending=1-5,6-10,10+`.
+- **Management.** The donut's Enrolled row opens `?enrolled=1` and Not Enrolled opens
+  `?enrolled=0`. The provider list adds an `Unmanaged` row (→ `?provider=Unmanaged`).
+- **5 Install Health.** `/api/v1/installs` is about 94 MB, so the top failing items come from
+  `/api/v1/installs/filters` instead (17 MB, the payload the installs report itself reads).
+  Each device's `modules.installs.{cimian,munki}.items[]` is classified with the installs
+  report's `isErrorItem`. Those devices carry no `platform`: Cimian means Windows, Munki
+  means macOS. `staleAgentThresholdDays` is 1 in the payload, so the card applies its own
+  7-day threshold (`staleDays > 7`), and so does `/installs?stale=1`.
+- **6 Check-in Gaps.** The web routes are `/api/dashboard` and `/api/events/failures`. The
+  failure summary has no platform, so the 24-hour numbers stay fleet-wide and are labelled
+  "All platforms" when the platform toggle is set. The silent-device counts do follow the toggle.
+  Rejected opens `/events/failures?hours=24` (rejected is that page's default). Retried and
+  Repaired (`accepted`) add `outcome=`.
+- **7 OS Currency.** macOS releases are ordered by release, not by number: 15 is followed by
+  26. With 27 the newest, 15 is still supported and 14 isn't. Windows patch level is
+  `featureUpdate` (the update revision, e.g. 9711) within one `buildNumber`. The 5-device
+  minimum applies to Windows builds the same way. "On latest patch" opens `/system`
+  unfiltered, because there's no parameter for it.
+- **8 Software Risk.** The live fleet reports `criticalCveCount` and
+  `activelyExploitedCveCount` as 0 everywhere. Few install items carry both
+  `installedVersion` and `latestVersion`, so the "behind" list is usually empty, and the card
+  says so.
+- **9 Certificates.** In certificate rows, `serialNumber` is the device's serial and
+  `certSerialNumber` is the certificate's. Devices are counted by `serialNumber`.
+- **10 Identity.** The identity report's directory donut, which reads the route's
+  `enrollmentType`, counts hybrid devices as "Domain Joined". The card and `?join=` use the
+  four-way `joinType` (from `entraJoined` and `domainJoined`), so `hybrid` is its own slice.
+- **11 App Usage.** The usage report covers the whole fleet, so the card is labelled "All
+  platforms" when the platform toggle is set. Least-used ranks by `activeDeviceCount / installedDeviceCount`.
+- **12 Network & Peripherals.** Network rows have no `platform`, so it comes from
+  `operatingSystem`. Rooms are ranked by printer count. `/network` also accepts
+  `signal=excellent|good|fair`.
+- **Degrading.** A card that reads two sources shows whichever one loaded and says which
+  one didn't. A card shows its error only when every source it reads has failed.

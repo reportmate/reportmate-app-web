@@ -8,7 +8,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
-import { DashboardInsights, useDashboardInsights } from "../../src/lib/modules/widgets/InsightWidgets"
+import { InsightCards, INSIGHT_CARD_COUNT, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
@@ -95,6 +95,8 @@ interface Device {
   inventoryState?: InventoryState
 }
 
+const allCards = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
+
 export default function ClientDashboard() {
   // All data comes from consolidated /api/dashboard call
   // Eliminates separate events API call for faster load
@@ -115,6 +117,7 @@ export default function ClientDashboard() {
   const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   const insights = useDashboardInsights()
+  const layout = useInsightLayout()
   
   // Filter devices by platform
   const filteredDevices = useMemo(() => {
@@ -128,6 +131,14 @@ export default function ClientDashboard() {
     return events.filter(event => isPlatformVisible(event.platform || 'Unknown'))
   }, [events, platformFilter, isPlatformVisible])
   
+  const insightCtx: InsightContext = useMemo(() => ({
+    insights,
+    isPlatformVisible,
+    platformFilter,
+    installStats,
+    devices: filteredDevices,
+  }), [insights, isPlatformVisible, platformFilter, installStats, filteredDevices])
+
   // Mark as mounted
   useEffect(() => {
     setMounted(true)
@@ -488,11 +499,21 @@ export default function ClientDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
       <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
-        {/* Laptop: two columns (30/70) with the insight cards in a row below.
-            Desktop (>= 1680px): three columns, insights in the middle. */}
-        <div className="grid grid-cols-1 lg:grid-cols-10 desktop:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8">
+        {/* Layout per docs/DASHBOARD-WIDGETS.md. Laptop: 30/70 with all twelve
+            insight cards in a 2-column grid below. Desktop (>= 1680px): three
+            columns with cards 1-4 in the middle and 5-12 four across below.
+            Wide (>= 2200px): four columns, cards dealt alternately into two. */}
+        <div
+          className={
+            layout === "wide"
+              ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start"
+              : layout === "desktop"
+                ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start"
+                : "grid grid-cols-1 lg:grid-cols-10 gap-8"
+          }
+        >
           {/* Column A - Status Widget + Error/Warning Stats + New Clients Table */}
-          <div className="lg:col-span-3 desktop:col-span-1 space-y-8">
+          <div className={layout === "narrow" ? "lg:col-span-3 space-y-8" : "space-y-8"}>
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
               <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
@@ -512,11 +533,19 @@ export default function ClientDashboard() {
             </ErrorBoundary>
           </div>
 
-          {/* Column B (desktop only) - insight cards */}
-          <DashboardInsights insights={insights} isPlatformVisible={isPlatformVisible} className="hidden desktop:block desktop:col-span-1 space-y-8" />
+
+          {layout === "wide" && (
+            <>
+              <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 0)} className="space-y-8" />
+              <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 1)} className="space-y-8" />
+            </>
+          )}
+          {layout === "desktop" && (
+            <InsightCards ctx={insightCtx} positions={allCards.slice(0, 4)} className="space-y-8" />
+          )}
 
           {/* Column C - Recent Events + Platform Distribution + OS Version Charts */}
-          <div className="lg:col-span-7 desktop:col-span-1 space-y-8">
+          <div className={layout === "narrow" ? "lg:col-span-7 space-y-8" : "space-y-8"}>
             {/* Recent Events Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
               <RecentEventsTable
@@ -560,8 +589,12 @@ export default function ClientDashboard() {
             </ErrorBoundary>
           </div>
         </div>
-        {/* Below desktop width the insight cards sit in a row under the columns */}
-        <DashboardInsights insights={insights} isPlatformVisible={isPlatformVisible} className="desktop:hidden mt-8 grid grid-cols-1 md:grid-cols-2 gap-8" />
+        {layout === "desktop" && (
+          <InsightCards ctx={insightCtx} positions={allCards.slice(4)} className="mt-8 grid grid-cols-4 gap-8 items-start" />
+        )}
+        {layout === "narrow" && (
+          <InsightCards ctx={insightCtx} positions={allCards} className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start" />
+        )}
       </div>
       
       {/* Performance monitors disabled for memory optimization */}
