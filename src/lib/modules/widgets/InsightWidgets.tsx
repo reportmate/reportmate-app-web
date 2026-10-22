@@ -658,9 +658,42 @@ function HardwareAtRisk({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - 5 Install Health
+// MARK: - 5 Install Health (column 1, under Fleet Status)
 
-function InstallHealth({ ctx }: { ctx: InsightContext }) {
+/** A hero-size figure: the most prominent numbers on the dashboard. */
+function HeroStat({
+  value,
+  label,
+  tone,
+  link,
+}: {
+  value: number;
+  label: string;
+  tone: Tone;
+  link: string;
+}) {
+  return (
+    <Link
+      href={link}
+      className="flex-1 min-w-0 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+    >
+      <div
+        className={`text-6xl font-bold leading-none tabular-nums tracking-tight ${value === 0 ? "text-gray-400 dark:text-gray-500" : TONES[tone].text}`}
+      >
+        {value}
+      </div>
+      <div className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+        {label}
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Install Health replaces the Errors and Warnings tiles and sits under Fleet
+ * Status, with the headline counts as the biggest numbers on the page.
+ */
+export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "installHealth");
   const d: InstallHealthCard | null = card.status === "ready" ? card.data : null;
   return (
@@ -674,11 +707,11 @@ function InstallHealth({ ctx }: { ctx: InsightContext }) {
     >
       {d && (
         <>
-          <div className="flex gap-2">
-            <BigStat value={d.withErrors.count} label="devices with errors" tone="red" link={linkHref(d.withErrors.link)} />
-            <BigStat value={d.withWarnings.count} label="devices with warnings" tone="yellow" link={linkHref(d.withWarnings.link)} />
+          <div className="flex gap-3">
+            <HeroStat value={d.withErrors.count} label="devices with errors" tone="red" link={linkHref(d.withErrors.link)} />
+            <HeroStat value={d.withWarnings.count} label="devices with warnings" tone="yellow" link={linkHref(d.withWarnings.link)} />
           </div>
-          <div className="mt-4">
+          <div className="mt-5">
             <SectionLabel>Top failing items</SectionLabel>
             {d.topFailing.length ? (
               <BarList
@@ -925,48 +958,35 @@ function LocalAdminExposure({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - 11 Unused Software
+// MARK: - 11 App Usage (wide events column, under Recent Events)
 
-function UnusedSoftware({ ctx }: { ctx: InsightContext }) {
+const APP_USAGE_TOP = 10;
+
+/** The most-used apps. Sits in the wide events column under Recent Events. */
+export function AppUsageCard({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "unusedSoftware");
   const d: UnusedSoftwareCard | null = card.status === "ready" ? card.data : null;
   const hours = (h: number) => (h >= 1000 ? `${Math.round(h / 1000)}k h` : `${Math.round(h)} h`);
+  const top = d ? d.mostUsed.slice(0, APP_USAGE_TOP) : [];
   return (
     <InsightCard
-      title="Unused Software"
-      subtitle={`Installed widely, rarely opened · last ${d?.days ?? 30} days${ctx.platformFilter !== "all" ? " · All platforms" : ""}`}
+      title="App Usage"
+      subtitle={`Most used apps · last ${d?.days ?? 30} days${ctx.platformFilter !== "all" ? " · All platforms" : ""}`}
       link={`/applications?type=usage&period=${d?.days ?? 30}`}
       tone="teal"
       icon={<Icon d={ICONS.apps} />}
       card={card}
     >
-      {d && (
-        <>
-          <SectionLabel>Least used, on {d.minInstalls}+ devices</SectionLabel>
-          {d.leastUsed.length ? (
-            <DeviceList
-              items={d.leastUsed.map((a) => ({
-                key: a.name,
-                name: a.name,
-                detail: `${a.activeDevices} of ${a.installedDevices} devices`,
-                link: linkHref(a.link),
-              }))}
-            />
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">Nothing installed widely goes unused</p>
-          )}
-          {d.mostUsed.length > 0 && (
-            <div className="mt-4">
-              <SectionLabel>Most used</SectionLabel>
-              <BarList
-                color={TONES.teal.hex}
-                labelWidth="w-32"
-                items={d.mostUsed.map((a) => ({ label: a.name, count: a.totalHours, detail: hours(a.totalHours), link: linkHref(a.link) }))}
-              />
-            </div>
-          )}
-        </>
-      )}
+      {d &&
+        (top.length ? (
+          <BarList
+            color={TONES.teal.hex}
+            labelWidth="w-56"
+            items={top.map((a) => ({ label: a.name, count: a.totalHours, detail: hours(a.totalHours), link: linkHref(a.link) }))}
+          />
+        ) : (
+          <p className="text-sm text-gray-400 dark:text-gray-500">No usage recorded</p>
+        ))}
     </InsightCard>
   );
 }
@@ -1006,20 +1026,21 @@ function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - The twelve cards, in spec order
+// MARK: - The grid cards, in spec order
+
+// Install Health and App Usage have fixed places (column 1 and the events
+// column); the remaining cards fill the insight columns and grid.
 
 const CARDS: { id: InsightCardKey; Card: React.FC<{ ctx: InsightContext }> }[] = [
   { id: "rebootDebt", Card: RebootDebt },
   { id: "protectionGaps", Card: ProtectionGaps },
   { id: "unmanagedDevices", Card: UnmanagedDevices },
   { id: "hardwareAtRisk", Card: HardwareAtRisk },
-  { id: "installHealth", Card: InstallHealth },
   { id: "checkinGaps", Card: CheckinGaps },
   { id: "osCurrency", Card: OSCurrency },
   { id: "softwareRisk", Card: SoftwareRisk },
   { id: "expiringCertificates", Card: ExpiringCertificates },
   { id: "localAdminExposure", Card: LocalAdminExposure },
-  { id: "unusedSoftware", Card: UnusedSoftware },
   { id: "connectivityProblems", Card: ConnectivityProblems },
 ];
 

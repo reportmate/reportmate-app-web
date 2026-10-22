@@ -9,6 +9,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { peekCached, rememberCached, trackedFetch } from "../data-cache";
+
+const insightsUrl = (scope: string) =>
+  `/api/v1/dashboard/insights?platform=${encodeURIComponent(scope)}`;
 
 export const INSIGHTS_REFRESH_MS = 5 * 60 * 1000;
 
@@ -238,31 +242,38 @@ export interface InsightsState {
  * that platform on screen.
  */
 export function useDashboardInsights(platform: string): InsightsState {
-  const [state, setState] = useState<Omit<InsightsState, "refresh">>({
-    data: null,
-    loading: true,
-    error: null,
-  });
-  const latest = useRef(0);
   const scope =
     platform === "macOS" || platform === "Windows" ? platform : "all";
+  // The last answer for this platform shows instantly when the dashboard is
+  // opened again; the request below refreshes it in the background.
+  const [state, setState] = useState<Omit<InsightsState, "refresh">>(() => ({
+    data: peekCached<InsightsDocument>(insightsUrl(scope)) ?? null,
+    loading: true,
+    error: null,
+  }));
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
     const id = ++latest.current;
     setState((s) => ({
       ...s,
       loading: true,
-      data: s.data && s.data.platform === scope ? s.data : null,
+      data:
+        s.data && s.data.platform === scope
+          ? s.data
+          : (peekCached<InsightsDocument>(insightsUrl(scope)) ?? null),
     }));
     try {
-      const res = await fetch(
-        `/api/v1/dashboard/insights?platform=${encodeURIComponent(scope)}`,
+      const res = await trackedFetch(
+        insightsUrl(scope),
         { cache: "no-store", credentials: "include" },
+        { background: peekCached(insightsUrl(scope)) !== undefined },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as InsightsDocument;
       if (!json || typeof json.cards !== "object")
         throw new Error("Unexpected response");
+      rememberCached(insightsUrl(scope), json);
       if (id === latest.current)
         setState({ data: json, loading: false, error: null });
     } catch (err) {

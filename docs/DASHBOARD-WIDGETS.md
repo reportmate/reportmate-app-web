@@ -187,3 +187,12 @@ shows its error state; the rest render.
   as an alias for `mac|win` and rewrites the URL to the short form.
 - `/identity?admins=` takes `extra` (more than one admin), or an exact admin-user count: `2`,
   `3`, or `4+` for four or more.
+- Revision 3 behaviour on web:
+  - `src/lib/data-cache.ts` keeps the last answer for each request for the life of the tab, so
+    the dashboard and the reports render it instantly on return and refresh in the background.
+  - `trackedFetch` drives the thin bar under the toolbar. A first load shows "Loading n of N";
+    a refresh of data already on screen shows a faint sweep.
+  - Skeleton blocks get a shimmer sweep on top of `animate-pulse`.
+  - A refresh that fails with data on screen keeps the data and shows `RefreshErrorBanner`
+    ("Couldn't refresh · Retry · Last updated …").
+  - The web device page already uses the same toolbar as every other page, so it needed no change.

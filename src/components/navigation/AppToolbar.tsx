@@ -9,6 +9,7 @@ import { DeviceSearchField } from "../search/DeviceSearchField"
 import { SearchModal } from "../search/SearchModal"
 import { PlatformToggle } from "../ui/PlatformToggle"
 import { DemoBanner } from "../ui/DemoBanner"
+import { LoadProgressBar } from "./LoadProgressBar"
 import { useDemoMode } from "../../providers/DemoModeProvider"
 
 interface Device {
@@ -126,6 +127,7 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
             </div>
           </div>
         </div>
+        <LoadProgressBar />
       </header>
 
       {/* Search Modal for mobile and Cmd+K */}

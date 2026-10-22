@@ -2,16 +2,26 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
-import { WarningStatsWidget, ErrorStatsWidget, InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
+import type { InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
-import { InsightCards, INSIGHT_CARD_COUNT, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
+import { AppUsageCard, InsightCards, InstallHealthHero, INSIGHT_CARD_COUNT, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
+
+/** The dashboard's own data, kept across navigation so a return renders instantly. */
+const DASHBOARD_CACHE_KEY = "dashboard:view"
+interface DashboardView {
+  devices: Device[]
+  events: FleetEvent[]
+  installStats: InstallStatsData | null
+}
 
 // WebPubSub message types for JSON subprotocol
 interface WebPubSubMessage {
@@ -100,12 +110,17 @@ const allCards = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
 export default function ClientDashboard() {
   // All data comes from consolidated /api/dashboard call
   // Eliminates separate events API call for faster load
-  const [events, setEvents] = useState<FleetEvent[]>([])
-  const [devices, setDevices] = useState<Device[]>([])
-  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [cachedView] = useState(() => peekCached<DashboardView>(DASHBOARD_CACHE_KEY))
+  // A failed background refresh keeps the data on screen and shows a banner
+  const [dashboardRefreshError, setDashboardRefreshError] = useState<string | null>(null)
+  const [dashboardRetrying, setDashboardRetrying] = useState(false)
+  const refreshDashboardRef = useRef<() => Promise<void>>(async () => {})
+  const [events, setEvents] = useState<FleetEvent[]>(() => cachedView?.events ?? [])
+  const [devices, setDevices] = useState<Device[]>(() => cachedView?.devices ?? [])
+  const [devicesLoading, setDevicesLoading] = useState(!cachedView)
   const [, setTimeUpdateCounter] = useState(0)
-  const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
-  const [installStatsLoading, setInstallStatsLoading] = useState(true)
+  const [installStats, setInstallStats] = useState<InstallStatsData | null>(() => cachedView?.installStats ?? null)
+  const [, setInstallStatsLoading] = useState(!cachedView)
   const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -132,6 +147,12 @@ export default function ClientDashboard() {
   }, [events, platformFilter, isPlatformVisible])
   
   const insightCtx: InsightContext = useMemo(() => ({ insights, platformFilter }), [insights, platformFilter])
+
+  // Keep the latest view for the next visit
+  useEffect(() => {
+    if (devicesLoading || devices.length === 0) return
+    rememberCached<DashboardView>(DASHBOARD_CACHE_KEY, { devices, events, installStats })
+  }, [devices, events, installStats, devicesLoading])
 
   // Mark as mounted
   useEffect(() => {
@@ -166,17 +187,20 @@ export default function ClientDashboard() {
 
     const fetchDashboardData = async (isInitialLoad = false) => {
       try {
-        if (isInitialLoad) {
+        // A return visit already shows the cached view; this is a background refresh
+        const hasCache = peekCached(DASHBOARD_CACHE_KEY) !== undefined
+        if (isInitialLoad && !hasCache) {
           setDevicesLoading(true)
           setInstallStatsLoading(true)
         }
         
         // Single consolidated API call
-        const response = await fetch('/api/dashboard', { cache: 'no-store' })
+        const response = await trackedFetch('/api/dashboard', { cache: 'no-store' }, { background: !isInitialLoad || hasCache })
 
         if (!response.ok) {
           throw new Error(`Failed to load dashboard data: ${response.status}`)
         }
+        setDashboardRefreshError(null)
 
         const data = await response.json()
         
@@ -313,10 +337,12 @@ export default function ClientDashboard() {
       } catch (error) {
         if (!aborted) {
           console.error('[DASHBOARD] Dashboard data fetch failed:', error)
-          if (isInitialLoad) {
+          if (isInitialLoad && peekCached(DASHBOARD_CACHE_KEY) === undefined) {
             setDevices([])
             setInstallStats(null)
             setConnectionStatus('error')
+          } else {
+            setDashboardRefreshError(error instanceof Error ? error.message : 'Refresh failed')
           }
           // Non-initial refresh failures are transient — don't change
           // connectionStatus since we still have valid data displaying
@@ -328,6 +354,8 @@ export default function ClientDashboard() {
         }
       }
     }
+
+    refreshDashboardRef.current = () => fetchDashboardData(false)
 
     // Initial load
     fetchDashboardData(true)
@@ -493,10 +521,33 @@ export default function ClientDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
       <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
-        {/* Layout per docs/DASHBOARD-WIDGETS.md. Laptop: 30/70 with all twelve
-            insight cards in a 2-column grid below. Desktop (>= 1680px): three
-            columns with cards 1-4 in the middle and 5-12 four across below.
-            Wide (>= 2200px): four columns, cards dealt alternately into two. */}
+        {(() => {
+          // Keep the last good data on screen; say a refresh failed and when the data is from
+          const insightsFailed = !!insights.data && !!insights.error
+          const error = dashboardRefreshError || (insightsFailed ? insights.error : null)
+          if (!error) return null
+          const updatedAt = dashboardRefreshError
+            ? (lastUpdateTime ?? cachedAt(DASHBOARD_CACHE_KEY))
+            : insights.data?.generatedAt ? Date.parse(insights.data.generatedAt) : null
+          return (
+            <RefreshErrorBanner
+              className="mb-6 w-fit"
+              error={error}
+              updatedAt={updatedAt}
+              retrying={dashboardRetrying || insights.loading}
+              onRetry={async () => {
+                setDashboardRetrying(true)
+                insights.refresh()
+                try { await refreshDashboardRef.current() } finally { setDashboardRetrying(false) }
+              }}
+            />
+          )
+        })()}
+        {/* Layout per docs/DASHBOARD-WIDGETS.md. Install Health sits under Fleet
+            Status and App Usage under Recent Events at every width. The other
+            insight cards: laptop, a 2-column grid below; desktop (>= 1680px),
+            cards 1-4 in the middle column and the rest four across below;
+            wide (>= 2200px), dealt alternately into two middle columns. */}
         <div
           className={
             layout === "wide"
@@ -506,19 +557,16 @@ export default function ClientDashboard() {
                 : "grid grid-cols-1 lg:grid-cols-10 gap-8"
           }
         >
-          {/* Column A - Status Widget + Error/Warning Stats + New Clients Table */}
+          {/* Column A - Fleet Status + Install Health + New Clients */}
           <div className={layout === "narrow" ? "lg:col-span-3 space-y-8" : "space-y-8"}>
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
               <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
-            {/* Error and Warning Stats Cards - Side by Side */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-              <div className="grid grid-cols-2 gap-4">
-                <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} platformFilter={platformFilter} />
-                <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} platformFilter={platformFilter} />
-              </div>
+            {/* Install Health replaces the Errors and Warnings tiles */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading install health</div>}>
+              <InstallHealthHero ctx={insightCtx} />
             </ErrorBoundary>
 
             {/* New Clients Table */}
@@ -552,6 +600,11 @@ export default function ClientDashboard() {
                 loadingProgress={loadingProgress}
                 loadingMessage={loadingMessage}
               />
+            </ErrorBoundary>
+
+            {/* App Usage - directly under Recent Events */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading app usage</div>}>
+              <AppUsageCard ctx={insightCtx} />
             </ErrorBoundary>
 
             {/* Platform Distribution - Full Width */}
