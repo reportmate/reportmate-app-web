@@ -1,0 +1,169 @@
+{
+  "hours": 24,
+  "platform": "all",
+  "filters": { "tool": null, "level": null, "message": null },
+  "generatedAt": "2026-10-22T18:00:00+00:00",
+  "computeSeconds": 0.42,
+  "tools": [
+    {
+      "tool": "installs",
+      "name": "Munki",
+      "platform": "macOS",
+      "devices": 120,
+      "devicesWithErrors": 3,
+      "devicesWithWarnings": 5,
+      "errorLines": 14,
+      "warningLines": 22,
+      "lastAt": "2026-10-22T17:00:00Z",
+      "trend": [
+        { "hour": "2026-10-22T09:00:00Z", "errors": 2, "warnings": 4 },
+        { "hour": "2026-10-22T13:00:00Z", "errors": 8, "warnings": 10 },
+        { "hour": "2026-10-22T17:00:00Z", "errors": 4, "warnings": 8 }
+      ],
+      "link": { "path": "/management/logs", "params": { "tool": "installs", "level": "error", "platform": "macOS", "hours": "24" } },
+      "warningsLink": { "path": "/management/logs", "params": { "tool": "installs", "level": "warning", "platform": "macOS", "hours": "24" } }
+    },
+    {
+      "tool": "installs",
+      "name": "Cimian",
+      "platform": "Windows",
+      "devices": 340,
+      "devicesWithErrors": 2,
+      "devicesWithWarnings": 1,
+      "errorLines": 9,
+      "warningLines": 2,
+      "lastAt": "2026-10-22T16:00:00Z",
+      "trend": [
+        { "hour": "2026-10-22T10:00:00Z", "errors": 4, "warnings": 1 },
+        { "hour": "2026-10-22T16:00:00Z", "errors": 5, "warnings": 1 }
+      ]
+    },
+    {
+      "tool": "reports",
+      "name": "ReportMate",
+      "platform": null,
+      "devices": 460,
+      "devicesWithErrors": 1,
+      "devicesWithWarnings": 0,
+      "errorLines": 3,
+      "warningLines": 0,
+      "lastAt": "2026-10-22T11:00:00Z",
+      "trend": [{ "hour": "2026-10-22T11:00:00Z", "errors": 3, "warnings": 0 }]
+    },
+    {
+      "tool": "mdm",
+      "name": "MDM",
+      "platform": null,
+      "devices": 460,
+      "devicesWithErrors": 300,
+      "devicesWithWarnings": 320,
+      "errorLines": 9000,
+      "warningLines": 12000,
+      "lastAt": "2026-10-22T17:00:00Z",
+      "trend": []
+    }
+  ],
+  "messages": [
+    {
+      "id": "a1b2c3d4e5f6",
+      "message": "Failed to download catalog production",
+      "tool": "installs",
+      "name": "Munki",
+      "devices": 3,
+      "lines": 8,
+      "lastAt": "2026-10-22T17:00:00Z",
+      "link": { "path": "/management/logs", "params": { "tool": "installs", "level": "error", "message": "a1b2c3d4e5f6", "hours": "24" } }
+    },
+    {
+      "id": "0f9e8d7c6b5a",
+      "message": "Package hash mismatch for Firefox",
+      "tool": "installs",
+      "name": "Cimian",
+      "devices": 1,
+      "lines": 2,
+      "lastAt": "2026-10-22T16:00:00Z"
+    },
+    {
+      "id": "112233445566",
+      "message": "Upload to API timed out",
+      "tool": "reports",
+      "name": "ReportMate",
+      "devices": 1,
+      "lines": 3,
+      "lastAt": "2026-10-22T11:00:00Z"
+    },
+    {
+      "id": "ffffffffffff",
+      "message": "Enrollment session failed",
+      "tool": "mdm",
+      "name": "MDM",
+      "devices": 300,
+      "lines": 9000,
+      "lastAt": "2026-10-22T17:00:00Z"
+    }
+  ],
+  "devices": [
+    {
+      "serialNumber": "SAMPLE-MAC-0001",
+      "deviceName": "Sample Mac 1",
+      "platform": "macOS",
+      "tool": "installs",
+      "name": "Munki",
+      "errors": 8,
+      "warnings": 4,
+      "lastAt": "2026-10-22T17:00:00Z",
+      "link": { "path": "/device/SAMPLE-MAC-0001", "params": { "tab": "management", "tool": "installs", "level": "error" } }
+    },
+    {
+      "serialNumber": "SAMPLE-MAC-0002",
+      "deviceName": "Sample Mac 2",
+      "platform": "macOS",
+      "tool": "installs",
+      "name": "Munki",
+      "errors": 6,
+      "warnings": 0,
+      "lastAt": "2026-10-22T14:00:00Z"
+    },
+    {
+      "serialNumber": "SAMPLE-MAC-0003",
+      "deviceName": "Sample Mac 3",
+      "platform": "macOS",
+      "tool": "installs",
+      "name": "Munki",
+      "errors": 0,
+      "warnings": 18,
+      "lastAt": "2026-10-22T12:00:00Z"
+    },
+    {
+      "serialNumber": "SAMPLE-WIN-0001",
+      "deviceName": "Sample PC 1",
+      "platform": "Windows",
+      "tool": "installs",
+      "name": "Cimian",
+      "errors": 9,
+      "warnings": 2,
+      "lastAt": "2026-10-22T16:00:00Z"
+    },
+    {
+      "serialNumber": "SAMPLE-WIN-0002",
+      "deviceName": "Sample PC 2",
+      "platform": "Windows",
+      "tool": "reports",
+      "name": "ReportMate",
+      "errors": 3,
+      "warnings": 0,
+      "lastAt": "2026-10-22T11:00:00Z"
+    },
+    {
+      "serialNumber": "SAMPLE-WIN-0003",
+      "deviceName": "Sample PC 3",
+      "platform": "Windows",
+      "tool": "mdm",
+      "name": "MDM",
+      "errors": 30,
+      "warnings": 40,
+      "lastAt": "2026-10-22T17:00:00Z"
+    }
+  ],
+  "devicesTruncated": false
+}

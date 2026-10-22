@@ -15,6 +15,7 @@ import { LAST_SEEN_LABELS, type LastSeenBucket, boolish, lastSeenBucket, lastSee
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { ManagementShieldIcon, ManagementViewSwitch } from "@/src/components/management/ManagementViewSwitch"
 
 const MANAGEMENT_URL = '/api/v1/management'
 
@@ -910,7 +911,11 @@ function ManagementPageContent() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management Service</h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ManagementShieldIcon />
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management Service</h2>
+                  <ManagementViewSwitch current="enrollment" />
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Enrollment status and type, providers, and configurations {filteredManagement.length} devices
                 </p>
