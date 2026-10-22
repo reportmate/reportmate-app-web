@@ -4,12 +4,21 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useCallback, useMemo, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
+import {
+  CERT_CLASS_ALL,
+  certClassLabel,
+  certClassOf,
+  deviceCertLabel,
+  deviceExpiredCertCount,
+  parseCertDeepLink,
+  type CertClass,
+} from "@/src/lib/security/certificates"
 
 // ============ TYPE DEFINITIONS ============
 
@@ -74,6 +83,12 @@ interface SecurityDevice {
   // Certificates (Phase 1 split — separate user-managed from OS-bundled roots)
   userExpiredCertCount?: number
   osRootExpiredCertCount?: number
+  // Certificate classes: expiredCertCount and expiringSoonCertCount are
+  // actionable only; these break the rest out by class.
+  actionableCertCount?: number
+  systemManagedCertCount?: number
+  trustStoreCertCount?: number
+  systemManagedExpiredCertCount?: number
   // Phase 2 — protection posture
   lsaProtectionEnabled?: boolean
   lsaProtectionMode?: string  // "Disabled" | "PPL" | "PPLBoot"
@@ -136,6 +151,11 @@ interface CertificateResult {
   keyAlgorithm: string
   certSerialNumber: string
   isSelfSigned: boolean
+  class?: CertClass | null
+  displayName?: string | null
+  issuerName?: string | null
+  path?: string | null
+  thumbprint?: string | null
 }
 
 type SortColumn = 'device' | 'encryption' | 'protection' | 'detection' | 'firewall' | 'tampering' | 'remote' | 'certificates' | 'cve'
@@ -301,6 +321,10 @@ function SortHeader({ label, column, sortColumn, sortDirection, onSort }: {
 
 function SecurityPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // Certificate deep links: certs=expired|expiring, certSearch, certStatus, certClass=all
+  const [initialCertLink] = useState(() => parseCertDeepLink(searchParams))
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   // Data
@@ -324,7 +348,7 @@ function SecurityPageContent() {
   const [firewallFilter, setFirewallFilter] = useState('')
   const [tamperingFilter, setTamperingFilter] = useState('')
   const [remoteFilter, setRemoteFilter] = useState('')
-  const [certFilter, setCertFilter] = useState('')
+  const [certFilter, setCertFilter] = useState<string>(initialCertLink.certFilter)
   const [cveFilter, setCveFilter] = useState('')
 
   // Sorting
@@ -334,7 +358,7 @@ function SecurityPageContent() {
   // Accordion
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
-  const [certSearchExpanded, setCertSearchExpanded] = useState(false)
+  const [certSearchExpanded, setCertSearchExpanded] = useState(!!(initialCertLink.certSearch || initialCertLink.certStatus !== 'all'))
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -342,8 +366,10 @@ function SecurityPageContent() {
   )
 
   // Certificate search
-  const [certSearchQuery, setCertSearchQuery] = useState('')
-  const [certSearchStatus, setCertSearchStatus] = useState('all')
+  const [certSearchQuery, setCertSearchQuery] = useState(initialCertLink.certSearch)
+  const [certSearchStatus, setCertSearchStatus] = useState<string>(initialCertLink.certStatus)
+  // Off by default: only actionable certificates. On = certClass=all in the URL.
+  const [showSystemManaged, setShowSystemManaged] = useState(initialCertLink.showSystemManaged)
   const [certResults, setCertResults] = useState<CertificateResult[]>([])
   const [certSearchLoading, setCertSearchLoading] = useState(false)
   const [certSearchPerformed, setCertSearchPerformed] = useState(false)
@@ -399,6 +425,7 @@ function SecurityPageContent() {
       const params = new URLSearchParams()
       if (certSearchQuery.trim()) params.set('search', certSearchQuery.trim())
       if (certSearchStatus !== 'all') params.set('status', certSearchStatus)
+      if (showSystemManaged) params.set('class', CERT_CLASS_ALL)
       const response = await fetch(`/api/v1/security/certificates?${params.toString()}`, {
         cache: 'no-store',
         credentials: 'include',
@@ -414,7 +441,7 @@ function SecurityPageContent() {
     } finally {
       setCertSearchLoading(false)
     }
-  }, [certSearchQuery, certSearchStatus])
+  }, [certSearchQuery, certSearchStatus, showSystemManaged])
 
   // Auto-search when status filter changes (if there's already a search query)
   useEffect(() => {
@@ -423,14 +450,39 @@ function SecurityPageContent() {
     }
   }, [certSearchStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Deep link (certSearch / certStatus): run the search once on arrival. A
+  // link carrying both is already searched by the status effect above.
+  useEffect(() => {
+    const { certSearch, certStatus } = initialCertLink
+    if (certSearch.trim() && certStatus !== 'all') return
+    if (certSearch.trim() || certStatus !== 'all') searchCertificates()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-run a search already on screen when the class toggle changes
+  useEffect(() => {
+    if (certSearchPerformed) searchCertificates()
+  }, [showSystemManaged]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep certClass=all in the URL while system-managed certificates are shown;
+  // the default (actionable only) is omitted. Other params are left as they are.
+  useEffect(() => {
+    const current = (searchParams.get('certClass') || '').toLowerCase() === CERT_CLASS_ALL
+    if (current === showSystemManaged) return
+    const params = new URLSearchParams(searchParams.toString())
+    if (showSystemManaged) params.set('certClass', CERT_CLASS_ALL)
+    else params.delete('certClass')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [showSystemManaged]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Grouped certificate results: group by commonName, track device serials
   const groupedCertResults = useMemo(() => {
     if (certResults.length === 0) return []
-    const groups: Record<string, { commonName: string; issuer: string; status: string; devices: { serialNumber: string; deviceName: string; notAfter: string; isExpired: boolean; isExpiringSoon: boolean }[]; expiredCount: number; expiringCount: number; validCount: number }> = {}
+    const groups: Record<string, { commonName: string; issuer: string; status: string; certClass: CertClass; devices: { serialNumber: string; deviceName: string; notAfter: string; isExpired: boolean; isExpiringSoon: boolean }[]; expiredCount: number; expiringCount: number; validCount: number }> = {}
     for (const cert of certResults) {
-      const key = cert.commonName || 'Unknown'
+      const key = cert.displayName || cert.commonName || 'Unknown'
       if (!groups[key]) {
-        groups[key] = { commonName: key, issuer: cert.issuer, status: cert.status, devices: [], expiredCount: 0, expiringCount: 0, validCount: 0 }
+        groups[key] = { commonName: key, issuer: cert.issuerName || cert.issuer, status: cert.status, certClass: certClassOf(cert), devices: [], expiredCount: 0, expiringCount: 0, validCount: 0 }
       }
       // Avoid duplicate devices within same cert group
       if (!groups[key].devices.some(d => d.serialNumber === cert.serialNumber)) {
@@ -504,14 +556,9 @@ function SecurityPageContent() {
     return hasSsh ? 'SSH Enabled' : 'Disabled'
   }
 
-  const getCertLabel = (d: SecurityDevice): string => {
-    // Prefer user-managed expired count (OS-root expirations are natural rotation, not a finding).
-    // Fall back to the total when the new field isn't present (old payloads).
-    const expired = d.userExpiredCertCount ?? d.expiredCertCount
-    if (expired > 0) return 'Has Expired'
-    if (d.expiringSoonCertCount > 0) return 'Expiring Soon'
-    return 'Valid'
-  }
+  // Actionable certificates only, unless "Show system-managed" is on.
+  const getExpiredCertCount = (d: SecurityDevice): number => deviceExpiredCertCount(d, showSystemManaged)
+  const getCertLabel = (d: SecurityDevice): string => deviceCertLabel(d, showSystemManaged)
 
   // Detection: prefer active-threat count (excludes ASR blocks which are protection working).
   // Falls back to legacy detectionCount when activeThreatCount isn't in the payload.
@@ -627,7 +674,7 @@ function SecurityPageContent() {
       case 'firewall': av = a.firewallEnabled ? '1' : '0'; bv = b.firewallEnabled ? '1' : '0'; break
       case 'tampering': av = getTamperLabel(a); bv = getTamperLabel(b); break
       case 'remote': av = getRemoteLabel(a); bv = getRemoteLabel(b); break
-      case 'certificates': av = String(a.expiredCertCount + a.expiringSoonCertCount).padStart(5, '0'); bv = String(b.expiredCertCount + b.expiringSoonCertCount).padStart(5, '0'); break
+      case 'certificates': av = String(getExpiredCertCount(a) + a.expiringSoonCertCount).padStart(5, '0'); bv = String(getExpiredCertCount(b) + b.expiringSoonCertCount).padStart(5, '0'); break
       case 'cve': av = String(a.cveCount).padStart(5, '0'); bv = String(b.cveCount).padStart(5, '0'); break
     }
     return sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
@@ -654,7 +701,7 @@ function SecurityPageContent() {
       })()),
       d.firewallEnabled ? 'On' : 'Off',
       [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
-      String(d.expiredCertCount), String(d.expiringSoonCertCount),
+      String(getExpiredCertCount(d)), String(d.expiringSoonCertCount),
       String(d.cveCount), String(d.criticalCveCount),
     ].join(','))
     const csv = [headers.join(','), ...rows].join('\n')
@@ -812,6 +859,11 @@ function SecurityPageContent() {
             >
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Certificates</span>
+                {showSystemManaged && (
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                    Including system-managed
+                  </span>
+                )}
                 {selectedCertName && (
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                     Filtering: {selectedCertName}
@@ -870,6 +922,18 @@ function SecurityPageContent() {
                   >
                     {certSearchLoading ? 'Searching...' : 'Search'}
                   </button>
+                  <label
+                    className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer select-none flex-shrink-0"
+                    title="Include certificates the OS or an agent rotates, and OS trust-store roots"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={showSystemManaged}
+                      onChange={(e) => setShowSystemManaged(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                    />
+                    Show system-managed
+                  </label>
                 </div>
 
                 {/* Grouped certificate results */}
@@ -893,6 +957,11 @@ function SecurityPageContent() {
                               <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={group.commonName}>
                                 {group.commonName}
                               </p>
+                              {showSystemManaged && group.certClass !== 'actionable' && (
+                                <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 flex-shrink-0">
+                                  {certClassLabel(group.certClass)}
+                                </span>
+                              )}
                               {isSelected && (
                                 <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -1117,13 +1186,13 @@ function SecurityPageContent() {
                         {/* Certificates */}
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1">
-                            {d.expiredCertCount > 0 && (
-                              <Badge className={redBadge}>{d.expiredCertCount}</Badge>
+                            {getExpiredCertCount(d) > 0 && (
+                              <Badge className={redBadge}>{getExpiredCertCount(d)}</Badge>
                             )}
                             {d.expiringSoonCertCount > 0 && (
                               <Badge className={amberBadge}>{d.expiringSoonCertCount}</Badge>
                             )}
-                            {d.expiredCertCount === 0 && d.expiringSoonCertCount === 0 && (
+                            {getExpiredCertCount(d) === 0 && d.expiringSoonCertCount === 0 && (
                               <span className="text-xs text-green-600 dark:text-green-400">OK</span>
                             )}
                           </div>
