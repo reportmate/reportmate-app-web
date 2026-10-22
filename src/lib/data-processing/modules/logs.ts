@@ -55,6 +55,8 @@ export interface LogRoot {
   warningCount?: number
   /** Tails of the root's most relevant logs, primary first; absent until fetched per tool */
   tails: LogTail[]
+  /** Error and warning lines per UTC hour, stamped by the API at ingest (log_tails.summarize_root) */
+  levelSummary?: { hours?: Record<string, number[]>; [key: string]: unknown }
 }
 
 export interface LogsInfo {
@@ -133,6 +135,7 @@ export function normalizeLogRoot(raw: any): LogRoot | null {
     errorCount: toNumber(pick(raw, 'errorCount', 'error_count')),
     warningCount: toNumber(pick(raw, 'warningCount', 'warning_count')),
     tails,
+    ...(raw.levelSummary && typeof raw.levelSummary === 'object' ? { levelSummary: raw.levelSummary } : {}),
   }
 }
 

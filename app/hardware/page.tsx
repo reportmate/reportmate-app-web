@@ -5,7 +5,12 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
-import { archFamily, isLowMemory, isLowStorage, paramList } from "@/src/lib/dashboard/reportRules"
+import {
+  archFamily, isLowMemory, isLowStorageBucket, paramList,
+  storageFreeBucket, storageCapacityBucket,
+  STORAGE_FREE_KEYS, STORAGE_FREE_LABELS, STORAGE_CAPACITY_KEYS, STORAGE_CAPACITY_LABELS,
+  type StorageFreeKey, type StorageCapacityKey,
+} from "@/src/lib/dashboard/reportRules"
 import { HardwarePageSkeleton } from "@/src/components/skeleton/HardwarePageSkeleton"
 import { usePlatformFilterSafe, normalizePlatform, getDevicePlatformLabel } from "@/src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
@@ -73,11 +78,14 @@ function HardwarePageContent() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [processorFilter, setProcessorFilter] = useState<string>('all')
-  // Dashboard deep-link filters (?arch=, ?storage=low, ?memory=le8). They use
+  // Dashboard deep-link filters (?arch=, ?storage=low|lt5|5-10|10-20|20+,
+  // ?capacity=le256|512|1t|2t+, ?memory=le8). They use
   // the dashboard's own rules, so they sit beside the charts' buckets rather
   // than in them, and show as removable pills under the search row.
   const [selectedArchFamilies, setSelectedArchFamilies] = useState<string[]>([])
   const [lowStorageOnly, setLowStorageOnly] = useState(false)
+  const [storageFreeKeys, setStorageFreeKeys] = useState<StorageFreeKey[]>([])
+  const [capacityKeys, setCapacityKeys] = useState<StorageCapacityKey[]>([])
   const [lowMemoryOnly, setLowMemoryOnly] = useState(false)
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
@@ -226,6 +234,7 @@ function HardwarePageContent() {
     selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
     selectedAreas.length + selectedFleets.length +
     selectedArchFamilies.length + (lowStorageOnly ? 1 : 0) + (lowMemoryOnly ? 1 : 0) +
+    storageFreeKeys.length + capacityKeys.length +
     (processorFilter !== 'all' ? 1 : 0)
 
   const clearAllFilters = () => {
@@ -246,6 +255,8 @@ function HardwarePageContent() {
     setSelectedFleets([])
     setSelectedArchFamilies([])
     setLowStorageOnly(false)
+    setStorageFreeKeys([])
+    setCapacityKeys([])
     setLowMemoryOnly(false)
     setProcessorFilter('all')
     setSearchQuery('')
@@ -265,7 +276,13 @@ function HardwarePageContent() {
     setSearchQuery(searchParams.get('search') || '')
     setProcessorFilter(searchParams.get('processor') || 'all')
     setSelectedArchFamilies(paramList(searchParams.get('arch')))
-    setLowStorageOnly(searchParams.get('storage') === 'low')
+    // storage= takes `low` (the card's under-10% total) and the free-space
+    // bucket keys, comma-separated; capacity= the capacity bucket keys
+    const storageValues = paramList(searchParams.get('storage')).map(v => v.toLowerCase())
+    setLowStorageOnly(storageValues.includes('low'))
+    setStorageFreeKeys(STORAGE_FREE_KEYS.filter(k => storageValues.includes(k)))
+    const capacityValues = paramList(searchParams.get('capacity')).map(v => v.toLowerCase())
+    setCapacityKeys(STORAGE_CAPACITY_KEYS.filter(k => capacityValues.includes(k)))
     setLowMemoryOnly(searchParams.get('memory') === 'le8')
     // type=laptop|desktop is the Device Type chart's own selection
     const typeLabels: Record<string, string> = { laptop: 'Laptop', desktop: 'Desktop' }
@@ -287,7 +304,8 @@ function HardwarePageContent() {
       put('search', searchQuery.trim())
       put('processor', processorFilter !== 'all' ? processorFilter : null)
       put('arch', selectedArchFamilies.join(','))
-      put('storage', lowStorageOnly ? 'low' : null)
+      put('storage', [...(lowStorageOnly ? ['low'] : []), ...storageFreeKeys].join(',') || null)
+      put('capacity', capacityKeys.join(',') || null)
       put('memory', lowMemoryOnly ? 'le8' : null)
       put('type', selectedDeviceTypes.map(t => t.toLowerCase()).join(','))
       const next = params.toString().replace(/%2C/gi, ',')
@@ -296,8 +314,8 @@ function HardwarePageContent() {
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
     }, 150)
     return () => clearTimeout(timer)
-  }, [searchQuery, processorFilter, selectedArchFamilies, lowStorageOnly, lowMemoryOnly,
-      selectedDeviceTypes, pathname, router])
+  }, [searchQuery, processorFilter, selectedArchFamilies, lowStorageOnly, storageFreeKeys, capacityKeys,
+      lowMemoryOnly, selectedDeviceTypes, pathname, router])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -435,7 +453,11 @@ function HardwarePageContent() {
       // Dashboard rules, read from the record as the API sent it (before the
       // architecture normalisation above), the same object the card counts.
       archFamily: archFamily(hardwareRecord),
-      lowStorage: isLowStorage(hardwareRecord),
+      // Measured exactly as the API's storage SQL does, so storage=low is
+      // lt5 + 5-10 and matches the card's Low storage count.
+      lowStorage: isLowStorageBucket(hardwareRecord),
+      storageFreeBucket: storageFreeBucket(hardwareRecord),
+      storageCapacityBucket: storageCapacityBucket(hardwareRecord),
       lowMemory: isLowMemory(hardwareRecord),
     }
   })
@@ -750,6 +772,8 @@ function HardwarePageContent() {
     // Dashboard deep-link filters
     if (selectedArchFamilies.length > 0 && !selectedArchFamilies.some(a => a.toLowerCase() === h.archFamily.toLowerCase())) return false
     if (lowStorageOnly && !h.lowStorage) return false
+    if (storageFreeKeys.length > 0 && !(h.storageFreeBucket && storageFreeKeys.includes(h.storageFreeBucket))) return false
+    if (capacityKeys.length > 0 && !(h.storageCapacityBucket && capacityKeys.includes(h.storageCapacityBucket))) return false
     if (lowMemoryOnly && !h.lowMemory) return false
 
     if (searchQuery.trim()) {
@@ -867,7 +891,17 @@ function HardwarePageContent() {
       label: a,
       clear: () => setSelectedArchFamilies(prev => prev.filter(x => x !== a)),
     })),
-    ...(lowStorageOnly ? [{ key: 'storage', label: 'Low storage', clear: () => setLowStorageOnly(false) }] : []),
+    ...(lowStorageOnly ? [{ key: 'storage', label: 'Low storage (under 10% free)', clear: () => setLowStorageOnly(false) }] : []),
+    ...storageFreeKeys.map(k => ({
+      key: `storage-${k}`,
+      label: STORAGE_FREE_LABELS[k],
+      clear: () => setStorageFreeKeys(prev => prev.filter(x => x !== k)),
+    })),
+    ...capacityKeys.map(k => ({
+      key: `capacity-${k}`,
+      label: `Capacity: ${STORAGE_CAPACITY_LABELS[k]}`,
+      clear: () => setCapacityKeys(prev => prev.filter(x => x !== k)),
+    })),
     ...(lowMemoryOnly ? [{ key: 'memory', label: '8 GB memory or less', clear: () => setLowMemoryOnly(false) }] : []),
     ...(processorFilter !== 'all'
       ? [{ key: 'processor', label: `Processor: ${processorFilter}`, clear: () => setProcessorFilter('all') }]

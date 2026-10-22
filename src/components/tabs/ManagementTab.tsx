@@ -11,6 +11,7 @@ import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
 import { ManagementLogsSection } from './ManagementLogsSection'
+import type { ToolLevel } from '../../lib/dashboard/reportRules'
 import { extractLogs } from '../../lib/data-processing/modules/logs'
 
 // Helper to parse osquery boolean strings ("true", "false", "1", "0") to boolean
@@ -157,9 +158,14 @@ interface ManagementTabProps {
   device: Record<string, unknown>
   /** The installs module, when loaded: the log viewer reads tool versions from it as a fallback */
   installs?: unknown
+  /** Deep link `?tool=&level=`: the log viewer opens on that tool, filtered to that level */
+  logTool?: string | null
+  logLevel?: ToolLevel | null
+  /** The log viewer's tool and level choice, for the page to keep in the URL */
+  onLogSelectionChange?: (tool: string | null, level: ToolLevel | null) => void
 }
 
-export const ManagementTab: React.FC<ManagementTabProps> = ({ device, installs }) => {
+export const ManagementTab: React.FC<ManagementTabProps> = ({ device, installs, logTool, logLevel, onLogSelectionChange }) => {
   // State for profile accordion expansion
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set())
   // State for managed policies accordion expansion
@@ -1313,7 +1319,14 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device, installs }
       </div>
 
       {/* Management tool logs - one inner tab per Managed logs root */}
-      <ManagementLogsSection serialNumber={(device as any)?.serialNumber} logs={managementLogs} installs={installs} />
+      <ManagementLogsSection
+        serialNumber={(device as any)?.serialNumber}
+        logs={managementLogs}
+        installs={installs}
+        initialTool={logTool}
+        initialLevel={logLevel}
+        onSelectionChange={onLogSelectionChange}
+      />
 
       {/* Configuration Profiles Section - macOS profiles and Windows policy branches alike */}
       {profileEntries.length > 0 && (

@@ -14,7 +14,7 @@ import { getDevicePlatform, usePlatformFilterSafe } from '@/src/providers/Platfo
 import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
-import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS } from '@/src/lib/dashboard/reportRules'
+import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS, installAgent, installAgentFromParam, INSTALL_AGENT_LABELS, type InstallAgent } from '@/src/lib/dashboard/reportRules'
 import { cachedAt, peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
 import { RefreshErrorBanner } from '@/src/components/ui/RefreshErrorBanner'
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
@@ -329,6 +329,9 @@ function InstallsPageContent() {
   const [itemFilter, setItemFilter] = useState(initialFilter === 'all' ? initialItem : '')
   // `stale=1`: devices whose install agent has been silent > SILENT_AGENT_DAYS
   const [staleOnly, setStaleOnly] = useState(searchParams.get('stale') === '1')
+  // `agent=munki|cimian`: every view narrowed to devices on that install agent
+  // (Munki = macOS, Cimian = Windows), combined with filter= and stale=.
+  const [agentFilter, setAgentFilter] = useState<InstallAgent | null>(installAgentFromParam(searchParams.get('agent')))
   const [staleAgents, setStaleAgents] = useState<any[]>(() => (Array.isArray(cachedFilters()?.staleAgents) ? cachedFilters().staleAgents : []))
   // Device status filter (active, stale, missing)
   const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | DeviceStatusFilterValue>('all')
@@ -352,7 +355,7 @@ function InstallsPageContent() {
   // For installs: mac = only devices with Munki data, win = only devices with Cimian data
   // Declared early to avoid temporal dead zone when referenced in handleConfigReport
   const platformFilteredDevices = useMemo(() => {
-    if (platformFilter === 'all') return devices
+    if (platformFilter === 'all' && !agentFilter) return devices
     return devices.filter((device: any) => {
       let platform = getDevicePlatform(device)
       // Installs-specific fallback: use install manager presence when generic platform detection fails
@@ -360,9 +363,10 @@ function InstallsPageContent() {
         if (device.modules?.installs?.cimian) platform = 'Windows'
         else if (device.modules?.installs?.munki) platform = 'macOS'
       }
-      return isPlatformVisible(platform)
+      if (agentFilter && installAgent({ platform, modules: device.modules }) !== agentFilter) return false
+      return platformFilter === 'all' || isPlatformVisible(platform)
     })
-  }, [devices, platformFilter, isPlatformVisible])
+  }, [devices, platformFilter, isPlatformVisible, agentFilter])
 
   // Serials of the devices the `item` and `stale` deep links keep
   const itemFilterSerials = useMemo(() => {
@@ -473,6 +477,7 @@ function InstallsPageContent() {
     setItemsStatusFilter('all')
     setItemFilter('')
     setStaleOnly(false)
+    setAgentFilter(null)
     setWidgetsExpanded(true)
   }
 
@@ -923,6 +928,11 @@ function InstallsPageContent() {
   // Filter installs based on search query AND inventory filters AND device status AND install status
   const filteredInstalls = useMemo(() => {
     let filtered = installs
+
+    // agent= narrows the generated report too (Munki rows are macOS, Cimian Windows)
+    if (agentFilter) {
+      filtered = filtered.filter(install => installAgent({ platform: install.platform }) === agentFilter)
+    }
     
     // Apply device status filter (Active/Stale/Missing based on lastSeen)
     if (deviceStatusFilter !== 'all') {
@@ -1039,7 +1049,7 @@ function InstallsPageContent() {
     })
 
     return sorted
-  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection])
+  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection, agentFilter])
 
   useEffect(() => {
     fetchFilterOptions()
@@ -1100,6 +1110,7 @@ function InstallsPageContent() {
       setItemFilter(itemParam)
     }
     setStaleOnly(searchParams.get('stale') === '1')
+    setAgentFilter(installAgentFromParam(searchParams.get('agent')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuery])
 
@@ -1121,12 +1132,13 @@ function InstallsPageContent() {
     set('view', statusView === 'messages' ? 'messages' : null)
     set('item', urlItem || null)
     set('stale', staleOnly ? '1' : null)
+    set('agent', agentFilter)
     const next = params.toString()
     if (next === searchParams.toString()) return
     ownUrlWritesRef.current.add(next)
     router.replace(next ? `/installs?${next}` : '/installs', { scroll: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemsStatusFilter, statusView, urlItem, staleOnly])
+  }, [itemsStatusFilter, statusView, urlItem, staleOnly, agentFilter])
 
   const toggleExpandedMessage = useCallback((key: string) => {
     setExpandedMessages(prev => {
@@ -3615,7 +3627,7 @@ function InstallsPageContent() {
           )}
 
           {/* Deep-link filters (dashboard Install Health card): clearable */}
-          {!filtersLoading && !isGeneratingReport && ((itemFilter && itemsStatusFilter === 'all') || staleOnly) && (
+          {!filtersLoading && !isGeneratingReport && ((itemFilter && itemsStatusFilter === 'all') || staleOnly || agentFilter) && (
             <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3630,6 +3642,14 @@ function InstallsPageContent() {
                     </button>
                   </span>
                 )}
+                {agentFilter && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    Agent: {INSTALL_AGENT_LABELS[agentFilter]} ({platformFilteredDevices.length})
+                    <button onClick={() => setAgentFilter(null)} className="hover:text-yellow-950 dark:hover:text-white" title="Clear agent filter" aria-label="Clear agent filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
                 {staleOnly && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
                     Install agent silent &gt; {SILENT_AGENT_DAYS} days ({staleSerials?.size ?? 0})
@@ -3640,7 +3660,7 @@ function InstallsPageContent() {
                 )}
               </div>
               <button
-                onClick={() => { setItemFilter(''); setStaleOnly(false) }}
+                onClick={() => { setItemFilter(''); setStaleOnly(false); setAgentFilter(null) }}
                 className="px-3 py-1 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors whitespace-nowrap"
               >
                 Clear Filters

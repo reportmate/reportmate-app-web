@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
@@ -11,7 +11,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
-import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins } from "@/src/lib/dashboard/reportRules"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
@@ -164,6 +164,13 @@ function IdentityPageContent() {
   // (the directory donut folds hybrid into Domain Joined; this does not).
   const [joinFilter, setJoinFilter] = useState<JoinType[]>(() =>
     paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
+  // `directory=psso,bound,unbound`: a Mac's directory state as the API's
+  // Directory Join card reads it (reportRules.macDirectory); Macs only.
+  const directoryFromParam = (value: string | null): MacDirectory[] => {
+    const values = paramList(value).map(v => v.toLowerCase())
+    return MAC_DIRECTORY_KEYS.filter(k => values.includes(k))
+  }
+  const [macDirectoryFilter, setMacDirectoryFilter] = useState<MacDirectory[]>(() => directoryFromParam(searchParams.get('directory')))
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
@@ -209,9 +216,9 @@ function IdentityPageContent() {
       return next
     })
   }
-  const hasActiveWidgetFilter = adminFilter !== 'all' || joinFilter.length > 0 || directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
+  const hasActiveWidgetFilter = adminFilter !== 'all' || joinFilter.length > 0 || macDirectoryFilter.length > 0 || directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
   const clearWidgetFilters = () => {
-    setAdminFilter('all'); setJoinFilter([])
+    setAdminFilter('all'); setJoinFilter([]); setMacDirectoryFilter([])
     setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null); setShowAdminsReport(false)
     setSecureTokenFilter(null); setBootstrapTokenFilter(null)
   }
@@ -273,6 +280,8 @@ function IdentityPageContent() {
   // inventory values, so select every value of that kind once the rows are in.
   // `usages=` carries raw values that have no kind.
   const [urlHydrated, setUrlHydrated] = useState(false)
+  // Query strings this page wrote itself, so the URL → state effect below skips them
+  const ownUrlWrites = useRef<Set<string>>(new Set())
   useEffect(() => {
     if (loading || urlHydrated) return
     setUrlHydrated(true)
@@ -299,6 +308,7 @@ function IdentityPageContent() {
     }
     set('admins', adminFilter === 'multiple-admins' ? 'extra' : adminCount)
     set('join', joinFilter.length > 0 ? JOIN_TYPES.filter(j => joinFilter.includes(j)).join(',') : null)
+    set('directory', macDirectoryFilter.length > 0 ? macDirectoryFilter.join(',') : null)
     const kinds = new Set<string>()
     const raw: string[] = []
     for (const u of selectedUsages) {
@@ -310,10 +320,27 @@ function IdentityPageContent() {
     set('usages', raw.length > 0 ? raw.join(',') : null)
     const next = params.toString()
     if (next !== searchParams.toString()) {
+      ownUrlWrites.current.add(next)
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlHydrated, adminFilter, joinFilter, selectedUsages])
+  }, [urlHydrated, adminFilter, joinFilter, macDirectoryFilter, selectedUsages])
+
+  // URL → state when the URL changes from outside (a dashboard deep link,
+  // Back) while the page is open; the first render already read it, and the
+  // page's own writes are recognised and skipped.
+  const currentQuery = searchParams.toString()
+  const lastAppliedQuery = useRef(currentQuery)
+  useEffect(() => {
+    if (lastAppliedQuery.current === currentQuery) return
+    lastAppliedQuery.current = currentQuery
+    if (ownUrlWrites.current.delete(currentQuery)) return
+    const admins = adminsFromParam(searchParams.get('admins'))
+    setAdminFilter(admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all')
+    setJoinFilter(paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
+    setMacDirectoryFilter(directoryFromParam(searchParams.get('directory')))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuery])
 
   // Platform-filtered devices (for widgets — no search/admin filter)
   const platformFilteredDevices = identityDevices.filter(d => {
@@ -342,6 +369,10 @@ function IdentityPageContent() {
     if (adminFilter === 'multiple-admins' && d.adminUsers <= 1) return false
     if (adminCount && !matchesAdmins(d, adminCount)) return false
     if (joinFilter.length > 0 && !joinFilter.includes(joinType(d))) return false
+    if (macDirectoryFilter.length > 0) {
+      const dir = macDirectory(d)
+      if (!dir || !macDirectoryFilter.includes(dir)) return false
+    }
     
     // Widget click: directory filter
     if (directoryFilter) {
@@ -661,6 +692,7 @@ function IdentityPageContent() {
                   {[
                     adminFilter === 'multiple-admins' ? 'More than one admin' : adminFilter === 'no-admins' ? 'No admin users' : adminCount ? ADMINS_LABELS[adminCount] : null,
                     joinFilter.length > 0 ? `Join: ${joinFilter.map(j => JOIN_LABELS[j]).join(', ')}` : null,
+                    macDirectoryFilter.length > 0 ? `Mac directory: ${macDirectoryFilter.map(k => MAC_DIRECTORY_LABELS[k]).join(', ')}` : null,
                     directoryFilter,
                     authFilter,
                     adminAccountFilter ? `Admin: ${adminAccountFilter}` : null,

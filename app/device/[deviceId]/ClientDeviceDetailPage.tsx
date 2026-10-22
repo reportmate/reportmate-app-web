@@ -28,6 +28,7 @@ import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDet
 import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
 import { safeHost } from "@/src/lib/security/safeUrl"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { toolLevelFromParam, toolRootFromParam, type ToolLevel } from "@/src/lib/dashboard/reportRules"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
@@ -252,6 +253,21 @@ export default function ClientDeviceDetailPage() {
   // Tab state — always starts as 'info' (SSR-safe), synced to URL hash via effect below
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('info')
+  // Deep link from the Management Tools card: `?tab=management&tool=<root>&level=error|warning`
+  // opens the Management tab with its log viewer on that tool and level.
+  const tabParam = searchParams?.get('tab') ?? null
+  const logTool = toolRootFromParam(searchParams?.get('tool') ?? null)
+  const logLevel = toolLevelFromParam(searchParams?.get('level') ?? null)
+  const handleLogSelectionChange = (tool: string | null, level: ToolLevel | null) => {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (tool) url.searchParams.set('tool', tool)
+    else url.searchParams.delete('tool')
+    if (level) url.searchParams.set('level', level)
+    else url.searchParams.delete('level')
+    if (url.href === window.location.href) return
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
+  }
   
   // UI State
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
@@ -407,12 +423,16 @@ export default function ClientDeviceDetailPage() {
     return hoverColorMap[accentColor as keyof typeof hoverColorMap] || hoverColorMap.blue
   }
   
-  // Unified hash-to-tab sync: runs on mount, deviceId change, and browser back/forward
+  // Unified hash-to-tab sync: runs on mount, deviceId change, and browser back/forward.
+  // With no tab hash, a `?tab=` query parameter (dashboard deep links) picks the tab.
   useEffect(() => {
     const syncHashToTab = () => {
       const hash = window.location.hash.replace('#', '') as TabType
+      const queryTab = (new URLSearchParams(window.location.search).get('tab') || '').toLowerCase() as TabType
       if (hash && tabs.some(tab => tab.id === hash)) {
         setActiveTab(hash)
+      } else if (queryTab && tabs.some(tab => tab.id === queryTab)) {
+        setActiveTab(queryTab)
       } else {
         setActiveTab('info')
       }
@@ -428,7 +448,7 @@ export default function ClientDeviceDetailPage() {
       window.removeEventListener('hashchange', syncHashToTab)
       window.removeEventListener('popstate', syncHashToTab)
     }
-  }, [deviceId])
+  }, [deviceId, tabParam])
 
   // The Management tab's log viewer shows each tool's installed version from
   // the installs module when the client did not report one on the log root.
@@ -580,9 +600,12 @@ export default function ClientDeviceDetailPage() {
   const handleTabChange = async (tabId: TabType) => {
     setActiveTab(tabId)
     if (typeof window !== 'undefined') {
-      // Strip filter param from URL when switching tabs — it's only for initial deep-linking
+      // Strip the deep-link params when switching tabs — they're only for initial deep-linking
       const url = new URL(window.location.href)
       url.searchParams.delete('filter')
+      url.searchParams.delete('tab')
+      url.searchParams.delete('tool')
+      url.searchParams.delete('level')
       url.hash = tabId
       window.history.pushState(null, '', url.toString())
     }
@@ -1231,6 +1254,9 @@ export default function ClientDeviceDetailPage() {
           <ManagementTab
             device={deviceInfo as unknown as Record<string, unknown>}
             installs={isModuleLoaded('installs') ? (getModuleData('installs') as unknown) : undefined}
+            logTool={logTool}
+            logLevel={logLevel}
+            onLogSelectionChange={handleLogSelectionChange}
           />
         )}
 

@@ -559,3 +559,272 @@ export function matchesAdmins(r: Row, admins: AdminsParam): boolean {
   if (admins === "4+") return n >= 4;
   return n === Number(admins);
 }
+
+// MARK: - Storage buckets (`/hardware?storage=`, `/hardware?capacity=`)
+
+/** The API's boolean vocabularies (dashboard_insights._TRUE / _FALSE). */
+const SQL_TRUE = ["true", "t", "yes", "y", "on", "1"];
+const SQL_FALSE = ["false", "f", "no", "n", "off", "0"];
+const sqlText = (v: any): string =>
+  v === null || v === undefined ? "" : String(v).trim().toLowerCase();
+/** `LOWER(x) IN {{TRUE}}`: true, t, yes, y, on or 1 (a JSON true reads as "true"). */
+export const sqlTrue = (v: any): boolean => SQL_TRUE.includes(sqlText(v));
+const sqlFalse = (v: any): boolean => SQL_FALSE.includes(sqlText(v));
+
+/** A JSON number the SQL `jsonb_typeof(..) = 'number'` test accepts, else null. */
+const jsonNumber = (v: any): number | null =>
+  typeof v === "number" && Number.isFinite(v) ? v : null;
+
+/**
+ * Internal storage exactly as the API's storage_devices.sql reduces it: the
+ * `storage` list (or `drives` when that is empty), drives whose `isInternal`
+ * is not a false word, each drive's `capacity` (or `size` when capacity is
+ * missing or 0) and `freeSpace` (or `free_space`), numbers only.
+ */
+export function internalStorage(r: Row): { total: number; free: number } {
+  const list: any[] =
+    Array.isArray(r.storage) && r.storage.length > 0
+      ? r.storage
+      : Array.isArray(r.drives)
+        ? r.drives
+        : [];
+  let total = 0,
+    free = 0;
+  for (const d of list) {
+    if (!d || typeof d !== "object" || Array.isArray(d)) continue;
+    if (sqlFalse(d.isInternal)) continue;
+    const cap = jsonNumber(d.capacity);
+    total += (cap !== null && cap !== 0 ? cap : jsonNumber(d.size)) ?? 0;
+    const fs = jsonNumber(d.freeSpace);
+    free += (fs !== null && fs !== 0 ? fs : jsonNumber(d.free_space)) ?? 0;
+  }
+  return { total, free };
+}
+
+export const STORAGE_FREE_KEYS = ["lt5", "5-10", "10-20", "20+"] as const;
+export type StorageFreeKey = (typeof STORAGE_FREE_KEYS)[number];
+export const STORAGE_FREE_LABELS: Record<StorageFreeKey, string> = {
+  lt5: "Under 5% free",
+  "5-10": "5-10% free",
+  "10-20": "10-20% free",
+  "20+": "20% or more free",
+};
+
+export const STORAGE_CAPACITY_KEYS = ["le256", "512", "1t", "2t+"] as const;
+export type StorageCapacityKey = (typeof STORAGE_CAPACITY_KEYS)[number];
+export const STORAGE_CAPACITY_LABELS: Record<StorageCapacityKey, string> = {
+  le256: "256 GB or less",
+  "512": "512 GB",
+  "1t": "1 TB",
+  "2t+": "2 TB or more",
+};
+
+/** Devices the storage card measures: some internal capacity and some free space. */
+const measuredStorage = (r: Row) => {
+  const s = internalStorage(r);
+  return s.total > 0 && s.free > 0 ? s : null;
+};
+
+/** `storage=lt5|5-10|10-20|20+`: free space over internal capacity, storage.sql's buckets. */
+export function storageFreeBucket(r: Row): StorageFreeKey | null {
+  const s = measuredStorage(r);
+  if (!s) return null;
+  const ratio = s.free / s.total;
+  if (ratio < 0.05) return "lt5";
+  if (ratio < 0.1) return "5-10";
+  if (ratio < 0.2) return "10-20";
+  return "20+";
+}
+
+/**
+ * `storage=low` on the card is lt5 + 5-10 (shape_storage `lowStorage`), i.e.
+ * under 10% free, measured the storage.sql way.
+ */
+export const isLowStorageBucket = (r: Row): boolean => {
+  const b = storageFreeBucket(r);
+  return b === "lt5" || b === "5-10";
+};
+
+/**
+ * `capacity=le256|512|1t|2t+`: total internal capacity in decimal bytes with
+ * storage.sql's midpoint cut-offs (384 GB, 768 GB, 1.536 TB), so a "512 GB"
+ * drive that formats to 494 GB still lands in 512.
+ */
+export function storageCapacityBucket(r: Row): StorageCapacityKey | null {
+  const s = measuredStorage(r);
+  if (!s) return null;
+  if (s.total < 384e9) return "le256";
+  if (s.total < 768e9) return "512";
+  if (s.total < 1536e9) return "1t";
+  return "2t+";
+}
+
+// MARK: - Install agent (`/installs?agent=`)
+
+export const INSTALL_AGENTS = ["munki", "cimian"] as const;
+export type InstallAgent = (typeof INSTALL_AGENTS)[number];
+export const INSTALL_AGENT_LABELS: Record<InstallAgent, string> = {
+  munki: "Munki",
+  cimian: "Cimian",
+};
+
+export const installAgentFromParam = (value: string | null): InstallAgent | null => {
+  const v = (value || "").trim().toLowerCase();
+  return v === "munki" || v === "cimian" ? v : null;
+};
+
+/**
+ * The install agent a device counts under on the Install Health card: Munki
+ * on macOS and Cimian on Windows (install_counts.sql splits by platform).
+ * When the platform is unknown the agent whose module the device reports
+ * decides, Cimian first, as the installs report already falls back.
+ */
+export function installAgent(r: Row): InstallAgent | null {
+  const p = rowPlatform(r);
+  if (p === "Windows") return "cimian";
+  if (p === "macOS") return "munki";
+  const inst = r.modules?.installs;
+  if (inst?.cimian) return "cimian";
+  if (inst?.munki) return "munki";
+  return null;
+}
+
+// MARK: - Mac directory (`/identity?directory=`)
+
+export const MAC_DIRECTORY_KEYS = ["psso", "bound", "unbound"] as const;
+export type MacDirectory = (typeof MAC_DIRECTORY_KEYS)[number];
+export const MAC_DIRECTORY_LABELS: Record<MacDirectory, string> = {
+  psso: "Platform SSO / Entra",
+  bound: "AD-bound",
+  unbound: "Not bound",
+};
+
+/**
+ * A Mac's directory state as directory_join.sql reads it: Platform SSO
+ * registered or Entra joined first, then bound to AD or LDAP, else not bound.
+ * Reads the identity route's flattened fields (platformSSORegistered,
+ * entraJoined, domainJoined, ldapBound) and falls back to the raw blocks.
+ * Null for anything that is not a Mac.
+ */
+export function macDirectory(r: Row): MacDirectory | null {
+  if (rowPlatform(r) !== "macOS") return null;
+  const ds = r.directoryServices || r.directory_services || {};
+  const az =
+    ds.azureAd || ds.azure_ad || ds.entraId || ds.entra_id || ({} as Row);
+  const ad = ds.activeDirectory || ds.active_directory || ({} as Row);
+  const pssoBlock = r.platformSSOUsers || r.platform_sso_users || {};
+  const psso =
+    sqlTrue(r.platformSSORegistered) ||
+    sqlTrue(pssoBlock.deviceRegistered ?? pssoBlock.device_registered);
+  const entra =
+    sqlTrue(r.entraJoined) ||
+    ["joined", "is_aad_joined", "isAadJoined", "is_entra_joined", "isEntraJoined"].some(
+      (k) => sqlTrue(az[k]),
+    );
+  const domain =
+    sqlTrue(r.domainJoined) ||
+    sqlTrue(r.adBound) ||
+    ["bound", "is_domain_joined", "isDomainJoined"].some((k) => sqlTrue(ad[k]));
+  const ldap = sqlTrue(r.ldapBound) || sqlTrue(ds.ldap?.bound);
+  if (psso || entra) return "psso";
+  if (domain || ldap) return "bound";
+  return "unbound";
+}
+
+// MARK: - Management tool logs (`/devices?tool=&level=`, `/device/<serial>?tab=management&tool=&level=`)
+
+/** Log root keys the Management Tools card links with. */
+export const MANAGEMENT_TOOL_ROOTS = [
+  "installs",
+  "bootstrap",
+  "reports",
+  "state",
+  "encryption",
+  "users",
+  "utilities",
+  "notifications",
+  "installer",
+  "mdm",
+] as const;
+export type ManagementToolRoot = (typeof MANAGEMENT_TOOL_ROOTS)[number];
+
+export const toolRootFromParam = (value: string | null): ManagementToolRoot | null => {
+  const v = (value || "").trim().toLowerCase();
+  return (MANAGEMENT_TOOL_ROOTS as readonly string[]).includes(v)
+    ? (v as ManagementToolRoot)
+    : null;
+};
+
+export type ToolLevel = "error" | "warning";
+export const toolLevelFromParam = (value: string | null): ToolLevel | null => {
+  const v = (value || "").trim().toLowerCase();
+  return v === "error" || v === "warning" ? v : null;
+};
+
+/** The card's window (dashboard_insights.TOOL_WINDOW_HOURS). */
+export const TOOL_WINDOW_HOURS = 24;
+
+/** The first UTC hour key inside the window, `YYYY-MM-DDTHH` like levelSummary's keys. */
+export function toolWindowStartHour(now: number = Date.now(), hours: number = TOOL_WINDOW_HOURS): string {
+  return new Date(now - hours * 3600000).toISOString().slice(0, 13);
+}
+
+/**
+ * Error and warning lines in a log root's `levelSummary` (stamped at ingest,
+ * log_tails.summarize_root) from `sinceHour` on, summed the way
+ * management_tool_errors.sql does: `hours` maps an hour key to
+ * [errors, warnings], keys compared as text, non-numbers count as 0.
+ */
+export function levelSummaryCounts(
+  summary: any,
+  sinceHour: string = toolWindowStartHour(),
+): { errors: number; warnings: number } {
+  const hours = summary && typeof summary === "object" ? summary.hours : null;
+  let errors = 0,
+    warnings = 0;
+  if (!hours || typeof hours !== "object" || Array.isArray(hours))
+    return { errors, warnings };
+  for (const [key, value] of Object.entries(hours)) {
+    if (key < sinceHour || !Array.isArray(value)) continue;
+    errors += jsonNumber(value[0]) !== null ? Math.trunc(value[0]) : 0;
+    warnings += jsonNumber(value[1]) !== null ? Math.trunc(value[1]) : 0;
+  }
+  return { errors, warnings };
+}
+
+/** True when the root logged at least one line of `level` inside the window. */
+export function rootHasLevelInWindow(
+  root: Row | null | undefined,
+  level: ToolLevel,
+  sinceHour: string = toolWindowStartHour(),
+): boolean {
+  const c = levelSummaryCounts(root?.levelSummary, sinceHour);
+  return level === "error" ? c.errors > 0 : c.warnings > 0;
+}
+
+const TOOL_PRODUCT_NAMES: Record<string, [mac: string, windows: string]> = {
+  installs: ["Munki", "Cimian"],
+  bootstrap: ["BootstrapMate", "BootstrapMate"],
+  reports: ["ReportMate", "ReportMate"],
+  state: ["Outset", "StartSet"],
+  encryption: ["Crypt", "Crypt"],
+  users: ["ManageUsers", "ManageUsers"],
+  utilities: ["Utilities", "Utilities"],
+  notifications: ["swiftDialog", "csharpDialog"],
+  installer: ["Installer", "Installer"],
+};
+
+/**
+ * The product name the card shows for a tool (dashboard_insights.tool_product):
+ * per platform when given, both names when the tool differs by platform and
+ * no platform is set, and "MDM" for the mdm root.
+ */
+export function toolProductLabel(tool: string, platform?: string | null): string {
+  if (tool === "mdm") return "MDM";
+  const names = TOOL_PRODUCT_NAMES[tool];
+  if (!names) return tool.charAt(0).toUpperCase() + tool.slice(1);
+  const p = normalizePlatform(platform || "");
+  if (p === "Windows") return names[1];
+  if (p === "macOS") return names[0];
+  return names[0] === names[1] ? names[0] : `${names[0]} / ${names[1]}`;
+}
