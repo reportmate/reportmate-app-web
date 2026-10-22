@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
+import { safeInternalPath } from "@/src/lib/security/safeUrl"
 
 interface DarkDevice {
   serialNumber: string
@@ -46,7 +47,8 @@ type SortDir = 'asc' | 'desc'
 export default function CoveragePage() {
   const searchParams = useSearchParams()
   const fromParam = searchParams.get('from')
-  const backHref = fromParam || '/applications?type=usage'
+  // `from=` comes from the URL: only a same-site path is followed
+  const backHref = safeInternalPath(fromParam, '/applications?type=usage')
 
   const [data, setData] = useState<CollectionHealth | null>(null)
   const [error, setError] = useState<string | null>(null)
