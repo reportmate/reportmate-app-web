@@ -83,6 +83,14 @@ function slot<K extends InsightCardKey>(
 
 const plural = fmtPlural;
 
+/**
+ * Breakdown rows worth showing: a zero-count segment or row says nothing, so
+ * it is hidden. Fixed buckets where a zero is information (uptime, storage
+ * free space and capacity, protection gaps) don't use this.
+ */
+const shown = <T,>(rows: T[] | undefined, count: (r: T) => unknown): T[] =>
+  (rows ?? []).filter((r) => (countOf(count(r)) ?? 0) > 0);
+
 // MARK: - Layout
 
 export type InsightLayout = "narrow" | "desktop" | "wide";
@@ -725,11 +733,11 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
           </div>
           <div className="mt-4">
             <SectionLabel>Top failing items</SectionLabel>
-            {d.topFailing.length ? (
+            {shown(d.topFailing, (i) => i.devices).length ? (
               <BarList
                 color={TONES.red.hex}
                 labelWidth="w-32"
-                items={d.topFailing.map((i) => ({ label: i.name, count: i.devices, link: linkHref(i.link) }))}
+                items={shown(d.topFailing, (i) => i.devices).map((i) => ({ label: i.name, count: i.devices, link: linkHref(i.link) }))}
               />
             ) : (
               <p className="text-sm text-gray-400 dark:text-gray-500">No failing items</p>
@@ -769,13 +777,13 @@ export function CheckinGaps({ ctx }: { ctx: InsightContext }) {
             <BigStat value={d.retried.count} label="retried" tone="yellow" link={linkHref(d.retried.link)} />
             <BigStat value={d.accepted.count} label="repaired" tone="blue" link={linkHref(d.accepted.link)} />
           </div>
-          {d.reasons.length > 0 && (
+          {shown(d.reasons, (r) => r.count).length > 0 && (
             <div className="mt-4">
               <SectionLabel>Rejection reasons</SectionLabel>
               <BarList
                 color={TONES.red.hex}
                 labelWidth="w-36"
-                items={d.reasons.map((r) => ({
+                items={shown(d.reasons, (r) => r.count).map((r) => ({
                   label: reasonLabel(r.reason),
                   count: r.count,
                   detail: `${r.count}`,
@@ -822,13 +830,13 @@ function UpdateDebt({ ctx }: { ctx: InsightContext }) {
               { label: "Behind", count: d.behind.count, color: TONES.orange.hex, link: linkHref(d.behind.link) },
             ]}
           />
-          {d.lagging.length > 0 && (
+          {shown(d.lagging, (v) => v.devices).length > 0 && (
             <div className="mt-4">
               <SectionLabel>Most devices behind</SectionLabel>
               <BarList
                 color={TONES.orange.hex}
                 labelWidth="w-36"
-                items={d.lagging.map((v) => ({ label: v.label, count: v.devices, link: linkHref(v.link) }))}
+                items={shown(d.lagging, (v) => v.devices).map((v) => ({ label: v.label, count: v.devices, link: linkHref(v.link) }))}
               />
             </div>
           )}
@@ -870,11 +878,11 @@ function SoftwareRisk({ ctx }: { ctx: InsightContext }) {
           </div>
           <div className="mt-4">
             <SectionLabel>Managed items behind</SectionLabel>
-            {d.itemsBehind.length ? (
+            {shown(d.itemsBehind, (i) => i.devices).length ? (
               <BarList
                 color={TONES.orange.hex}
                 labelWidth="w-32"
-                items={d.itemsBehind.map((i) => ({ label: i.name, count: i.devices, link: linkHref(i.link) }))}
+                items={shown(d.itemsBehind, (i) => i.devices).map((i) => ({ label: i.name, count: i.devices, link: linkHref(i.link) }))}
               />
             ) : (
               <p className="text-sm text-gray-400 dark:text-gray-500">Every managed item is on its latest version</p>
@@ -1103,7 +1111,7 @@ function Storage({ ctx }: { ctx: InsightContext }) {
           <div className="flex flex-wrap gap-2 mt-4">
             <StatChip value={d.lowStorage.count} label="under 10% free" tone="red" link={linkHref(d.lowStorage.link)} />
             {d.lowStorage.byPlatform.length > 1 &&
-              d.lowStorage.byPlatform.map((p) => (
+              shown(d.lowStorage.byPlatform, (p) => p.count).map((p) => (
                 <StatChip key={p.platform} value={p.count} label={p.platform} tone="orange" link={linkHref(p.link)} />
               ))}
           </div>
@@ -1159,19 +1167,19 @@ function DirectoryServices({ ctx }: { ctx: InsightContext }) {
         <>
           <Donut
             center={fmtCount(d.devices)}
-            data={d.segments.map((s) => ({
+            data={shown(d.segments, (s) => s.count).map((s) => ({
               label: s.label,
               count: s.count,
               color: DIRECTORY_COLORS[s.key] ?? TONES.gray.hex,
               link: linkHref(s.link),
             }))}
           />
-          {d.segments.some((s) => s.children?.length) && (
+          {d.segments.some((s) => shown(s.children, (c) => c.count).length) && (
             <ul className="mt-3 space-y-0.5">
               {d.segments
                 .filter((s) => s.children?.length)
                 .flatMap((s) =>
-                  (s.children ?? []).map((c) => (
+                  shown(s.children, (c) => c.count).map((c) => (
                     <li key={`${s.key}:${c.key}`}>
                       <Link
                         href={linkHref(c.link)}
@@ -1227,20 +1235,20 @@ function UserAccounts({ ctx }: { ctx: InsightContext }) {
           <SectionLabel>Authentication</SectionLabel>
           <Donut
             center={fmtCount(d.devices ?? (d as { total?: number }).total)}
-            data={(d.authentication ?? []).map((a) => ({
+            data={shown(d.authentication, (a) => a.count).map((a) => ({
               label: a.label,
               count: a.count,
               color: AUTH_COLORS[a.key] ?? TONES.gray.hex,
               link: linkHref(a.link),
             }))}
           />
-          {d.adminAccounts?.length > 0 && (
+          {shown(d.adminAccounts, (a) => a.devices).length > 0 && (
             <div className="mt-4">
               <SectionLabel>Administrator accounts</SectionLabel>
               <BarList
                 color={TONES.indigo.hex}
                 labelWidth="w-32"
-                items={d.adminAccounts.slice(0, 5).map((a) => ({ label: a.name, count: a.devices, link: linkHref(a.link) }))}
+                items={shown(d.adminAccounts, (a) => a.devices).slice(0, 5).map((a) => ({ label: a.name, count: a.devices, link: linkHref(a.link) }))}
               />
             </div>
           )}

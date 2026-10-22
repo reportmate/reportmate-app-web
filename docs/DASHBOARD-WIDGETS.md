@@ -402,3 +402,8 @@ Fix every dead or unfiltered link, and every target page that ignores its params
   - Below the lg breakpoint the two laptop stacks follow one another.
   - Balanced by card heights measured against production on 2026-10-22: at 1280 the stacks
     are 4,132 / 4,164 px, and at 1728 they are 2,804 / 2,922 / 2,913 px.
+- Zero-count segments and rows are hidden in card breakdowns. This covers Directory Services
+  segments and trust rows, User Accounts authentication and admin accounts, rejection
+  reasons, top failing items, lagging versions, items behind, and low storage by platform.
+  Fixed buckets where a zero is information stay: uptime, storage free space and capacity,
+  and protection gaps.

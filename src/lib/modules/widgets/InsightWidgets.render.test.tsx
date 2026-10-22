@@ -284,3 +284,18 @@ describe('Management Tools Logs links before API #163', () => {
     expect(hrefs()).toContain('/management/logs?tool=reports&level=error')
   })
 })
+
+describe('zero-count breakdown rows', () => {
+  it('hides them in breakdowns and keeps fixed buckets', () => {
+    const cards = JSON.parse(JSON.stringify(doc.cards))
+    cards.userAccounts.authentication.find((a: { key: string }) => a.key === 'legacy').count = 0
+    cards.directoryServices.segments[1].children[1].count = 0
+    cards.rebootDebt.uptimeBuckets[0].count = 0
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } })} positions={[0, 1, 8]} />)
+    expect(screen.queryByText('Legacy')).toBeNull()
+    expect(screen.queryByText('Domain Joined: Unconfirmed')).toBeNull()
+    expect(screen.getByText('Domain Joined: Trusted')).toBeTruthy()
+    expect(screen.getByText('Modern')).toBeTruthy()
+    expect(screen.getByText('< 1 day')).toBeTruthy()
+  })
+})
