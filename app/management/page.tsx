@@ -12,6 +12,10 @@ import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/Platfo
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import { LAST_SEEN_LABELS, type LastSeenBucket, boolish, lastSeenBucket, lastSeenFromParam, managementProvider, paramList } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+
+const MANAGEMENT_URL = '/api/v1/management'
 
 // The dashboard deep-links here with `?provider=`, `?enrolled=0|1` and
 // `?enrollmentType=` (docs/DASHBOARD-WIDGETS.md). `provider` selects bars in the
@@ -154,9 +158,13 @@ function ManagementPageContent() {
   const pathname = usePathname()
   const [initialUrl] = useState(() => parseManagementParams(new URLSearchParams(searchParams.toString())))
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => peekCached(MANAGEMENT_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [management, setManagement] = useState<Management[]>([])
+  const [management, setManagement] = useState<Management[]>(() => peekCached<Management[]>(MANAGEMENT_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // Selected Providers-widget bars (`provider=`); empty means all
   const [providerFilters, setProviderFilters] = useState<string[]>(initialUrl.providers)
@@ -304,11 +312,11 @@ function ManagementPageContent() {
       try {
                 
         // OPTIMIZED: Single consolidated API call for management data with inventory
-        const response = await fetch('/api/v1/management', { 
+        const response = await trackedFetch(MANAGEMENT_URL, { 
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-        })
+        }, { background: peekCached(MANAGEMENT_URL) !== undefined })
         
         if (!response.ok) throw new Error(`Management API failed: ${response.status}`)
         
@@ -361,17 +369,21 @@ function ManagementPageContent() {
           }
         })
         
-        setManagement(combinedData)
+        setManagement(rememberCached(MANAGEMENT_URL, combinedData))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching management:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(MANAGEMENT_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchManagement()
-  }, [])
+  }, [reloadKey])
 
   // Subset of management filtered by the global platform filter only — used by widgets
   // so that widget counts respond to the ?platform= URL param (and the platform nav toggle)
@@ -899,6 +911,13 @@ function ManagementPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Enrollment status and type, providers, and configurations {filteredManagement.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(MANAGEMENT_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               {loading ? (
                 /* Loading Progress Bar */

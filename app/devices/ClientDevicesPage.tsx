@@ -11,6 +11,8 @@ import { PlatformBadge } from "../../src/components/ui/PlatformBadge"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 import DeviceFilters, { FilterOptions } from "../../src/components/shared/DeviceFilters"
 import { useScrollCollapse } from "../../src/hooks/useScrollCollapse"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
 
 interface InventoryItem {
   id: string
@@ -46,9 +48,17 @@ interface InventoryItem {
 const includesCI = (list: string[], value?: string | null) =>
   list.some(v => v.toLowerCase() === (value || '').toLowerCase())
 
+// Transformed rows, keyed apart from the raw /api/v1/devices JSON that
+// useDeviceData caches, so the two shapes never collide.
+const DEVICES_CACHE_KEY = '/api/v1/devices#inventory'
+
 function DevicesPageContent() {
-  const [inventory, setInventory] = useState<InventoryItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => peekCached<InventoryItem[]>(DEVICES_CACHE_KEY) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(DEVICES_CACHE_KEY) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
@@ -141,9 +151,10 @@ function DevicesPageContent() {
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const response = await fetch('/api/v1/devices', {
+        const response = await trackedFetch('/api/v1/devices', {
           credentials: 'include'
-        })
+        }, { background: peekCached(DEVICES_CACHE_KEY) !== undefined })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const data = await response.json()
         
         // FIXED: API returns {devices: [...], count: N} structure
@@ -208,20 +219,25 @@ function DevicesPageContent() {
             return true
           })
 
-          setInventory(uniqueItems)
+          setInventory(rememberCached(DEVICES_CACHE_KEY, uniqueItems))
+          setRefreshError(null)
         } else {
-                    setInventory([])
+                    setInventory(rememberCached<InventoryItem[]>(DEVICES_CACHE_KEY, []))
+          setRefreshError(null)
         }
       } catch (err) {
         console.error('Error fetching inventory:', err)
-        setError('Failed to fetch inventory data')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(DEVICES_CACHE_KEY) === undefined) setError('Failed to fetch inventory data')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchInventory()
-  }, [])
+  }, [reloadKey])
 
   // Search predicate shared by the table filter and the counter row.
   const matchesSearch = (item: InventoryItem, query: string) => (
@@ -512,6 +528,13 @@ function DevicesPageContent() {
                     </span>
                   )}
                 </h2>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(DEVICES_CACHE_KEY)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   {isFiltered 
                     ? `Showing filtered results from ${baseCounts.all} total devices`

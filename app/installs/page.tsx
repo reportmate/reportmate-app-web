@@ -15,6 +15,13 @@ import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
 import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS } from '@/src/lib/dashboard/reportRules'
+import { cachedAt, peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
+import { RefreshErrorBanner } from '@/src/components/ui/RefreshErrorBanner'
+
+// The filters payload (~17 MB) is kept parsed in memory for the tab, so a
+// return visit seeds from it instantly. Never stringified, never retried.
+const INSTALLS_FILTERS_URL = '/api/v1/installs/filters'
+const cachedFilters = () => peekCached<any>(INSTALLS_FILTERS_URL)
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -165,13 +172,16 @@ function InstallsPageContent() {
   const initialItem = (searchParams.get('item') || '').trim()
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(false)
-  const [filtersLoading, setFiltersLoading] = useState(true)
+  const [filtersLoading, setFiltersLoading] = useState(() => cachedFilters() === undefined)
+  // A failed background refresh keeps the cached filters and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState(initialFilter !== 'all' ? initialItem : '')
   const [filtersExpanded, setFiltersExpanded] = useState(false) // Collapsed by default since Config Report is default view
-  const [devices, setDevices] = useState<any[]>([])
+  const [devices, setDevices] = useState<any[]>(() => (Array.isArray(cachedFilters()?.devices) ? cachedFilters().devices : []))
   const [, startTransition] = useTransition() // For non-blocking state updates
   const [isConfigReport, setIsConfigReport] = useState(false)
   const [configReportData, setConfigReportData] = useState<any[]>([])
@@ -210,7 +220,7 @@ function InstallsPageContent() {
   const [itemFilter, setItemFilter] = useState(initialFilter === 'all' ? initialItem : '')
   // `stale=1`: devices whose install agent has been silent > SILENT_AGENT_DAYS
   const [staleOnly, setStaleOnly] = useState(searchParams.get('stale') === '1')
-  const [staleAgents, setStaleAgents] = useState<any[]>([])
+  const [staleAgents, setStaleAgents] = useState<any[]>(() => (Array.isArray(cachedFilters()?.staleAgents) ? cachedFilters().staleAgents : []))
   // Device status filter (active, stale, missing)
   const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | DeviceStatusFilterValue>('all')
   // Install status filter (installed, pending, warnings, errors, removed)
@@ -279,7 +289,7 @@ function InstallsPageContent() {
     platforms: string[]
   }>({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], areas: [], platforms: [] })
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>(() => cachedFilters() ?? {
     managedInstalls: [],
     otherInstalls: [],
     totalManagedInstalls: 0,
@@ -360,8 +370,10 @@ function InstallsPageContent() {
   // Fetch filter options
   const fetchFilterOptions = useCallback(async () => {
     let progressInterval: NodeJS.Timeout | null = null
+    const hasCache = cachedFilters() !== undefined
     try {
-      setFiltersLoading(true)
+      // With cached filters on screen, refresh in the background, no skeleton.
+      if (!hasCache) setFiltersLoading(true)
       setError(null) // Clear any previous errors
       
       // NOTE: sessionStorage caching DISABLED - was causing 60+ second UI freeze
@@ -403,14 +415,14 @@ function InstallsPageContent() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 120000)
       
-      const response = await fetch('/api/v1/installs/filters', {
+      const response = await trackedFetch(INSTALLS_FILTERS_URL, {
         cache: 'no-store',
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache'
         },
         signal: controller.signal
-      })
+      }, { background: hasCache })
       
       clearTimeout(timeoutId)
       
@@ -441,6 +453,8 @@ function InstallsPageContent() {
       // Get the actual device count from the response
       const _actualDeviceCount = data.devicesWithData || 0
       
+      rememberCached(INSTALLS_FILTERS_URL, data)
+      setRefreshError(null)
       setFilterOptions(data)
       setStaleAgents(Array.isArray(data.staleAgents) ? data.staleAgents : [])
       
@@ -463,6 +477,11 @@ function InstallsPageContent() {
                 return
       }
       console.error('[INSTALLS PAGE] Error fetching filter options:', error)
+      // Keep the cached filters on screen when a background refresh fails.
+      if (hasCache) {
+        setRefreshError(error instanceof Error ? error.message : String(error))
+        return
+      }
       setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
       setLoadingProgress({ current: 0, total: 0 })
     } finally {
@@ -470,6 +489,7 @@ function InstallsPageContent() {
         clearInterval(progressInterval)
       }
       setFiltersLoading(false)
+      setRetrying(false)
     }
   }, [])
 
@@ -1920,6 +1940,13 @@ function InstallsPageContent() {
                         : 'Filtered install records across selected devices and criteria'
                   }
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(INSTALLS_FILTERS_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); fetchFilterOptions() }}
+                  className="mt-2 w-fit"
+                />
               </div>
               
               {/* Loading Progress - Inline with title */}

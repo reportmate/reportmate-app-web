@@ -13,6 +13,8 @@ import { UptimeDistributionChart } from "@/src/lib/modules/graphs/UptimeDistribu
 import { PendingUpdatesChart } from "@/src/lib/modules/graphs/PendingUpdatesChart"
 import { LicenseSourceChart } from "@/src/lib/modules/graphs/LicenseSourceChart"
 import { useDeviceData } from "@/src/hooks/useDeviceData"
+import { cachedAt, peekCached } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
@@ -240,8 +242,9 @@ function SystemPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const [loading, setLoading] = useState(true)
-  const [systems, setSystems] = useState<SystemDevice[]>([])
+  // useDeviceData caches /api/v1/system; with it cached, skip the skeleton.
+  const [loading, setLoading] = useState(() => peekCached('/api/v1/system') === undefined)
+  const [systems, setSystems] = useState<SystemDevice[]>(() => peekCached<SystemDevice[]>('/api/v1/system') ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // OS version filter, set from ?osVersion= or by clicking a version in the charts
   const [osVersionFilter, setOsVersionFilter] = useState<string | null>(searchParams.get('osVersion'))
@@ -458,10 +461,11 @@ function SystemPageContent() {
     (osVersionFilter ? 1 : 0)
 
   // Use the new hook to get both devices data (with inventory) and system module data
-  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error } = useDeviceData({
+  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error, refreshError, refetch } = useDeviceData({
     includeModuleData: true,
     moduleType: 'system'
   })
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     console.log('[SystemPage] Hook data:', {
@@ -926,6 +930,13 @@ function SystemPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   OS versions, activation status, and system uptime {searchFilteredSystems.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt('/api/v1/system')}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); refetch().finally(() => setRetrying(false)) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-4">
                 {/* Export to CSV Button */}

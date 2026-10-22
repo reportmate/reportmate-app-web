@@ -12,6 +12,10 @@ import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+
+const IDENTITY_URL = '/api/v1/identity'
 
 const JOIN_TYPES: JoinType[] = ['entra', 'domain', 'hybrid', 'workgroup']
 
@@ -140,9 +144,13 @@ function IdentityPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => peekCached(IDENTITY_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>([])
+  const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>(() => peekCached<IdentityDevice[]>(IDENTITY_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // `admins=extra` deep-links to the existing "more than one admin" filter;
   // `admins=2|3|4+` to an exact admin count (4+ is four or more).
@@ -230,31 +238,35 @@ function IdentityPageContent() {
   useEffect(() => {
     const fetchIdentity = async () => {
       try {
-        const response = await fetch('/api/v1/identity', {
+        const response = await trackedFetch(IDENTITY_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: peekCached(IDENTITY_URL) !== undefined })
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
         
         const data = await response.json()
-        setIdentityDevices(data)
+        setIdentityDevices(rememberCached(IDENTITY_URL, data))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching identity:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(IDENTITY_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchIdentity()
-  }, [])
+  }, [reloadKey])
 
   // `usage=shared|assigned` names a usage kind; the Selections filter holds raw
   // inventory values, so select every value of that kind once the rows are in.
@@ -500,6 +512,13 @@ function IdentityPageContent() {
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       User accounts, sessions, and identity management across {filteredDevices.length} devices
                     </p>
+                    <RefreshErrorBanner
+                      error={refreshError}
+                      updatedAt={cachedAt(IDENTITY_URL)}
+                      retrying={retrying}
+                      onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                      className="mt-2 w-fit"
+                    />
                   </div>
                 </div>
               </div>

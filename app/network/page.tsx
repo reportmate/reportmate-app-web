@@ -14,6 +14,10 @@ import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { connectionKind, isPoorNetworkQuality, signalPercent } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+
+const NETWORK_URL = '/api/v1/network'
 
 interface NetworkDevice {
   id: string
@@ -65,8 +69,12 @@ const signalToParam = (bucket: SignalBucket | null): string | null =>
   bucket === 'poor' ? 'weak' : bucket
 
 function NetworkPageContent() {
-  const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>([])
-  const [loading, setLoading] = useState(true)
+  const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>(() => peekCached<NetworkDevice[]>(NETWORK_URL) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(NETWORK_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
@@ -204,11 +212,11 @@ function NetworkPageContent() {
     const fetchNetworkDevices = async () => {
       try {
         // Use the network API to get device data with network modules
-        const response = await fetch('/api/v1/network', {
+        const response = await trackedFetch(NETWORK_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
-        })
+        }, { background: peekCached(NETWORK_URL) !== undefined })
         
         if (!response.ok) {
           throw new Error(`API request failed: ${response.status}`)
@@ -217,7 +225,8 @@ function NetworkPageContent() {
         const data = await response.json()
         
         if (Array.isArray(data)) {
-          setNetworkDevices(data)
+          setNetworkDevices(rememberCached(NETWORK_URL, data))
+          setRefreshError(null)
           setError(null)
         } else {
           throw new Error('Invalid API response format')
@@ -225,15 +234,21 @@ function NetworkPageContent() {
         
       } catch (error) {
         console.error('Failed to fetch network devices:', error)
-        setError(error instanceof Error ? error.message : 'Unknown error')
-        setNetworkDevices([])
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(NETWORK_URL) === undefined) {
+          setError(error instanceof Error ? error.message : 'Unknown error')
+          setNetworkDevices([])
+        } else {
+          setRefreshError(error instanceof Error ? error.message : String(error))
+        }
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchNetworkDevices()
-  }, [])
+  }, [reloadKey])
 
   // Filter and process network devices
   const processedNetworkDevices = networkDevices.map(networkDevice => {
@@ -627,6 +642,13 @@ function NetworkPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   IP addresses, MAC addresses, and connectivity status {filteredNetworkDevices.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(NETWORK_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               {loading ? (
                 /* Loading Progress Bar */

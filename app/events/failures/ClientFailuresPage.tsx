@@ -7,6 +7,8 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { Search, X } from 'lucide-react'
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../../src/lib/data-cache"
+import { RefreshErrorBanner } from "../../../src/components/ui/RefreshErrorBanner"
 
 interface IngestFailure {
   id: number
@@ -125,6 +127,34 @@ function parseOutcome(value: string | null): Outcome {
   return OUTCOMES.includes(value as Outcome) ? (value as Outcome) : DEFAULT_OUTCOME
 }
 
+// The request URL doubles as the cache key, so each filter combination keeps
+// its own last answer.
+function failuresUrl(hours: number, outcome: Outcome, reason: string | null): string {
+  const params = new URLSearchParams({ limit: '500', hours: String(hours), outcome })
+  if (reason) params.append('reason', reason)
+  return `/api/events/failures?${params.toString()}`
+}
+
+interface FailuresPayload {
+  failures: IngestFailure[]
+  summary: ReasonSummary[]
+  total: number
+  counts: { rejected: number; retried: number; accepted: number }
+}
+
+function parseFailuresPayload(data: any): FailuresPayload {
+  return {
+    failures: Array.isArray(data.failures) ? data.failures : [],
+    summary: Array.isArray(data.summary) ? data.summary : [],
+    total: typeof data.total === 'number' ? data.total : 0,
+    counts: {
+      rejected: typeof data?.counts?.rejected === 'number' ? data.counts.rejected : 0,
+      retried: typeof data?.counts?.retried === 'number' ? data.counts.retried : 0,
+      accepted: typeof data?.counts?.accepted === 'number' ? data.counts.accepted : 0,
+    },
+  }
+}
+
 // `hours`, `outcome` and `reason` live in the URL, so the dashboard's
 // Check-in Gaps card can deep-link to e.g. `?hours=24&reason=<r>`.
 export default function ClientFailuresPage() {
@@ -139,14 +169,22 @@ function ClientFailuresPageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [failures, setFailures] = useState<IngestFailure[]>([])
-  const [summary, setSummary] = useState<ReasonSummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [initialCache] = useState(() => peekCached<FailuresPayload>(failuresUrl(
+    parseHours(searchParams.get('hours')),
+    parseOutcome(searchParams.get('outcome')),
+    searchParams.get('reason') || null,
+  )))
+  const [failures, setFailures] = useState<IngestFailure[]>(initialCache?.failures ?? [])
+  const [summary, setSummary] = useState<ReasonSummary[]>(initialCache?.summary ?? [])
+  const [total, setTotal] = useState(initialCache?.total ?? 0)
+  const [loading, setLoading] = useState(initialCache === undefined)
+  // A failed background refresh keeps the last answer and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hours, setHours] = useState(() => parseHours(searchParams.get('hours')))
   const [outcome, setOutcome] = useState<Outcome>(() => parseOutcome(searchParams.get('outcome')))
-  const [counts, setCounts] = useState<{ rejected: number; retried: number; accepted: number }>({ rejected: 0, retried: 0, accepted: 0 })
+  const [counts, setCounts] = useState<{ rejected: number; retried: number; accepted: number }>(initialCache?.counts ?? { rejected: 0, retried: 0, accepted: 0 })
   const [reasonFilter, setReasonFilter] = useState<string | null>(() => searchParams.get('reason') || null)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -175,37 +213,50 @@ function ClientFailuresPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hours, outcome, reasonFilter])
 
+  const applyPayload = useCallback((payload: FailuresPayload) => {
+    setFailures(payload.failures)
+    setSummary(payload.summary)
+    setTotal(payload.total)
+    setCounts(payload.counts)
+  }, [])
+
   const fetchFailures = useCallback(async () => {
+    const url = failuresUrl(hours, outcome, reasonFilter)
     try {
-      const params = new URLSearchParams({ limit: '500', hours: String(hours), outcome })
-      if (reasonFilter) params.append('reason', reasonFilter)
-      const resp = await fetch(`/api/events/failures?${params.toString()}`)
+      const resp = await trackedFetch(url, undefined, { background: peekCached(url) !== undefined })
       if (!resp.ok) {
         throw new Error(`Request failed with status ${resp.status}`)
       }
       const data = await resp.json()
-      setFailures(Array.isArray(data.failures) ? data.failures : [])
-      setSummary(Array.isArray(data.summary) ? data.summary : [])
-      setTotal(typeof data.total === 'number' ? data.total : 0)
-      setCounts({
-        rejected: typeof data?.counts?.rejected === 'number' ? data.counts.rejected : 0,
-        retried: typeof data?.counts?.retried === 'number' ? data.counts.retried : 0,
-        accepted: typeof data?.counts?.accepted === 'number' ? data.counts.accepted : 0,
-      })
+      applyPayload(rememberCached(url, parseFailuresPayload(data)))
       setError(null)
+      setRefreshError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load failures')
+      // Keep the last answer on screen when a background refresh fails.
+      if (peekCached(url) !== undefined) {
+        console.error('Failed to refresh failures:', e)
+        setRefreshError(e instanceof Error ? e.message : String(e))
+      } else setError(e instanceof Error ? e.message : 'Failed to load failures')
     } finally {
       setLoading(false)
+      setRetrying(false)
     }
-  }, [hours, reasonFilter, outcome])
+  }, [hours, reasonFilter, outcome, applyPayload])
 
   useEffect(() => {
-    setLoading(true)
+    // A filter combination seen before shows its last answer at once.
+    const cached = peekCached<FailuresPayload>(failuresUrl(hours, outcome, reasonFilter))
+    if (cached) {
+      applyPayload(cached)
+      setError(null)
+    }
+    // A banner from another filter combination does not apply to this one.
+    setRefreshError(null)
+    setLoading(cached === undefined)
     fetchFailures()
     const interval = setInterval(fetchFailures, 30000)
     return () => clearInterval(interval)
-  }, [fetchFailures])
+  }, [fetchFailures, hours, outcome, reasonFilter, applyPayload])
 
   const filteredFailures = useMemo(() => {
     if (!searchQuery.trim()) return failures
@@ -281,6 +332,13 @@ function ClientFailuresPageContent() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {OUTCOME_COPY[outcome].blurb}
               </p>
+              <RefreshErrorBanner
+                error={refreshError}
+                updatedAt={cachedAt(failuresUrl(hours, outcome, reasonFilter))}
+                retrying={retrying}
+                onRetry={() => { setRetrying(true); fetchFailures() }}
+                className="mt-2 w-fit"
+              />
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
               <select

@@ -1,4 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
+import { peekCached, rememberCached, trackedFetch } from '../lib/data-cache'
+
+// Both caches hold the raw parsed JSON, keyed by request URL.
+const DEVICES_URL = '/api/v1/devices'
+const moduleUrl = (moduleType: string) => `/api/v1/${moduleType}`
+const devicesFrom = (data: any): any[] => (Array.isArray(data) ? data : (data?.devices || []))
 
 interface Device {
   deviceId: string
@@ -51,6 +57,8 @@ interface UseDeviceDataReturn {
   devicesLoading: boolean
   moduleLoading: boolean
   error: string | null
+  /** Set when a background refresh failed while cached data stays on screen. */
+  refreshError: string | null
   refetch: () => Promise<void>
 }
 
@@ -64,21 +72,30 @@ interface UseDeviceDataReturn {
 export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceDataReturn {
   const { includeModuleData = false, moduleType } = options
   
-  const [devices, setDevices] = useState<Device[]>([])
-  const [moduleData, setModuleData] = useState<any[]>([])
-  const [devicesLoading, setDevicesLoading] = useState(true)
-  const [moduleLoading, setModuleLoading] = useState(includeModuleData)
+  // Seed from the tab's cache so a return visit renders its last data at once
+  // and the fetches below refresh it in the background.
+  const moduleCached = () =>
+    includeModuleData && moduleType ? peekCached<any[]>(moduleUrl(moduleType)) : undefined
+  const [devices, setDevices] = useState<Device[]>(() => {
+    const cached = peekCached(DEVICES_URL)
+    return cached === undefined ? [] : devicesFrom(cached)
+  })
+  const [moduleData, setModuleData] = useState<any[]>(() => moduleCached() ?? [])
+  const [devicesLoading, setDevicesLoading] = useState(() => peekCached(DEVICES_URL) === undefined)
+  const [moduleLoading, setModuleLoading] = useState(() => includeModuleData && moduleCached() === undefined)
   const [error, setError] = useState<string | null>(null)
+  const [devicesRefreshError, setDevicesRefreshError] = useState<string | null>(null)
+  const [moduleRefreshError, setModuleRefreshError] = useState<string | null>(null)
 
   const fetchDevices = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/devices', {
+      const response = await trackedFetch(DEVICES_URL, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
-      })
+      }, { background: peekCached(DEVICES_URL) !== undefined })
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -87,10 +104,13 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
       const data = await response.json()
       // FastAPI returns { devices: [...], total: ..., message: ... }
       // Extract the devices array
-      setDevices(Array.isArray(data) ? data : (data.devices || []))
+      setDevices(devicesFrom(rememberCached(DEVICES_URL, data)))
+      setDevicesRefreshError(null)
     } catch (err) {
       console.error('Error fetching devices:', err)
-      setError(err instanceof Error ? err.message : 'Failed to fetch devices')
+      // Keep the cached devices on screen when a background refresh fails.
+      if (peekCached(DEVICES_URL) === undefined) setError(err instanceof Error ? err.message : 'Failed to fetch devices')
+      else setDevicesRefreshError(err instanceof Error ? err.message : String(err))
     } finally {
       setDevicesLoading(false)
     }
@@ -110,13 +130,14 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
         const startTime = Date.now()
         console.log(`[useDeviceData] Fetching ${moduleType} module data... (attempt ${attempt}/${maxRetries})`)
         
-        const response = await fetch(`/api/v1/${moduleType}`, {
+        const url = moduleUrl(moduleType)
+        const response = await trackedFetch(url, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: peekCached(url) !== undefined })
         
         const fetchTime = Date.now() - startTime
         console.log(`[useDeviceData] ${moduleType} fetch completed in ${fetchTime}ms, status: ${response.status}`)
@@ -137,7 +158,8 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
         
         const data = await response.json()
         console.log(`[useDeviceData] ${moduleType} data received:`, Array.isArray(data) ? `${data.length} items` : typeof data)
-        setModuleData(data)
+        setModuleData(rememberCached(url, data))
+        setModuleRefreshError(null)
         setModuleLoading(false)
         return // Success, exit retry loop
         
@@ -156,12 +178,16 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
     
     // All retries failed
     console.error(`[useDeviceData] All ${maxRetries} attempts failed for ${moduleType}:`, lastError)
+    if (peekCached(moduleUrl(moduleType)) !== undefined) {
+      setModuleRefreshError(lastError?.message ?? 'Refresh failed')
+    }
     setModuleLoading(false)
   }, [includeModuleData, moduleType])
 
   const refetch = async () => {
-    setDevicesLoading(true)
-    if (includeModuleData) {
+    // With cached data on screen, refresh without flipping back to loading.
+    if (peekCached(DEVICES_URL) === undefined) setDevicesLoading(true)
+    if (includeModuleData && moduleCached() === undefined) {
       setModuleLoading(true)
     }
     setError(null)
@@ -183,6 +209,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
     devicesLoading,
     moduleLoading,
     error,
+    refreshError: moduleRefreshError ?? devicesRefreshError,
     refetch
   }
 }

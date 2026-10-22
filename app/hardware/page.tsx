@@ -25,6 +25,10 @@ import {
   DeviceTypeDonutChart 
 } from "@/src/lib/modules/graphs"
 import { FitText } from "@/src/components/ui/FitText"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+
+const HARDWARE_URL = '/api/v1/hardware'
 
 interface HardwareRecord {
   id: string
@@ -59,8 +63,12 @@ interface HardwareRecord {
 }
 
 function HardwarePageContent() {
-  const [hardware, setHardware] = useState<HardwareRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const [hardware, setHardware] = useState<HardwareRecord[]>(() => peekCached<HardwareRecord[]>(HARDWARE_URL) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(HARDWARE_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [processorFilter, setProcessorFilter] = useState<string>('all')
@@ -293,11 +301,11 @@ function HardwarePageContent() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const hardwareResponse = await fetch('/api/v1/hardware', {
+        const hardwareResponse = await trackedFetch(HARDWARE_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
-        })
+        }, { background: peekCached(HARDWARE_URL) !== undefined })
         
         if (!hardwareResponse.ok) {
           throw new Error(`Hardware API request failed: ${hardwareResponse.status}`)
@@ -329,21 +337,28 @@ function HardwarePageContent() {
             }
           })
           
-          setHardware(processedData)
+          setHardware(rememberCached(HARDWARE_URL, processedData))
+          setRefreshError(null)
           setError(null)
         } else {
           throw new Error('Invalid hardware API response format')
         }
       } catch (error) {
         console.error('Failed to fetch data:', error)
-        setError(error instanceof Error ? error.message : 'Unknown error')
-        setHardware([])
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(HARDWARE_URL) === undefined) {
+          setError(error instanceof Error ? error.message : 'Unknown error')
+          setHardware([])
+        } else {
+          setRefreshError(error instanceof Error ? error.message : String(error))
+        }
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
     fetchData()
-  }, [])
+  }, [reloadKey])
 
   const processedHardware = hardware.map(hardwareRecord => {
     let architecture = 'Unknown'
@@ -873,6 +888,13 @@ function HardwarePageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Processor, memory, storage, and architecture details - {filteredHardware.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(HARDWARE_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-4">
                 <div className="relative max-w-xs">

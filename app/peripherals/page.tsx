@@ -12,6 +12,10 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { deviceRoom, paramList } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+
+const PERIPHERALS_URL = '/api/v1/peripherals'
 
 interface Peripheral {
   id: string
@@ -142,9 +146,13 @@ function LoadingSkeleton() {
 
 function PeripheralsPageContent() {
   const searchParams = useSearchParams()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => peekCached(PERIPHERALS_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [peripherals, setPeripherals] = useState<Peripheral[]>([])
+  const [peripherals, setPeripherals] = useState<Peripheral[]>(() => peekCached<Peripheral[]>(PERIPHERALS_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // Multi-select peripheral-type pills, replacing the old dropdown
   const [selectedTypes, setSelectedTypes] = useState<PeripheralTypeKey[]>(() => typesFromParam(searchParams.get('kind')))
@@ -227,31 +235,35 @@ function PeripheralsPageContent() {
   useEffect(() => {
     const fetchPeripherals = async () => {
       try {
-        const response = await fetch('/api/v1/peripherals', {
+        const response = await trackedFetch(PERIPHERALS_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: peekCached(PERIPHERALS_URL) !== undefined })
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
         
         const data = await response.json()
-        setPeripherals(data)
+        setPeripherals(rememberCached(PERIPHERALS_URL, data))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching peripherals:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(PERIPHERALS_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchPeripherals()
-  }, [])
+  }, [reloadKey])
 
   const getTotalDevices = (peripheral: Peripheral): number =>
     PERIPHERAL_TYPES.reduce((sum, type) => sum + countOf(peripheral, type.field), 0)
@@ -387,6 +399,13 @@ function PeripheralsPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   USB, Bluetooth, and other connected devices {filteredPeripherals.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(PERIPHERALS_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-4">
                 {/* Search */}
