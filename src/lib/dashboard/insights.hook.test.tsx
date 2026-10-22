@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import fixture from './__fixtures__/insights.json'
-import { INSIGHT_CARD_KEYS, unwrapCard, useDashboardInsights } from './insights'
+import legacy from './__fixtures__/insights-legacy.json'
+import { INSIGHT_CARD_KEYS, cardFromDocument, unwrapCard, useDashboardInsights, type InsightsDocument } from './insights'
 import { clearCache } from '../data-cache'
 
 const json = (status: number, body: unknown) =>
@@ -48,6 +49,40 @@ describe('useDashboardInsights', () => {
     const second = renderHook(() => useDashboardInsights('all', { perCard: false }))
     expect(second.result.current.data?.cards.rebootDebt).toEqual(fixture.cards.rebootDebt)
     act(() => second.unmount())
+  })
+})
+
+describe('old card names', () => {
+  const realFetch = global.fetch
+  beforeEach(() => clearCache())
+  afterEach(() => { global.fetch = realFetch })
+
+  it('reads directoryJoin and managementToolErrors from a combined document', () => {
+    const doc = legacy as unknown as InsightsDocument
+    const dir = cardFromDocument(doc, 'directoryServices', 'macOS') as { segments: { key: string }[] }
+    expect(dir.segments.map(s => s.key)).toEqual(['psso', 'bound', 'unbound'])
+    expect(cardFromDocument(doc, 'managementToolLogs', 'all')).toEqual(legacy.cards.managementToolErrors)
+  })
+
+  it('falls back to the old per-card endpoint when the new one is a 404', async () => {
+    const old = legacy.cards as Record<string, unknown>
+    global.fetch = jest.fn(async (url: string) => {
+      const key = decodeURIComponent(String(url).split('/insights/')[1].split('?')[0])
+      if (key === 'managementToolLogs' || key === 'directoryServices') return json(404, { error: 'Unknown card' })
+      const body = old[key]
+      return body ? json(200, { card: key, data: body }) : json(404, { error: 'Unknown card' })
+    }) as unknown as typeof fetch
+    const { result } = renderHook(() => useDashboardInsights('all', { perCard: true }))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const urls = (global.fetch as jest.Mock).mock.calls.map(c => c[0] as string)
+    expect(urls).toEqual(expect.arrayContaining([
+      '/api/v1/dashboard/insights/managementToolLogs?platform=all',
+      '/api/v1/dashboard/insights/managementToolErrors?platform=all',
+      '/api/v1/dashboard/insights/directoryJoin?platform=all',
+    ]))
+    const cards = result.current.data!.cards as Record<string, any>
+    expect(cards.managementToolLogs.tools.length).toBeGreaterThan(0)
+    expect(cards.directoryServices.segments.map((s: { key: string }) => s.key)).toEqual(['entra', 'domain', 'hybrid', 'workgroup'])
   })
 })
 

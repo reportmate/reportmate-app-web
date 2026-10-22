@@ -15,7 +15,7 @@ import {
   type AppUsageCard as AppUsageCardData,
   type CheckinGapsCard,
   type ConnectivityProblemsCard,
-  type DirectoryJoinCard,
+  type DirectoryServicesCard,
   type ExpiringCertificatesCard,
   type InsightCardKey,
   type InsightCards as InsightCardData,
@@ -548,7 +548,7 @@ function DeviceList({
 
 // MARK: - 1 Reboot & Update Debt
 
-function RebootDebt({ ctx }: { ctx: InsightContext }) {
+export function RebootDebt({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "rebootDebt");
   const d = card.status === "ready" ? card.data : null;
   return (
@@ -658,7 +658,7 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
   const agents = d?.byAgent ?? [];
   return (
     <InsightCard
-      title="Install Health"
+      title="Installs"
       subtitle="Munki and Cimian results"
       link="/installs"
       tone="blue"
@@ -743,7 +743,7 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
 const reasonLabel = (r: string) =>
   r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, " ") : "Unknown";
 
-function CheckinGaps({ ctx }: { ctx: InsightContext }) {
+export function CheckinGaps({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "checkinGaps");
   const d: CheckinGapsCard | null = card.status === "ready" ? card.data : null;
   const allPlatforms = ctx.platformFilter !== "all" && d?.checkinsAllPlatforms !== false;
@@ -917,15 +917,54 @@ function ExpiringCertificates({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - Management Tools Errors
+// MARK: - Management Tools Logs
 
-function ManagementToolErrors({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "managementToolErrors");
+/**
+ * A log line reduced to its message: the leading timestamp, UTC offset and
+ * level tag go, so `<ts> -<n>:<n> [ERR] Device registration failed` and the
+ * same message at another time group together.
+ */
+export function normalizeLogMessage(message: string): string {
+  let m = message.trim();
+  for (let i = 0; i < 4; i++) {
+    const before = m;
+    m = m
+      .replace(/^<ts>\s*/i, "")
+      .replace(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?\s*/, "")
+      .replace(/^[+-]?(<n>|\d{1,2}):(<n>|\d{2})\s+/, "")
+      .replace(/^\[?(ERR|ERROR|WARN|WARNING|INFO|DEBUG|E|W)\]?[:\s]\s*/i, "")
+      .replace(/^[-:|]\s*/, "");
+    if (m === before) break;
+  }
+  return m || message.trim();
+}
+
+/** Groups the top errors by tool and normalised message, summing devices and lines. */
+export function groupToolErrors(errors: ManagementToolErrorsCard["topErrors"]): ManagementToolErrorsCard["topErrors"] {
+  const groups = new Map<string, ManagementToolErrorsCard["topErrors"][number]>();
+  for (const e of errors) {
+    const message = normalizeLogMessage(e.message);
+    const key = `${e.tool}\u0000${e.name}\u0000${message}`;
+    const prior = groups.get(key);
+    if (prior) groups.set(key, { ...prior, devices: prior.devices + e.devices, lines: prior.lines + e.lines });
+    else groups.set(key, { ...e, message });
+  }
+  return [...groups.values()].sort((a, b) => b.devices - a.devices || b.lines - a.lines);
+}
+
+/** The MDM agent's own logs (log root `mdm`) are left out; the card is about the management tools. */
+const isMdmRoot = (tool: string) => tool.toLowerCase() === "mdm";
+
+export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "managementToolLogs");
   const d: ManagementToolErrorsCard | null = card.status === "ready" ? card.data : null;
-  const tools = d ? d.tools.filter((t) => t.devicesWithErrors || t.devicesWithWarnings || t.errorLines) : [];
+  const tools = d
+    ? d.tools.filter((t) => !isMdmRoot(t.tool) && (t.devicesWithErrors || t.devicesWithWarnings || t.errorLines))
+    : [];
+  const topErrors = d ? groupToolErrors(d.topErrors.filter((m) => !isMdmRoot(m.tool))).slice(0, 5) : [];
   return (
     <InsightCard
-      title="Management Tools Errors"
+      title="Management Tools Logs"
       subtitle={`Errors and warnings in the tools' logs · last ${d?.windowHours ?? 24} h`}
       link="/devices"
       tone="red"
@@ -971,11 +1010,11 @@ function ManagementToolErrors({ ctx }: { ctx: InsightContext }) {
           ) : (
             <p className="text-sm text-gray-400 dark:text-gray-500">No errors or warnings logged</p>
           )}
-          {d.topErrors.length > 0 && (
+          {topErrors.length > 0 && (
             <div className="mt-4">
               <SectionLabel>Most common errors</SectionLabel>
               <ul className="space-y-1.5">
-                {d.topErrors.map((m) => (
+                {topErrors.map((m) => (
                   <li key={`${m.tool}:${m.message}`} className="text-sm">
                     <Link href={linkHref(m.link)} className={`block py-0.5 ${ROW_LINK}`} title={m.message}>
                       <span className="block truncate font-mono text-xs text-gray-900 dark:text-gray-100">{m.message}</span>
@@ -1062,77 +1101,72 @@ function Storage({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - Directory Join
+// MARK: - Directory Services (the Identity report's classes)
 
-type DirectoryView = "all" | "windows" | "mac";
-const DIRECTORY_VIEWS: { key: DirectoryView; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "windows", label: "Windows" },
-  { key: "mac", label: "Mac" },
-];
-const SEGMENT_COLORS: Record<string, string> = {
-  entra: "#3b82f6",
+const DIRECTORY_COLORS: Record<string, string> = {
+  cloud: "#3b82f6",
   domain: "#6366f1",
-  hybrid: "#14b8a6",
-  workgroup: "#9ca3af",
-  psso: "#3b82f6",
-  bound: "#6366f1",
-  unbound: "#9ca3af",
+  trusted: "#10b981",
+  unconfirmed: "#eab308",
+  broken: "#ef4444",
+  standard: "#14b8a6",
+  unjoined: "#9ca3af",
 };
 
-function DirectoryJoin({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "directoryJoin");
-  const d: DirectoryJoinCard | null = card.status === "ready" ? card.data : null;
-  // The toolbar's platform toggle picks the view; with it off, the card's own control does
-  const forced: DirectoryView | null =
-    ctx.platformFilter === "Windows" ? "windows" : ctx.platformFilter === "macOS" ? "mac" : null;
-  const [chosen, setChosen] = useState<DirectoryView>("all");
-  const view = forced ?? chosen;
-  const v = d?.views?.[view];
+/**
+ * Directory Services, with the Identity report's dataset, rules and names:
+ * Cloud Joined; Domain Joined (Trusted, Unconfirmed, Broken); Standard;
+ * Unjoined. Follows the toolbar's platform toggle; no views of its own.
+ */
+function DirectoryServices({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "directoryServices");
+  const d: DirectoryServicesCard | null = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
-      title="Directory Join"
-      subtitle="Join type, extra local admins, shared and assigned"
+      title="Directory Services"
+      subtitle="How devices are joined, as the Identity report classifies them"
       link="/identity"
       tone="purple"
       icon={<Icon d={ICONS.users} />}
       card={card}
     >
-      {d && v && (
+      {d && (
         <>
-          {!forced && (
-            <div role="radiogroup" aria-label="Platform" className="inline-flex mb-4 rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-900/40">
-              {DIRECTORY_VIEWS.map((o) => (
-                <button
-                  key={o.key}
-                  type="button"
-                  role="radio"
-                  aria-checked={view === o.key}
-                  onClick={() => setChosen(o.key)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    view === o.key
-                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          )}
           <Donut
-            center={String(v.devices)}
-            data={v.segments.map((s) => ({
+            center={String(d.devices)}
+            data={d.segments.map((s) => ({
               label: s.label,
               count: s.count,
-              color: SEGMENT_COLORS[s.key] ?? TONES.gray.hex,
+              color: DIRECTORY_COLORS[s.key] ?? TONES.gray.hex,
               link: linkHref(s.link),
             }))}
           />
+          {d.segments.some((s) => s.children?.length) && (
+            <ul className="mt-3 space-y-0.5">
+              {d.segments
+                .filter((s) => s.children?.length)
+                .flatMap((s) =>
+                  (s.children ?? []).map((c) => (
+                    <li key={`${s.key}:${c.key}`}>
+                      <Link
+                        href={linkHref(c.link)}
+                        className={`flex items-center gap-2 text-sm py-0.5 pl-5 ${ROW_LINK}`}
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: DIRECTORY_COLORS[c.key] ?? TONES.gray.hex }} />
+                        <span className="flex-1 truncate text-gray-600 dark:text-gray-300">
+                          {s.label}: {c.label}
+                        </span>
+                        <span className="font-medium tabular-nums text-gray-900 dark:text-gray-100">{c.count}</span>
+                      </Link>
+                    </li>
+                  )),
+                )}
+            </ul>
+          )}
           <div className="flex flex-wrap gap-2 mt-4">
-            <StatChip value={v.extraAdmins.count} label="with extra local admins" tone="orange" link={linkHref(v.extraAdmins.link)} />
-            <StatChip value={v.shared.count} label="shared" tone="blue" link={linkHref(v.shared.link)} />
-            <StatChip value={v.assigned.count} label="assigned" tone="teal" link={linkHref(v.assigned.link)} />
+            <StatChip value={d.extraAdmins.count} label="with extra local admins" tone="orange" link={linkHref(d.extraAdmins.link)} />
+            <StatChip value={d.shared.count} label="shared" tone="blue" link={linkHref(d.shared.link)} />
+            <StatChip value={d.assigned.count} label="assigned" tone="teal" link={linkHref(d.assigned.link)} />
           </div>
         </>
       )}
@@ -1201,7 +1235,7 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
     : state.error && !state.loading
       ? { status: "error", error: state.error, retry: state.refresh, retrying: state.loading }
       : { status: "loading", retry: state.refresh };
-  const hours = (h: number) => (h >= 1000 ? `${(h / 1000).toFixed(h >= 10000 ? 0 : 1)}k h` : `${Math.round(h)} h`);
+  const hours = (h: number) => `${Math.round(h).toLocaleString("en-US")} h`;
   return (
     <InsightCard
       title="App Usage"
@@ -1236,18 +1270,27 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
             </p>
           )}
           {d.apps.length ? (
-            <div className={state.loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
-              <BarList
-                color={TONES.teal.hex}
-                labelWidth="w-56"
-                items={d.apps.map((a) => ({
-                  label: a.name,
-                  count: a.totalHours,
-                  detail: hours(a.totalHours),
-                  link: linkHref(a.link),
-                }))}
-              />
-            </div>
+            <ul className={state.loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
+              {d.apps.map((a) => {
+                const max = Math.max(1, ...d.apps.map((x) => x.totalHours));
+                return (
+                  <li key={a.name}>
+                    <Link
+                      href={linkHref(a.link)}
+                      title={a.name}
+                      className={`grid grid-cols-[minmax(0,1fr)_10rem_7rem_6.5rem] items-center gap-3 text-sm py-1 ${ROW_LINK}`}
+                    >
+                      <span className="truncate text-gray-900 dark:text-gray-100">{a.name}</span>
+                      <span className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                        <span className="block h-full rounded-full" style={{ width: `${(a.totalHours / max) * 100}%`, backgroundColor: TONES.teal.hex }} />
+                      </span>
+                      <span className="text-right tabular-nums font-medium text-gray-900 dark:text-gray-100">{hours(a.totalHours)}</span>
+                      <span className="text-right tabular-nums text-gray-500 dark:text-gray-400">{plural(a.devices, "device")}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           ) : (
             <p className="text-sm text-gray-400 dark:text-gray-500">No usage recorded for this selection</p>
           )}
@@ -1294,19 +1337,17 @@ function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
 
 // MARK: - The grid cards, in spec order
 
-// Install Health and App Usage have fixed places (column 1 and the events
-// column); the remaining cards fill the insight columns and grid.
+// Fixed places (revision 4): Installs, Management Tools Logs and Check-in Gaps
+// in column 1; Reboot & Update Debt at the foot of column 2; App Usage under
+// Recent Events. These are the cards that fill the insight columns and grid.
 
 const CARDS: { id: InsightCardKey; Card: React.FC<{ ctx: InsightContext }> }[] = [
-  { id: "rebootDebt", Card: RebootDebt },
   { id: "protectionGaps", Card: ProtectionGaps },
-  { id: "managementToolErrors", Card: ManagementToolErrors },
   { id: "storage", Card: Storage },
-  { id: "checkinGaps", Card: CheckinGaps },
   { id: "osCurrency", Card: OSCurrency },
   { id: "softwareRisk", Card: SoftwareRisk },
   { id: "expiringCertificates", Card: ExpiringCertificates },
-  { id: "directoryJoin", Card: DirectoryJoin },
+  { id: "directoryServices", Card: DirectoryServices },
   { id: "connectivityProblems", Card: ConnectivityProblems },
 ];
 

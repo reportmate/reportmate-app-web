@@ -6,7 +6,7 @@ import appUsage from '../../dashboard/__fixtures__/app-usage.json'
 import appUsageShared from '../../dashboard/__fixtures__/app-usage-shared.json'
 import { linkHref, type InsightLink, type InsightsDocument, type InsightsState } from '../../dashboard/insights'
 import { clearCache } from '../../data-cache'
-import { AppUsageCard, InsightCards, InstallHealthHero, INSIGHT_CARD_COUNT, type InsightContext } from './InsightWidgets'
+import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, RebootDebt, INSIGHT_CARD_COUNT, normalizeLogMessage, type InsightContext } from './InsightWidgets'
 
 const all = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
 const doc = fixture as unknown as InsightsDocument
@@ -16,11 +16,14 @@ const ctx = (insights: Partial<InsightsState>, platformFilter = 'all'): InsightC
   insights: { data: null, loading: false, error: null, pending: new Set(), refresh: jest.fn(), ...insights },
 })
 
-/** The grid cards plus Install Health, which has a fixed place in column 1. */
+/** The grid cards plus the cards with fixed places (revision 4). */
 const Dashboard = ({ c, positions = all }: { c: InsightContext; positions?: number[] }) => (
   <>
     <InstallHealthHero ctx={c} />
+    <ManagementToolLogs ctx={c} />
+    <CheckinGaps ctx={c} />
     <InsightCards ctx={c} positions={positions} />
+    <RebootDebt ctx={c} />
   </>
 )
 
@@ -45,11 +48,11 @@ describe('InsightCards', () => {
     expect(screen.getAllByTestId('insight-skeleton')).toHaveLength(11)
   })
 
-  it('renders the revision 3 cards from the API fixture', () => {
+  it('renders the revision 4 cards from the API fixture', () => {
     render(<Dashboard c={ctx({ data: doc })} />)
     for (const title of [
-      'Install Health', 'Reboot & Update Debt', 'Protection Gaps', 'Management Tools Errors', 'Storage',
-      'Check-in Gaps', 'OS Currency', 'Software Risk', 'Expiring Certificates', 'Directory Join', 'Connectivity Problems',
+      'Installs', 'Reboot & Update Debt', 'Protection Gaps', 'Management Tools Logs', 'Storage',
+      'Check-in Gaps', 'OS Currency', 'Software Risk', 'Expiring Certificates', 'Directory Services', 'Connectivity Problems',
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy()
     expect(screen.queryAllByTestId('insight-skeleton')).toHaveLength(0)
   })
@@ -57,9 +60,10 @@ describe('InsightCards', () => {
   it('links every item where the server says', () => {
     render(<Dashboard c={ctx({ data: doc })} />)
     const rendered = new Set(hrefs())
-    // Directory Join shows one view at a time; the others are checked below
-    const expected = collectLinks(fixture.cards, p => p[0] === 'directoryJoin' && p[2] !== undefined && p[2] !== 'all')
-    const missing = expected.map(linkHref).filter(h => !rendered.has(h))
+    // Management Tools Logs groups its messages; checked on its own below
+    const expected = collectLinks(fixture.cards, p => p[0] === 'managementToolLogs' && p[1] === 'topErrors')
+    // The MDM agent's own log root is left out on purpose
+    const missing = expected.map(linkHref).filter(h => !h.includes('tool=mdm') && !rendered.has(h))
     expect(missing).toEqual([])
   })
 
@@ -76,19 +80,33 @@ describe('InsightCards', () => {
     expect(screen.getByText('Cimian')).toBeTruthy()
   })
 
-  it('switches Directory Join between All, Windows and Mac', () => {
-    render(<InsightCards ctx={ctx({ data: doc })} positions={[8]} />)
-    expect(hrefs()).toContain('/identity?join=entra')
-    fireEvent.click(screen.getByRole('radio', { name: 'Mac' }))
-    expect(hrefs()).toEqual(expect.arrayContaining(['/identity?directory=psso&platform=macOS', '/identity?admins=extra&platform=macOS']))
-    fireEvent.click(screen.getByRole('radio', { name: 'Windows' }))
-    expect(hrefs()).toContain('/identity?join=hybrid&platform=Windows')
+  it('shows Directory Services with the Identity report classes and no views of its own', () => {
+    render(<InsightCards ctx={ctx({ data: doc }, 'macOS')} positions={[5]} />)
+    expect(screen.queryByRole('radiogroup')).toBeNull()
+    expect(screen.getByText('Cloud Joined')).toBeTruthy()
+    expect(screen.getByText('Domain Joined: Broken')).toBeTruthy()
+    expect(hrefs()).toEqual(expect.arrayContaining([
+      '/identity?directory=cloud', '/identity?directory=domain', '/identity?directory=trusted',
+      '/identity?directory=unconfirmed', '/identity?directory=broken', '/identity?directory=standard',
+      '/identity?directory=unjoined', '/identity?admins=extra',
+    ]))
   })
 
-  it('follows the toolbar platform toggle in Directory Join', () => {
-    render(<InsightCards ctx={ctx({ data: doc }, 'macOS')} positions={[8]} />)
-    expect(screen.queryByRole('radiogroup')).toBeNull()
-    expect(hrefs()).toContain('/identity?directory=unbound&platform=macOS')
+  it('groups Management Tools Logs messages and leaves out the MDM agent', () => {
+    render(<ManagementToolLogs ctx={ctx({ data: doc })} />)
+    const rows = screen.getAllByText('Device registration failed for <guid>')
+    expect(rows).toHaveLength(1)
+    expect(screen.getByText(/Cimian · 9 devices · 23 lines/)).toBeTruthy()
+    expect(screen.queryByText('Intune')).toBeNull()
+    expect(screen.queryByText(/Enrollment check-in/)).toBeNull()
+    expect(screen.getByText('Munki')).toBeTruthy()
+  })
+
+  it('strips timestamps, offsets and level tags from log messages', () => {
+    expect(normalizeLogMessage('<ts> -<n>:<n> [ERR] Device registration failed for <guid>')).toBe('Device registration failed for <guid>')
+    expect(normalizeLogMessage('2026-10-22T14:03:51.721+00:00 ERROR: Disk full')).toBe('Disk full')
+    expect(normalizeLogMessage('[WARN] Retrying download')).toBe('Retrying download')
+    expect(normalizeLogMessage('Plain message')).toBe('Plain message')
   })
 
   it('shows a failed card with Retry and renders the rest', () => {
@@ -116,7 +134,7 @@ describe('InsightCards', () => {
   it('shows a card still on its own request as a skeleton (per-card loading)', () => {
     const cards = { ...doc.cards } as Record<string, unknown>
     delete cards.storage
-    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument, pending: new Set(['storage']) })} positions={[3]} />)
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument, pending: new Set(['storage']) })} positions={[1]} />)
     expect(screen.getByTestId('insight-skeleton')).toBeTruthy()
   })
 })
@@ -152,6 +170,8 @@ describe('AppUsageCard', () => {
     render(<AppUsageCard platformFilter="all" />)
     await waitFor(() => expect(screen.getByText('SampleApp 0')).toBeTruthy())
     expect(screen.getByText('SampleApp 9')).toBeTruthy()
+    expect(screen.getByText('1,200 h')).toBeTruthy()
+    expect(screen.getAllByText('40 devices').length).toBeGreaterThan(0)
     expect(screen.queryByText('SampleApp 10')).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Shared' }))

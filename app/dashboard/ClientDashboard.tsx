@@ -8,7 +8,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
-import { AppUsageCard, InsightCards, InstallHealthHero, INSIGHT_CARD_COUNT, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
+import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, RebootDebt, INSIGHT_CARD_COUNT, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
@@ -519,6 +519,12 @@ export default function ClientDashboard() {
     return <SkeletonTimeout page><DashboardSkeleton /></SkeletonTimeout>
   }
 
+  const newClients = (
+    <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
+      <NewClientsWidget devices={filteredDevices as any} loading={devicesLoading} />
+    </ErrorBoundary>
+  )
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
       <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
@@ -544,11 +550,12 @@ export default function ClientDashboard() {
             />
           )
         })()}
-        {/* Layout per docs/DASHBOARD-WIDGETS.md. Install Health sits under Fleet
-            Status and App Usage under Recent Events at every width. The other
-            insight cards: laptop, a 2-column grid below; desktop (>= 1680px),
-            cards 1-4 in the middle column and the rest four across below;
-            wide (>= 2200px), dealt alternately into two middle columns. */}
+        {/* Layout per docs/DASHBOARD-WIDGETS.md, revision 4. Column 1: Fleet
+            Status, Installs, Management Tools Logs, Check-in Gaps. Column 2: New
+            Clients, insight cards, Reboot & Update Debt. App Usage sits under
+            Recent Events. Wide (>= 2200px) deals the other insight cards into
+            two columns; desktop (>= 1680px) puts three in column 2 and the
+            rest four across below; laptop puts them in a 2-column grid below. */}
         <div
           className={
             layout === "wide"
@@ -558,7 +565,7 @@ export default function ClientDashboard() {
                 : "grid grid-cols-1 lg:grid-cols-10 gap-8"
           }
         >
-          {/* Column A - Fleet Status + Install Health + New Clients */}
+          {/* Column 1 - Fleet Status, Installs, Management Tools Logs, Check-in Gaps */}
           <div className={layout === "narrow" ? "lg:col-span-3 space-y-8" : "space-y-8"}>
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
@@ -570,21 +577,33 @@ export default function ClientDashboard() {
               <InstallHealthHero ctx={insightCtx} />
             </ErrorBoundary>
 
-            {/* New Clients Table */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
-              <NewClientsWidget devices={filteredDevices as any} loading={devicesLoading} />
+            {/* Management Tools Logs, then Check-in Gaps at the foot of column 1 */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading management tools logs</div>}>
+              <ManagementToolLogs ctx={insightCtx} />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading check-in gaps</div>}>
+              <CheckinGaps ctx={insightCtx} />
             </ErrorBoundary>
           </div>
 
 
+          {/* Column 2 - New Clients on top, insight cards, Reboot & Update Debt at the foot */}
           {layout === "wide" && (
             <>
-              <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 0)} className="space-y-8" />
+              <div className="space-y-8">
+                {newClients}
+                <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 0)} className="space-y-8" />
+                <RebootDebt ctx={insightCtx} />
+              </div>
               <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 1)} className="space-y-8" />
             </>
           )}
           {layout === "desktop" && (
-            <InsightCards ctx={insightCtx} positions={allCards.slice(0, 4)} className="space-y-8" />
+            <div className="space-y-8">
+              {newClients}
+              <InsightCards ctx={insightCtx} positions={allCards.slice(0, 3)} className="space-y-8" />
+              <RebootDebt ctx={insightCtx} />
+            </div>
           )}
 
           {/* Column C - Recent Events + Platform Distribution + OS Version Charts */}
@@ -638,10 +657,14 @@ export default function ClientDashboard() {
           </div>
         </div>
         {layout === "desktop" && (
-          <InsightCards ctx={insightCtx} positions={allCards.slice(4)} className="mt-8 grid grid-cols-4 gap-8 items-start" />
+          <InsightCards ctx={insightCtx} positions={allCards.slice(3)} className="mt-8 grid grid-cols-4 gap-8 items-start" />
         )}
         {layout === "narrow" && (
-          <InsightCards ctx={insightCtx} positions={allCards} className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start" />
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+            {newClients}
+            <InsightCards ctx={insightCtx} positions={allCards} className="contents" />
+            <RebootDebt ctx={insightCtx} />
+          </div>
         )}
       </div>
       

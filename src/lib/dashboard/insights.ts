@@ -163,6 +163,20 @@ export interface DirectoryJoinCard {
   views: { all: DirectoryJoinView; windows: DirectoryJoinView; mac: DirectoryJoinView };
 }
 
+/** A Directory Services slice; Domain Joined carries Trusted, Unconfirmed and Broken. */
+export interface DirectoryServiceSegment extends KeyedCount {
+  children?: KeyedCount[];
+}
+
+/** The Identity report's Directory Services classes, for the global platform. */
+export interface DirectoryServicesCard {
+  devices: number;
+  segments: DirectoryServiceSegment[];
+  extraAdmins: Counted;
+  shared: Counted;
+  assigned: Counted;
+}
+
 export interface ConnectivityProblemsCard {
   devices: number;
   weakSignal: Counted;
@@ -193,13 +207,13 @@ export interface InsightCards {
   installHealth: InstallHealthCard | CardError;
   rebootDebt: RebootDebtCard | CardError;
   protectionGaps: ProtectionGapsCard | CardError;
-  managementToolErrors: ManagementToolErrorsCard | CardError;
+  managementToolLogs: ManagementToolErrorsCard | CardError;
   storage: StorageCard | CardError;
   checkinGaps: CheckinGapsCard | CardError;
   osCurrency: OSCurrencyCard | CardError;
   softwareRisk: SoftwareRiskCard | CardError;
   expiringCertificates: ExpiringCertificatesCard | CardError;
-  directoryJoin: DirectoryJoinCard | CardError;
+  directoryServices: DirectoryServicesCard | CardError;
   connectivityProblems: ConnectivityProblemsCard | CardError;
 }
 
@@ -256,13 +270,13 @@ export const INSIGHT_CARD_KEYS: InsightCardKey[] = [
   "installHealth",
   "rebootDebt",
   "protectionGaps",
-  "managementToolErrors",
+  "managementToolLogs",
   "storage",
   "checkinGaps",
   "osCurrency",
   "softwareRisk",
   "expiringCertificates",
-  "directoryJoin",
+  "directoryServices",
   "connectivityProblems",
 ];
 
@@ -273,6 +287,47 @@ export const INSIGHT_CARD_KEYS: InsightCardKey[] = [
  */
 export const INSIGHTS_PER_CARD =
   process.env.NEXT_PUBLIC_INSIGHTS_PER_CARD !== "false";
+
+/**
+ * Earlier API names for a card, tried in order when the current one is not
+ * deployed yet (404), and read from a combined document that still uses them.
+ */
+export const CARD_KEY_ALIASES: Partial<Record<InsightCardKey, string[]>> = {
+  managementToolLogs: ["managementToolErrors"],
+  directoryServices: ["directoryJoin"],
+};
+
+/**
+ * A card section in the current shape. Directory Join's `{views}` becomes the
+ * view for the platform asked for; Domain Joined's breakdown may arrive as
+ * `children`, `breakdown` or `trust`.
+ */
+export function normalizeCard(key: string, section: any, scope: string): any {
+  if (!section || typeof section !== "object" || isCardError(section)) return section;
+  if (key === "directoryServices") {
+    let view = section;
+    if (section.views && typeof section.views === "object") {
+      view = section.views[scope === "macOS" ? "mac" : scope === "Windows" ? "windows" : "all"] ?? section.views.all ?? {};
+    }
+    return {
+      ...view,
+      segments: (Array.isArray(view.segments) ? view.segments : []).map((seg: any) => ({
+        ...seg,
+        children: seg.children ?? seg.breakdown ?? seg.trust ?? undefined,
+      })),
+    };
+  }
+  return section;
+}
+
+/** Reads a card from a combined document under its current or earlier name. */
+export function cardFromDocument(doc: InsightsDocument | null | undefined, key: InsightCardKey, scope: string): unknown {
+  const cards = (doc?.cards ?? {}) as Record<string, unknown>;
+  for (const k of [key, ...(CARD_KEY_ALIASES[key] ?? [])]) {
+    if (cards[k] !== undefined) return normalizeCard(key, cards[k], scope);
+  }
+  return undefined;
+}
 
 const cardUrl = (key: string, scope: string) =>
   `/api/v1/dashboard/insights/${encodeURIComponent(key)}?platform=${encodeURIComponent(scope)}`;
@@ -360,9 +415,15 @@ export function useDashboardInsights(
         const json = (await res.json()) as InsightsDocument;
         if (!json || typeof json.cards !== "object")
           throw new Error("Unexpected response");
-        rememberCached(insightsUrl(scope), json);
+        const cards: Record<string, unknown> = {};
+        for (const k of INSIGHT_CARD_KEYS) {
+          const c = cardFromDocument(json, k, scope);
+          if (c !== undefined) cards[k] = c;
+        }
+        const normalized = { ...json, cards } as InsightsDocument;
+        rememberCached(insightsUrl(scope), normalized);
         if (id === latest.current)
-          setState({ data: json, loading: false, error: null, pending: new Set() });
+          setState({ data: normalized, loading: false, error: null, pending: new Set() });
       } catch (err) {
         if (id === latest.current)
           setState((s) => ({
@@ -382,13 +443,17 @@ export function useDashboardInsights(
       INSIGHT_CARD_KEYS.map(async (key) => {
         let section: unknown;
         try {
-          const res = await trackedFetch(
-            cardUrl(key, scope),
-            { cache: "no-store", credentials: "include" },
-            { background: hadCache },
-          );
-          if (!res.ok) throw new Error(await failureText(res));
-          section = unwrapCard(key, await res.json());
+          let res: Response | null = null;
+          for (const name of [key, ...(CARD_KEY_ALIASES[key] ?? [])]) {
+            res = await trackedFetch(
+              cardUrl(name, scope),
+              { cache: "no-store", credentials: "include" },
+              { background: hadCache },
+            );
+            if (res.status !== 404) break;
+          }
+          if (!res || !res.ok) throw new Error(res ? await failureText(res) : "No response");
+          section = normalizeCard(key, unwrapCard(key, await res.json()), scope);
           const doc = peekCached<InsightsDocument>(insightsUrl(scope)) ?? emptyDocument(scope);
           rememberCached(insightsUrl(scope), {
             ...doc,

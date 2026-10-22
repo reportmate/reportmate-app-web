@@ -828,3 +828,40 @@ export function toolProductLabel(tool: string, platform?: string | null): string
   if (p === "macOS") return names[0];
   return names[0] === names[1] ? names[0] : `${names[0]} / ${names[1]}`;
 }
+
+// MARK: - Directory Services (`/identity?directory=`), the Identity report's classes
+
+/**
+ * The Identity report's Directory Services widget classes, as URL keys. The
+ * Domain Joined slice breaks down into Trusted, Unconfirmed and Broken.
+ * `psso`, `bound` and `unbound` (Mac directory state) are read separately.
+ */
+export const DIRECTORY_SERVICE_LABELS = {
+  cloud: "Cloud Joined",
+  domain: "Domain Joined",
+  trusted: "Trusted",
+  unconfirmed: "Unconfirmed",
+  broken: "Broken",
+  standard: "Standard",
+  unjoined: "Unjoined",
+} as const;
+export type DirectoryServiceKey = keyof typeof DIRECTORY_SERVICE_LABELS;
+
+/** `directory=` → the identity widget's label. Takes the key or the label, any case. */
+export function directoryServiceFromParam(value: string | null): string | null {
+  const v = (value || "").trim().toLowerCase().replace(/[\s_]+/g, "-");
+  if (!v) return null;
+  for (const [key, label] of Object.entries(DIRECTORY_SERVICE_LABELS)) {
+    if (v === key || v === label.toLowerCase().replace(/\s+/g, "-")) return label;
+  }
+  if (v === "cloud-joined" || v === "entra") return DIRECTORY_SERVICE_LABELS.cloud;
+  if (v === "domain-joined") return DIRECTORY_SERVICE_LABELS.domain;
+  return null;
+}
+
+/** The identity widget's label → its `directory=` key. */
+export function directoryServiceToParam(label: string | null): string | null {
+  if (!label) return null;
+  const hit = Object.entries(DIRECTORY_SERVICE_LABELS).find(([, l]) => l === label);
+  return hit ? hit[0] : null;
+}

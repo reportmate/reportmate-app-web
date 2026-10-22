@@ -416,7 +416,7 @@
       },
       "generatedAt": "2026-10-22T15:00:00+00:00"
     },
-    "managementToolErrors": {
+    "managementToolLogs": {
       "error": "Database unavailable",
       "generatedAt": "2026-10-22T15:00:00+00:00"
     },
@@ -645,240 +645,117 @@
       ],
       "generatedAt": "2026-10-22T15:00:00+00:00"
     },
-    "directoryJoin": {
-      "views": {
-        "all": {
-          "devices": 916,
-          "segments": [
-            {
-              "key": "entra",
-              "label": "Entra joined",
-              "count": 313,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "entra"
-                }
-              }
-            },
-            {
-              "key": "domain",
-              "label": "Domain joined",
-              "count": 0,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "domain"
-                }
-              }
-            },
-            {
-              "key": "hybrid",
-              "label": "Hybrid joined",
-              "count": 46,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "hybrid"
-                }
-              }
-            },
-            {
-              "key": "workgroup",
-              "label": "Workgroup",
-              "count": 342,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "workgroup"
-                }
-              }
-            }
-          ],
-          "extraAdmins": {
-            "count": 773,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "admins": "extra"
-              }
-            }
-          },
-          "shared": {
-            "count": 546,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "usage": "shared"
-              }
-            }
-          },
-          "assigned": {
-            "count": 363,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "usage": "assigned"
-              }
+    "directoryServices": {
+      "generatedAt": "2026-10-22T15:00:00+00:00",
+      "devices": 916,
+      "segments": [
+        {
+          "key": "cloud",
+          "label": "Cloud Joined",
+          "count": 313,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "cloud"
             }
           }
         },
-        "windows": {
-          "devices": 381,
-          "segments": [
-            {
-              "key": "entra",
-              "label": "Entra joined",
-              "count": 313,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "entra",
-                  "platform": "Windows"
-                }
-              }
-            },
-            {
-              "key": "domain",
-              "label": "Domain joined",
-              "count": 0,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "domain",
-                  "platform": "Windows"
-                }
-              }
-            },
-            {
-              "key": "hybrid",
-              "label": "Hybrid joined",
-              "count": 46,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "hybrid",
-                  "platform": "Windows"
-                }
-              }
-            },
-            {
-              "key": "workgroup",
-              "label": "Workgroup",
-              "count": 22,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "join": "workgroup",
-                  "platform": "Windows"
-                }
-              }
-            }
-          ],
-          "extraAdmins": {
-            "count": 273,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "admins": "extra",
-                "platform": "Windows"
-              }
+        {
+          "key": "domain",
+          "label": "Domain Joined",
+          "count": 54,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "domain"
             }
           },
-          "shared": {
-            "count": 200,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "usage": "shared",
-                "platform": "Windows"
+          "children": [
+            {
+              "key": "trusted",
+              "label": "Trusted",
+              "count": 40,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "trusted"
+                }
+              }
+            },
+            {
+              "key": "unconfirmed",
+              "label": "Unconfirmed",
+              "count": 10,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "unconfirmed"
+                }
+              }
+            },
+            {
+              "key": "broken",
+              "label": "Broken",
+              "count": 4,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "broken"
+                }
               }
             }
-          },
-          "assigned": {
-            "count": 150,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "usage": "assigned",
-                "platform": "Windows"
-              }
+          ]
+        },
+        {
+          "key": "standard",
+          "label": "Standard",
+          "count": 200,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "standard"
             }
           }
         },
-        "mac": {
-          "devices": 535,
-          "segments": [
-            {
-              "key": "psso",
-              "label": "Platform SSO / Entra",
-              "count": 180,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "directory": "psso",
-                  "platform": "macOS"
-                }
-              }
-            },
-            {
-              "key": "bound",
-              "label": "AD-bound",
-              "count": 8,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "directory": "bound",
-                  "platform": "macOS"
-                }
-              }
-            },
-            {
-              "key": "unbound",
-              "label": "Not bound",
-              "count": 347,
-              "link": {
-                "path": "/identity",
-                "params": {
-                  "directory": "unbound",
-                  "platform": "macOS"
-                }
-              }
-            }
-          ],
-          "extraAdmins": {
-            "count": 500,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "admins": "extra",
-                "platform": "macOS"
-              }
-            }
-          },
-          "shared": {
-            "count": 346,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "usage": "shared",
-                "platform": "macOS"
-              }
-            }
-          },
-          "assigned": {
-            "count": 213,
-            "link": {
-              "path": "/identity",
-              "params": {
-                "usage": "assigned",
-                "platform": "macOS"
-              }
+        {
+          "key": "unjoined",
+          "label": "Unjoined",
+          "count": 349,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "unjoined"
             }
           }
         }
+      ],
+      "extraAdmins": {
+        "count": 773,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "admins": "extra"
+          }
+        }
       },
-      "generatedAt": "2026-10-22T15:00:00+00:00"
+      "shared": {
+        "count": 546,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "usage": "shared"
+          }
+        }
+      },
+      "assigned": {
+        "count": 363,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "usage": "assigned"
+          }
+        }
+      }
     },
     "connectivityProblems": {
       "devices": 924,

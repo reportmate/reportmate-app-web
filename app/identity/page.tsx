@@ -11,7 +11,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
-import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory } from "@/src/lib/dashboard/reportRules"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
@@ -178,7 +178,9 @@ function IdentityPageContent() {
   // Local Admins report mode (flat admin x device view)
   const [showAdminsReport, setShowAdminsReport] = useState(false)
   // Widget click filters
-  const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
+  // `directory=cloud|domain|trusted|unconfirmed|broken|standard|unjoined`: the
+  // Directory Services widget's classes, the dashboard card's links.
+  const [directoryFilter, setDirectoryFilter] = useState<string | null>(() => directoryServiceFromParam(searchParams.get('directory')))
   const [authFilter, setAuthFilter] = useState<string | null>(null)
   const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(null)
   // Mac-only filter chips. Values: 'with-token' | 'missing-token' | null, and
@@ -308,7 +310,7 @@ function IdentityPageContent() {
     }
     set('admins', adminFilter === 'multiple-admins' ? 'extra' : adminCount)
     set('join', joinFilter.length > 0 ? JOIN_TYPES.filter(j => joinFilter.includes(j)).join(',') : null)
-    set('directory', macDirectoryFilter.length > 0 ? macDirectoryFilter.join(',') : null)
+    set('directory', macDirectoryFilter.length > 0 ? macDirectoryFilter.join(',') : directoryServiceToParam(directoryFilter))
     const kinds = new Set<string>()
     const raw: string[] = []
     for (const u of selectedUsages) {
@@ -324,7 +326,7 @@ function IdentityPageContent() {
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlHydrated, adminFilter, joinFilter, macDirectoryFilter, selectedUsages])
+  }, [urlHydrated, adminFilter, joinFilter, macDirectoryFilter, directoryFilter, selectedUsages])
 
   // URL → state when the URL changes from outside (a dashboard deep link,
   // Back) while the page is open; the first render already read it, and the
@@ -339,6 +341,7 @@ function IdentityPageContent() {
     setAdminFilter(admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all')
     setJoinFilter(paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
     setMacDirectoryFilter(directoryFromParam(searchParams.get('directory')))
+    setDirectoryFilter(directoryServiceFromParam(searchParams.get('directory')))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuery])
 
