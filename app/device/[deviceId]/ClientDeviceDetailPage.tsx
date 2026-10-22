@@ -29,7 +29,6 @@ import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
 import { safeHost } from "@/src/lib/security/safeUrl"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { toolLevelFromParam, toolRootFromParam, type ToolLevel } from "@/src/lib/dashboard/reportRules"
-import { safeHost } from "@/src/lib/security/safeUrl"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
