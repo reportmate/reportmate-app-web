@@ -26,7 +26,7 @@ describe('useDashboardInsights', () => {
       const key = decodeURIComponent(String(url).split('/insights/')[1].split('?')[0])
       if (key === 'storage') return json(503, { error: 'Card not available' })
       // The API's envelope; one card answers bare to check that is accepted too
-      if (key === 'osCurrency') return json(200, cards[key])
+      if (key === 'updateDebt') return json(200, cards[key])
       return json(200, { card: key, platform: 'macOS', includeArchived: false, generatedAt: 'x', data: cards[key] })
     }) as unknown as typeof fetch
     const { result } = renderHook(() => useDashboardInsights('macOS', { perCard: true }))
@@ -35,7 +35,7 @@ describe('useDashboardInsights', () => {
     expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('/api/v1/dashboard/insights/installHealth?platform=macOS')
     const got = result.current.data!.cards as Record<string, unknown>
     expect(got.rebootDebt).toEqual(cards.rebootDebt)
-    expect(got.osCurrency).toEqual(cards.osCurrency)
+    expect(got.updateDebt).toEqual(cards.updateDebt)
     expect(got.storage).toEqual({ error: 'Card not available (HTTP 503)' })
     expect(result.current.pending.size).toBe(0)
   })
@@ -68,7 +68,7 @@ describe('old card names', () => {
     const old = legacy.cards as Record<string, unknown>
     global.fetch = jest.fn(async (url: string) => {
       const key = decodeURIComponent(String(url).split('/insights/')[1].split('?')[0])
-      if (key === 'managementToolLogs' || key === 'directoryServices') return json(404, { error: 'Unknown card' })
+      if (key === 'managementToolLogs' || key === 'directoryServices' || key === 'updateDebt') return json(404, { error: 'Unknown card' })
       const body = old[key]
       return body ? json(200, { card: key, data: body }) : json(404, { error: 'Unknown card' })
     }) as unknown as typeof fetch
@@ -79,7 +79,9 @@ describe('old card names', () => {
       '/api/v1/dashboard/insights/managementToolLogs?platform=all',
       '/api/v1/dashboard/insights/managementToolErrors?platform=all',
       '/api/v1/dashboard/insights/directoryJoin?platform=all',
+      '/api/v1/dashboard/insights/osCurrency?platform=all',
     ]))
+    expect((result.current.data!.cards as Record<string, any>).updateDebt.behind).toBeTruthy()
     const cards = result.current.data!.cards as Record<string, any>
     expect(cards.managementToolLogs.tools.length).toBeGreaterThan(0)
     expect(cards.directoryServices.segments.map((s: { key: string }) => s.key)).toEqual(['entra', 'domain', 'hybrid', 'workgroup'])

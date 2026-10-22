@@ -8,7 +8,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
-import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, RebootDebt, INSIGHT_CARD_COUNT, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
+import { AppUsageCard, CheckinGaps, InsightCardById, InstallHealthHero, ManagementToolLogs, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
@@ -106,7 +106,10 @@ interface Device {
   inventoryState?: InventoryState
 }
 
-const allCards = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
+/** Revision 5's columns 2 and 3. Narrower layouts keep this order. */
+const COLUMN_2 = ["directoryServices", "connectivityProblems", "protectionGaps", "expiringCertificates"] as const
+const COLUMN_3_BEFORE_APP_USAGE = ["updateDebt", "storage"] as const
+const COLUMN_3_AFTER_APP_USAGE = ["softwareRisk", "rebootDebt"] as const
 
 export default function ClientDashboard() {
   // All data comes from consolidated /api/dashboard call
@@ -519,11 +522,32 @@ export default function ClientDashboard() {
     return <SkeletonTimeout page><DashboardSkeleton /></SkeletonTimeout>
   }
 
+  const appUsage = (
+    <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading app usage</div>}>
+      <AppUsageCard platformFilter={platformFilter} />
+    </ErrorBoundary>
+  )
+  /** Column 3's cards in order; App Usage spans `appUsageSpan` in a grid. */
+  const column3Cards = (appUsageSpan = "") => (
+    <>
+      {COLUMN_3_BEFORE_APP_USAGE.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
+      <div className={appUsageSpan}>{appUsage}</div>
+      {COLUMN_3_AFTER_APP_USAGE.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
+    </>
+  )
   const newClients = (
     <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
       <NewClientsWidget devices={filteredDevices as any} loading={devicesLoading} />
     </ErrorBoundary>
   )
+
+  const column2 = (
+    <div className="space-y-8">
+      {newClients}
+      {COLUMN_2.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
+    </div>
+  )
+  const column3 = <div className="space-y-8">{column3Cards()}</div>
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
@@ -550,12 +574,12 @@ export default function ClientDashboard() {
             />
           )
         })()}
-        {/* Layout per docs/DASHBOARD-WIDGETS.md, revision 4. Column 1: Fleet
-            Status, Installs, Management Tools Logs, Check-in Gaps. Column 2: New
-            Clients, insight cards, Reboot & Update Debt. App Usage sits under
-            Recent Events. Wide (>= 2200px) deals the other insight cards into
-            two columns; desktop (>= 1680px) puts three in column 2 and the
-            rest four across below; laptop puts them in a 2-column grid below. */}
+        {/* Layout per docs/DASHBOARD-WIDGETS.md, revision 5. Column 1: Fleet
+            Status, Installs, Management Tools Logs, Check-in Gaps. Column 2:
+            New Clients, Directory Services, Connectivity Problems, Protection
+            Gaps, Expiring Certificates. Column 3: Update Debt, Storage, App
+            Usage, Software Risk, Reboot Debt. Events column last. Narrower
+            layouts keep the same order in fewer columns. */}
         <div
           className={
             layout === "wide"
@@ -587,24 +611,12 @@ export default function ClientDashboard() {
           </div>
 
 
-          {/* Column 2 - New Clients on top, insight cards, Reboot & Update Debt at the foot */}
-          {layout === "wide" && (
-            <>
-              <div className="space-y-8">
-                {newClients}
-                <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 0)} className="space-y-8" />
-                <RebootDebt ctx={insightCtx} />
-              </div>
-              <InsightCards ctx={insightCtx} positions={allCards.filter(i => i % 2 === 1)} className="space-y-8" />
-            </>
-          )}
-          {layout === "desktop" && (
-            <div className="space-y-8">
-              {newClients}
-              <InsightCards ctx={insightCtx} positions={allCards.slice(0, 3)} className="space-y-8" />
-              <RebootDebt ctx={insightCtx} />
-            </div>
-          )}
+          {/* Wide: column 2 (New Clients, Directory Services, Connectivity,
+              Protection Gaps, Certificates) and column 3 (Update Debt, Storage,
+              App Usage, Software Risk, Reboot Debt). Desktop: column 2 here,
+              column 3 four across below. */}
+          {layout !== "narrow" && column2}
+          {layout === "wide" && column3}
 
           {/* Column C - Recent Events + Platform Distribution + OS Version Charts */}
           <div className={layout === "narrow" ? "lg:col-span-7 space-y-8" : "space-y-8"}>
@@ -620,11 +632,6 @@ export default function ClientDashboard() {
                 loadingProgress={loadingProgress}
                 loadingMessage={loadingMessage}
               />
-            </ErrorBoundary>
-
-            {/* App Usage - directly under Recent Events */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading app usage</div>}>
-              <AppUsageCard platformFilter={platformFilter} />
             </ErrorBoundary>
 
             {/* Platform Distribution - Full Width */}
@@ -657,13 +664,15 @@ export default function ClientDashboard() {
           </div>
         </div>
         {layout === "desktop" && (
-          <InsightCards ctx={insightCtx} positions={allCards.slice(3)} className="mt-8 grid grid-cols-4 gap-8 items-start" />
+          <div className="mt-8 grid grid-cols-4 gap-8 items-start">
+            {column3Cards("col-span-2")}
+          </div>
         )}
         {layout === "narrow" && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {newClients}
-            <InsightCards ctx={insightCtx} positions={allCards} className="contents" />
-            <RebootDebt ctx={insightCtx} />
+            {COLUMN_2.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
+            {column3Cards("md:col-span-2")}
           </div>
         )}
       </div>

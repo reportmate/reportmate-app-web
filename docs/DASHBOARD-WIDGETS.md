@@ -58,7 +58,7 @@ these names on every platform:
 | /hardware                      | `arch` (`Apple Silicon,Intel,ARM64,x64`), `storage=low\|lt5\|5-10\|10-20\|20+`, `capacity=le256\|512\|1t\|2t+`, `platform=macOS\|Windows`, `memory=le8`, `type=laptop\|desktop`, `processor` (existing)                                                                     |
 | /installs                      | `filter=errors\|warnings\|pending`, `agent=munki\|cimian`, `item=<name>`, `stale=1`, `view=messages` (existing)                                                                                                |
 | /events/failures               | `hours`, `reason`, `outcome` (existing)                                                                                                                                                   |
-| /identity                      | `admins=extra\|2\|3\|4+`, `join=entra\|domain\|hybrid\|workgroup`, `directory=Cloud Joined\|Domain Joined\|Trusted\|Unconfirmed\|Broken\|Standard\|Unjoined` (the Identity report's own Directory Services labels), `usage=shared\|assigned`, `platform=macOS\|Windows`                                                                                                         |
+| /identity                      | `admins=extra\|2\|3\|4+`, `join=entra\|domain\|hybrid\|workgroup`, `directory=cloud\|domain\|trusted\|unconfirmed\|broken\|standard\|unjoined` (Identity report Directory Services: Cloud Joined, Domain Joined with Trusted / Unconfirmed / Broken, Standard, Unjoined), `usage=shared\|assigned`, `platform=macOS\|Windows`                                                                                                         |
 | /applications                  | existing `type=usage&apps=<name>&period=30`; `/applications/usage/<app>?days=30&usages=&catalogs=&platform=` for one app; `/applications?type=usage&period=&usages=&catalogs=&platform=` for the card header                                                                                              |
 | /network                       | `connection=wired\|wifi`, `signal=weak`, `quality=poor`, `vpn=1`                                                                                                                                                   |
 | /peripherals                   | `kind=printers\|displays`, `room=<room>`                                                                                                                                                  |
@@ -235,6 +235,20 @@ Each row is a fixed-column grid: name (flexible, truncated) | bar (fixed width) 
 ### Expiring Certificates: OS certificates are out of scope
 OS-level certificates nobody controls are being counted. That's a separate body of work; leave the card as it is in this sprint.
 
+## Revision 5: Rod's order, 2026-10-22 (supersedes earlier layout)
+
+Wide layout (four columns):
+- **Column 1:** Fleet Status, Installs, Management Tools Logs, Check-in Gaps (unchanged).
+- **Column 2:** New Clients (stays on top), Directory Services, Connectivity Problems, Protection Gaps, Expiring Certificates.
+- **Column 3:** Update Debt, Storage, App Usage, Software Risk, Reboot Debt (last).
+- **Column 4 (events):** Recent Events, Platform Distribution, OS versions. App Usage leaves this column.
+
+The desktop (three-column) and narrower tiers keep the same card order, flowed into fewer columns.
+
+Card changes:
+- **OS Currency → Update Debt.** It takes over the "with pending updates" and "with deferred updates" counts and links (`/system?pending=…`, `/system?deferred=1`). Server key `updateDebt`; keep `osCurrency` as an alias for one release.
+- **Reboot & Update Debt → Reboot Debt.** Uptime only: the 30+ days and 2–4 weeks hero figures plus the uptime buckets. The pending and deferred chips move to Update Debt. Server key `rebootDebt` stays.
+
 ## Web notes (2026-10-22)
 
 - The web app reads the endpoint through `app/api/v1/dashboard/insights/route.ts` and renders
@@ -310,4 +324,14 @@ OS-level certificates nobody controls are being counted. That's a separate body 
   - As a client-side safeguard, Management Tools Logs drops the `mdm` log root, strips
     timestamp, offset and level prefixes from messages, and merges duplicates by tool and
     message. The server-side fixes are still needed.
+- Revision 5 on web:
+  - Column 2 holds New Clients, Directory Services, Connectivity Problems, Protection Gaps
+    and Expiring Certificates.
+  - Column 3 holds Update Debt, Storage, App Usage, Software Risk and Reboot Debt.
+  - The events column holds Recent Events, Platform Distribution and OS versions.
+  - Desktop keeps column 2 beside the events column and puts column 3's cards four across
+    below, with App Usage two cells wide. Laptop flows the same order into two columns.
+  - Update Debt is requested as `updateDebt` and falls back to `osCurrency`. If its section
+    has no `pendingUpdates` or `deferredUpdates` yet, it takes them from Reboot Debt.
+  - Reboot Debt shows uptime only.
 

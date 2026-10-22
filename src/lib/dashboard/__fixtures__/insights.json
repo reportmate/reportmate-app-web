@@ -886,7 +886,7 @@
       },
       "generatedAt": "2026-10-22T15:00:00+00:00"
     },
-    "osCurrency": {
+    "updateDebt": {
       "devices": 771,
       "rated": 771,
       "onLatest": 609,
@@ -943,7 +943,25 @@
           }
         }
       ],
-      "generatedAt": "2026-10-22T15:00:00+00:00"
+      "generatedAt": "2026-10-22T15:00:00+00:00",
+      "pendingUpdates": {
+        "count": 290,
+        "link": {
+          "path": "/system",
+          "params": {
+            "pending": "1-5,6-10,10+"
+          }
+        }
+      },
+      "deferredUpdates": {
+        "count": 12,
+        "link": {
+          "path": "/system",
+          "params": {
+            "deferred": "1"
+          }
+        }
+      }
     },
     "softwareRisk": {
       "devices": 931,

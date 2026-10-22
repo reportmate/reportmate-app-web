@@ -6,7 +6,7 @@ import appUsage from '../../dashboard/__fixtures__/app-usage.json'
 import appUsageShared from '../../dashboard/__fixtures__/app-usage-shared.json'
 import { linkHref, type InsightLink, type InsightsDocument, type InsightsState } from '../../dashboard/insights'
 import { clearCache } from '../../data-cache'
-import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, RebootDebt, INSIGHT_CARD_COUNT, normalizeLogMessage, type InsightContext } from './InsightWidgets'
+import { AppUsageCard, CheckinGaps, InsightCards, InstallHealthHero, ManagementToolLogs, INSIGHT_CARD_COUNT, normalizeLogMessage, type InsightContext } from './InsightWidgets'
 
 const all = Array.from({ length: INSIGHT_CARD_COUNT }, (_, i) => i)
 const doc = fixture as unknown as InsightsDocument
@@ -23,7 +23,6 @@ const Dashboard = ({ c, positions = all }: { c: InsightContext; positions?: numb
     <ManagementToolLogs ctx={c} />
     <CheckinGaps ctx={c} />
     <InsightCards ctx={c} positions={positions} />
-    <RebootDebt ctx={c} />
   </>
 )
 
@@ -48,11 +47,11 @@ describe('InsightCards', () => {
     expect(screen.getAllByTestId('insight-skeleton')).toHaveLength(11)
   })
 
-  it('renders the revision 4 cards from the API fixture', () => {
+  it('renders the revision 5 cards from the API fixture', () => {
     render(<Dashboard c={ctx({ data: doc })} />)
     for (const title of [
-      'Installs', 'Reboot & Update Debt', 'Protection Gaps', 'Management Tools Logs', 'Storage',
-      'Check-in Gaps', 'OS Currency', 'Software Risk', 'Expiring Certificates', 'Directory Services', 'Connectivity Problems',
+      'Installs', 'Reboot Debt', 'Protection Gaps', 'Management Tools Logs', 'Storage',
+      'Check-in Gaps', 'Update Debt', 'Software Risk', 'Expiring Certificates', 'Directory Services', 'Connectivity Problems',
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy()
     expect(screen.queryAllByTestId('insight-skeleton')).toHaveLength(0)
   })
@@ -81,7 +80,7 @@ describe('InsightCards', () => {
   })
 
   it('shows Directory Services with the Identity report classes and no views of its own', () => {
-    render(<InsightCards ctx={ctx({ data: doc }, 'macOS')} positions={[5]} />)
+    render(<InsightCards ctx={ctx({ data: doc }, 'macOS')} positions={[0]} />)
     expect(screen.queryByRole('radiogroup')).toBeNull()
     expect(screen.getByText('Cloud Joined')).toBeTruthy()
     expect(screen.getByText('Domain Joined: Broken')).toBeTruthy()
@@ -140,7 +139,7 @@ describe('InsightCards', () => {
   it('shows a card still on its own request as a skeleton (per-card loading)', () => {
     const cards = { ...doc.cards } as Record<string, unknown>
     delete cards.storage
-    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument, pending: new Set(['storage']) })} positions={[1]} />)
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument, pending: new Set(['storage']) })} positions={[5]} />)
     expect(screen.getByTestId('insight-skeleton')).toBeTruthy()
   })
 })
@@ -193,5 +192,25 @@ describe('AppUsageCard', () => {
     render(<AppUsageCard platformFilter="macOS" />)
     await waitFor(() => expect(screen.getByText(/Card endpoint not found \(HTTP 404\)/)).toBeTruthy())
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+  })
+})
+
+describe('revision 5: Update Debt and Reboot Debt', () => {
+  it('puts pending and deferred updates on Update Debt, and only uptime on Reboot Debt', () => {
+    render(<InsightCards ctx={ctx({ data: doc })} positions={[4, 7]} />)
+    const update = screen.getByRole('heading', { name: 'Update Debt' }).closest('.rounded-xl') as HTMLElement
+    const reboot = screen.getByRole('heading', { name: 'Reboot Debt' }).closest('.rounded-xl') as HTMLElement
+    const links = (el: HTMLElement) => [...el.querySelectorAll('a[href]')].map(a => a.getAttribute('href'))
+    expect(links(update)).toEqual(expect.arrayContaining(['/system?pending=1-5,6-10,10%2B', '/system?deferred=1', '/system?patch=behind']))
+    expect(links(reboot)).toEqual(expect.arrayContaining(['/system?uptime=30d%2B', '/system?uptime=2-4w']))
+    expect(links(reboot)).not.toContain('/system?deferred=1')
+  })
+
+  it('takes pending and deferred from Reboot Debt while the API still sends them there', () => {
+    const cards = JSON.parse(JSON.stringify(doc.cards))
+    delete cards.updateDebt.pendingUpdates
+    delete cards.updateDebt.deferredUpdates
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } })} positions={[4]} />)
+    expect(hrefs()).toEqual(expect.arrayContaining(['/system?pending=1-5,6-10,10%2B', '/system?deferred=1']))
   })
 })

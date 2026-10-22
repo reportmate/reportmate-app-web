@@ -547,15 +547,15 @@ function DeviceList({
   );
 }
 
-// MARK: - 1 Reboot & Update Debt
+// MARK: - Reboot Debt (uptime only; pending and deferred updates are on Update Debt)
 
 export function RebootDebt({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "rebootDebt");
   const d = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
-      title="Reboot & Update Debt"
-      subtitle="Long uptimes and updates waiting"
+      title="Reboot Debt"
+      subtitle="Devices that haven't restarted in a while"
       link="/system"
       tone="orange"
       icon={<Icon d={ICONS.refresh} />}
@@ -566,10 +566,6 @@ export function RebootDebt({ ctx }: { ctx: InsightContext }) {
           <div className="flex gap-2">
             <BigStat value={d.uptime30dPlus.count} label="up 30+ days" tone="red" link={linkHref(d.uptime30dPlus.link)} />
             <BigStat value={d.uptime2to4w.count} label="up 2-4 weeks" tone="orange" link={linkHref(d.uptime2to4w.link)} />
-          </div>
-          <div className="flex flex-wrap gap-2 mt-3">
-            <StatChip value={d.pendingUpdates.count} label="with pending updates" tone="yellow" link={linkHref(d.pendingUpdates.link)} />
-            <StatChip value={d.deferredUpdates.count} label="with deferred updates" tone="orange" link={linkHref(d.deferredUpdates.link)} />
           </div>
           {d.uptimeBuckets.length > 0 && (
             <div className="mt-4">
@@ -792,15 +788,20 @@ export function CheckinGaps({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - 7 OS Currency
+// MARK: - Update Debt (was OS Currency)
 
-function OSCurrency({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "osCurrency");
+function UpdateDebt({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "updateDebt");
   const d: OSCurrencyCard | null = card.status === "ready" ? card.data : null;
+  // Pending and deferred moved here from Reboot Debt; an older API still sends them there
+  const reboot = slot(ctx, "rebootDebt");
+  const rebootData = reboot.status === "ready" ? reboot.data : null;
+  const pending = d?.pendingUpdates ?? rebootData?.pendingUpdates;
+  const deferred = d?.deferredUpdates ?? rebootData?.deferredUpdates;
   return (
     <InsightCard
-      title="OS Currency"
-      subtitle="Latest patch per release, as the fleet runs it"
+      title="Update Debt"
+      subtitle="Devices behind on OS patches and updates"
       link="/system"
       tone="indigo"
       icon={<Icon d={ICONS.refresh} />}
@@ -826,6 +827,12 @@ function OSCurrency({ ctx }: { ctx: InsightContext }) {
             </div>
           )}
           <div className="flex flex-wrap gap-2 mt-4">
+            {pending && (
+              <StatChip value={pending.count} label="with pending updates" tone="yellow" link={linkHref(pending.link)} />
+            )}
+            {deferred && (
+              <StatChip value={deferred.count} label="with deferred updates" tone="orange" link={linkHref(deferred.link)} />
+            )}
             <StatChip value={d.unsupportedMac.count} label="unsupported macOS" tone="red" link={linkHref(d.unsupportedMac.link)} />
             <StatChip value={d.windows10.count} label="Windows 10" tone="orange" link={linkHref(d.windows10.link)} />
           </div>
@@ -1271,7 +1278,7 @@ export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
                     <Link
                       href={linkHref(a.link)}
                       title={a.name}
-                      className={`grid grid-cols-[minmax(0,1fr)_10rem_7rem_6.5rem] items-center gap-3 text-sm py-1 ${ROW_LINK}`}
+                      className={`grid grid-cols-[minmax(0,1fr)_minmax(2.5rem,8rem)_auto_6.5rem] items-center gap-3 text-sm py-1 ${ROW_LINK}`}
                     >
                       <span className="truncate text-gray-900 dark:text-gray-100">{a.name}</span>
                       <span className="h-2 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
@@ -1330,19 +1337,30 @@ function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
 
 // MARK: - The grid cards, in spec order
 
-// Fixed places (revision 4): Installs, Management Tools Logs and Check-in Gaps
-// in column 1; Reboot & Update Debt at the foot of column 2; App Usage under
-// Recent Events. These are the cards that fill the insight columns and grid.
+// Column 1 (Installs, Management Tools Logs, Check-in Gaps) and App Usage are
+// placed by the dashboard; these are the other cards, in revision 5's order:
+// column 2's four after New Clients, then column 3's around App Usage.
 
 const CARDS: { id: InsightCardKey; Card: React.FC<{ ctx: InsightContext }> }[] = [
-  { id: "protectionGaps", Card: ProtectionGaps },
-  { id: "storage", Card: Storage },
-  { id: "osCurrency", Card: OSCurrency },
-  { id: "softwareRisk", Card: SoftwareRisk },
-  { id: "expiringCertificates", Card: ExpiringCertificates },
   { id: "directoryServices", Card: DirectoryServices },
   { id: "connectivityProblems", Card: ConnectivityProblems },
+  { id: "protectionGaps", Card: ProtectionGaps },
+  { id: "expiringCertificates", Card: ExpiringCertificates },
+  { id: "updateDebt", Card: UpdateDebt },
+  { id: "storage", Card: Storage },
+  { id: "softwareRisk", Card: SoftwareRisk },
+  { id: "rebootDebt", Card: RebootDebt },
 ];
+
+/** One insight card by its key, for layouts that place cards individually. */
+export function InsightCardById({ id, ctx }: { id: InsightCardKey; ctx: InsightContext }) {
+  const entry = CARDS.find((c) => c.id === id);
+  if (entry) return <entry.Card ctx={ctx} />;
+  if (id === "installHealth") return <InstallHealthHero ctx={ctx} />;
+  if (id === "managementToolLogs") return <ManagementToolLogs ctx={ctx} />;
+  if (id === "checkinGaps") return <CheckinGaps ctx={ctx} />;
+  return null;
+}
 
 export const INSIGHT_CARD_COUNT = CARDS.length;
 

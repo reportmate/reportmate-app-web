@@ -91,7 +91,11 @@ export interface CheckinGapsCard {
   missing: Counted;
 }
 
+/** Update Debt (was OS Currency): patch currency plus pending and deferred updates. */
 export interface OSCurrencyCard {
+  /** Present from the `updateDebt` key on; read from Reboot Debt before then. */
+  pendingUpdates?: Counted;
+  deferredUpdates?: Counted;
   devices: number;
   rated: number;
   onLatest: number;
@@ -210,7 +214,7 @@ export interface InsightCards {
   managementToolLogs: ManagementToolErrorsCard | CardError;
   storage: StorageCard | CardError;
   checkinGaps: CheckinGapsCard | CardError;
-  osCurrency: OSCurrencyCard | CardError;
+  updateDebt: OSCurrencyCard | CardError;
   softwareRisk: SoftwareRiskCard | CardError;
   expiringCertificates: ExpiringCertificatesCard | CardError;
   directoryServices: DirectoryServicesCard | CardError;
@@ -275,7 +279,7 @@ export const INSIGHT_CARD_KEYS: InsightCardKey[] = [
   "managementToolLogs",
   "storage",
   "checkinGaps",
-  "osCurrency",
+  "updateDebt",
   "softwareRisk",
   "expiringCertificates",
   "directoryServices",
@@ -296,6 +300,7 @@ export const INSIGHTS_PER_CARD =
  */
 export const CARD_KEY_ALIASES: Partial<Record<InsightCardKey, string[]>> = {
   managementToolLogs: ["managementToolErrors"],
+  updateDebt: ["osCurrency"],
   directoryServices: ["directoryJoin"],
 };
 
