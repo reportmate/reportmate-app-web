@@ -37,10 +37,8 @@ export function certClassOf(cert: AnyCert | null | undefined): CertClass {
     .trim()
     .toLowerCase();
   if ((KNOWN_CLASSES as string[]).includes(raw)) return raw as CertClass;
-  // Old rows carry no class. The device's own OS-root flag still marks a
-  // trust-store certificate, so expired OS roots stay hidden as they were.
-  if (!raw && (cert?.isOsTrustedRoot || cert?.is_os_trusted_root))
-    return "trust-store";
+  // Unstamped rows are actionable, as the API, the Mac app and the Windows app
+  // all treat them; the class is the API's decision alone.
   return "actionable";
 }
 
