@@ -24,6 +24,7 @@ import { evaluateSecurity } from '../../lib/rules/evaluateSecurity'
 import { getDeviceInventoryContext } from '../../lib/rules/inventoryMapping'
 import type { Severity } from '../../lib/settings/types'
 import { ModuleSlot } from '../modules/ModuleSlot'
+import { firewallAllowSigned, firewallStealthMode, securityReleaseInfo, unpatchedCves as readUnpatchedCves } from '../../lib/security/macSecurityKeys'
 
 interface SecurityTabProps {
   device: any
@@ -1034,8 +1035,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   label="Stealth Mode" 
                   isStatus 
                   neutral
-                  enabled={security?.firewall?.stealthMode === 1 || security?.firewall?.stealthMode === true}
-                  value={(security?.firewall?.stealthMode === 1 || security?.firewall?.stealthMode === true) ? 'Enabled' : 'Disabled'}
+                  enabled={firewallStealthMode(security)}
+                  value={firewallStealthMode(security) ? 'Enabled' : 'Disabled'}
                 />
                 <DetailRow 
                   label="Logging" 
@@ -1048,8 +1049,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   label="Allow Signed Apps" 
                   isStatus 
                   neutral
-                  enabled={security?.firewall?.allowSignedSoftware === 1 || security?.firewall?.allowSignedSoftware === true}
-                  value={(security?.firewall?.allowSignedSoftware === 1 || security?.firewall?.allowSignedSoftware === true) ? 'Allowed' : 'Blocked'}
+                  enabled={firewallAllowSigned(security)}
+                  value={firewallAllowSigned(security) ? 'Allowed' : 'Blocked'}
                 />
               </>
             ) : (
@@ -1634,10 +1635,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
       {/* Common Vulnerabilities and Exposures (CVE) Table */}
       {(() => {
         // Get CVE data from security - support both SOFA (Mac) and Windows Update formats
-        // Mac: sofaUnpatchedCves, sofaSecurityReleaseInfo
+        // Mac: unpatchedCVEs / sofaUnpatchedCves, securityReleaseInfo / sofaSecurityReleaseInfo
+        // (src/lib/security/macSecurityKeys.ts reads both spellings)
         // Windows: securityCves (new format with status), securityUpdates (legacy)
-        const sofaCves = security?.sofaUnpatchedCves || security?.sofa_unpatched_cves || []
-        const sofaReleaseInfo = security?.sofaSecurityReleaseInfo || security?.sofa_security_release_info || {}
+        const sofaCves = readUnpatchedCves(security)
+        const sofaReleaseInfo = securityReleaseInfo(security)
         const windowsCves = security?.securityCves || security?.security_cves || []
         const windowsUpdates = security?.securityUpdates || security?.security_updates || []
         
@@ -1656,19 +1658,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         }> = []
         
         // Add SOFA CVEs (Mac)
-        if (Array.isArray(sofaCves)) {
-          sofaCves.forEach((cve: any) => {
-            allCves.push({
-              cve: cve.cve || cve.cve_id || 'Unknown',
-              osVersion: cve.os_version || cve.osVersion || sofaReleaseInfo?.os_version || '',
-              patchedVersion: cve.patched_version || cve.patchedVersion || '',
-              activelyExploited: cve.actively_exploited === 'true' || cve.actively_exploited === true || cve.activelyExploited === true,
-              url: cve.url || '',
-              source: 'sofa',
-              status: 'Unpatched'
-            })
-          })
-        }
+        sofaCves.forEach(cve => {
+          allCves.push({ ...cve, source: 'sofa', status: 'Unpatched' })
+        })
         
         // Add Windows CVEs (new format with status field)
         if (Array.isArray(windowsCves) && windowsCves.length > 0) {
