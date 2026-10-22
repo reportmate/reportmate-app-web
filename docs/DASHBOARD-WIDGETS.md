@@ -49,17 +49,18 @@ these names on every platform:
 
 | Report                         | Parameters (comma-separated multi-values)                                                                                                                                                 |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| /devices                       | `status`, `search`, `platform`                                                                                                                                                            |
+| /device/<serial>               | `tab=management&tool=<log root key>&level=error` (log viewer) |
+| /devices                       | `status`, `search`, `platform`, `tool=<log root key>&level=error\|warning` (Management Tools Logs)                                                                                                                                                            |
 | /system                        | `osVersion`, `uptime` (bucket key `lt1d,1-3d,3-7d,1-2w,2-4w,30d+`), `pending` (`up-to-date,1-5,6-10,10+`), `deferred=1`, `edition`, `os` (`unsupported`, `windows10`), `patch` (`behind`) |
 | /security                      | `encryption=off`, `firewall=off`, `antivirus=off`, `sip=off`, `secureBoot=off`, `threats=1`, `certs=expired\|expiring`, `cve=critical\|exploited`                                         |
 | /security (certificate search) | `certSearch=<text>`, `certStatus=expiring\|expired`                                                                                                                                       |
-| /management                    | `provider`, `enrolled=0\|1`, `enrollmentType`                                                                                                                                             |
-| /hardware                      | `arch` (`Apple Silicon,Intel,ARM64,x64`), `storage=low`, `memory=le8`, `type=laptop\|desktop`, `processor` (existing)                                                                     |
-| /installs                      | `filter=errors\|warnings` (existing), `item=<name>`, `stale=1`, `view=messages` (existing)                                                                                                |
+| /management                    | `provider`, `enrolled=0\|1`, `enrollmentType`, `platform=macOS\|Windows`, `lastSeen=24h\|1-7d\|7d+`                                                                                                                                             |
+| /hardware                      | `arch` (`Apple Silicon,Intel,ARM64,x64`), `storage=low\|lt5\|5-10\|10-20\|20+`, `capacity=le256\|512\|1t\|2t+`, `platform=macOS\|Windows`, `memory=le8`, `type=laptop\|desktop`, `processor` (existing)                                                                     |
+| /installs                      | `filter=errors\|warnings\|pending`, `agent=munki\|cimian`, `item=<name>`, `stale=1`, `view=messages` (existing)                                                                                                |
 | /events/failures               | `hours`, `reason`, `outcome` (existing)                                                                                                                                                   |
-| /identity                      | `admins=extra`, `join=entra\|domain\|hybrid\|workgroup`, `usage=shared\|assigned`                                                                                                         |
-| /applications                  | existing `type=usage&apps=<name>&period=30`; `/applications/usage/<app>?days=30` for one app                                                                                              |
-| /network                       | `connection=wired\|wifi`, `signal=weak`                                                                                                                                                   |
+| /identity                      | `admins=extra\|2\|3\|4+`, `join=entra\|domain\|hybrid\|workgroup`, `directory=Cloud Joined\|Domain Joined\|Trusted\|Unconfirmed\|Broken\|Standard\|Unjoined` (the Identity report's own Directory Services labels), `usage=shared\|assigned`, `platform=macOS\|Windows`                                                                                                         |
+| /applications                  | existing `type=usage&apps=<name>&period=30`; `/applications/usage/<app>?days=30&usages=&catalogs=&platform=` for one app; `/applications?type=usage&period=&usages=&catalogs=&platform=` for the card header                                                                                              |
+| /network                       | `connection=wired\|wifi`, `signal=weak`, `quality=poor`, `vpn=1`                                                                                                                                                   |
 | /peripherals                   | `kind=printers\|displays`, `room=<room>`                                                                                                                                                  |
 
 ## New cards
@@ -166,6 +167,74 @@ Clients poll it every 5 minutes and render skeletons until the first answer. A
 section that failed server-side comes back as `{"error": "..."}` and the card
 shows its error state; the rest render.
 
+## Revision 3: Rod's review, 2026-10-22 (supersedes revisions 1 and 2 where they differ)
+
+### Card changes
+- **App Usage** (Rod's favourite, keep the name "App Usage"):
+  - Show the **top 10 most-used** apps. Drop the least-used / "Unused Software" list entirely.
+  - Add **Usage and Catalog filter chips** that work like Platform Distribution's. They filter the card in place, and each app link carries them.
+  - Move it to the **wide events column, directly under Recent Events**.
+  - Server: `/api/v1/dashboard/insights/app-usage?platform=&usages=&catalogs=&days=30`, small, cached per combination, top 10 plus the available usage and catalog values.
+- **Directory Join** (was Identity / Local Admin Exposure): join-type donut, extra local admins, shared and assigned.
+  - Three views in a segmented control, **All / Windows / Mac**, matching how `/management` presents platforms. Windows: Entra, Domain, Hybrid, Workgroup. Mac: its own directory states (Platform SSO / Entra, AD-bound, not bound), using the identity report's rules.
+  - The server returns all three views in one card.
+- **Storage** (replaces Hardware / Hardware at Risk; architecture is useless):
+  - Free-space buckets: under 5%, 5–10%, 10–20%, 20%+.
+  - Devices under 10% free, by platform.
+  - Capacity mix (≤256 GB, 512 GB, 1 TB, 2 TB+).
+  - Top 5 fullest devices.
+  - Links go to `/hardware?storage=low|<bucket>` (add `storage=` bucket keys).
+- **Management Tools Errors** (replaces Management / Unmanaged Devices): fleet-wide errors and warnings from the management tools' logs collected by the runners. The tools are Intune, BootstrapMate, Munki, Cimian, swiftDialog, csharpDialog, Presence, ReportMate, Outset and StartSet, i.e. the Managed suite buckets.
+  - Per tool: devices with errors, devices with warnings, and error-line counts, all over the last 24 hours.
+  - Top 5 error messages, normalised (numbers, paths and GUIDs stripped), with device counts.
+  - Each tool links to `/devices?tool=<tool>&level=error`, or the closest existing filter. Each device opens the device page's Management tab, log viewer, filtered to that tool and to errors (`/device/<serial>?tab=management&tool=<tool>&level=error`).
+  - Server: aggregate from the stored log tails (`log_tails.py`) with SQL. If the tails don't hold parsed levels, parse them server-side with the same line parsers the Mac app uses (convention, CMTrace, Intune daemon, Munki, syslog, ISO).
+- **Install Health replaces the Errors and Warnings tiles** and sits **under Fleet Status in column 1**. The headline numbers (devices with errors, devices with warnings) are displayed MUCH BIGGER: hero-size figures, at least as large as Fleet Status's centre count, the most prominent numbers on the dashboard. Below them:
+  - Devices with errors and with warnings, split Munki vs Cimian.
+  - Error and warning item counts.
+  - Top 5 failing items with device counts.
+  - Agents silent over 7 days.
+  - Pending installs.
+  - Remove the two separate Error and Warning tiles from every app.
+
+### App behaviour (all three apps)
+- **No dashboard reset on return.** Going back to the Dashboard (or any page) must show the last data instantly and refresh in the background. Keep the page model and its data alive across navigation, show a subtle "updating" state rather than skeletons, and live-update when new data lands. Skeletons appear only on the very first load.
+- **Skeletons need movement and progress.**
+  - Add a clearly visible shimmer sweep, not just a faint pulse.
+  - Add a progress indication: a thin determinate bar across the top of the page or card group showing sources loaded out of total ("Loading 2 of 3"), or an indeterminate sweep when the count is unknown.
+- **Device page keeps the full nav.** On `/device/<serial>`, don't collapse the report tabs into a Reports dropdown. The full header stays, and the device's own tabs are on the page. Fix the header overlap glitch seen in the Mac app, where the search field, Dashboard and Devices overlap during the transition.
+
+## Revision 4: Rod's review, 2026-10-22 afternoon (supersedes earlier revisions where they differ)
+
+### Layout
+- **Column 1:** Fleet Status, **Installs** (Install Health renamed), **Management Tools Logs**, then **Check-in Gaps** at the bottom.
+- **Column 2:** **New Clients** at the top, the other insight cards, then **Reboot & Update Debt** at the bottom.
+- The other insight columns and the events column stay as they are. App Usage stays under Recent Events.
+
+### Rule: no per-card platform toggles
+No widget has its own platform toggle. Every card follows the global `?platform=` toolbar toggle. Remove the All / Windows / Mac segmented control from Directory Join.
+
+### Management Tools Logs (was Management Tools Errors)
+- Rename it to **Management Tools Logs**.
+- **Exclude the MDM agent's logs** (Intune here), but stay MDM-agnostic: drop any log root the runner tags as the MDM or enrollment agent, or the tool matching the device's MDM provider from the management module (Intune, Jamf, Kandji, Mosyle, Workspace ONE, MicroMDM, NanoMDM and others). Never hardcode "Intune".
+- **Fix message normalisation.** Strip the leading timestamp, offset and level prefix before grouping, so `<ts> -<n>:<n> [ERR] Device registration failed for <guid>` becomes `Device registration failed for <guid>`.
+- **Fix duplicates.** The top list showed the same message 5 times. Group by tool and normalised message, then sum devices and lines.
+
+### Directory Join → use the Identity report's classification, exactly
+The card must use the **same dataset, rules and nomenclature as the Identity report's Directory Services widget**:
+- **Cloud Joined**
+- **Domain Joined**, broken down into **Trusted**, **Unconfirmed** and **Broken**
+- **Standard**
+- **Unjoined**
+
+Rename the card **Directory Services**. Port the rules from the web identity page's classification (`app/identity/page.tsx` and its widget) verbatim, server-side. Every segment links to `/identity?directory=<same key the identity report uses>`. Keep the extra-local-admins, shared and assigned chips. Follow the global platform toggle; no views.
+
+### App Usage grid
+Each row is a fixed-column grid: name (flexible, truncated) | bar (fixed width) | hours (right-aligned, fixed width, thousands separators, e.g. `328,025 h`) | devices (right-aligned, fixed width, e.g. `170 devices`). All columns line up across rows.
+
+### Expiring Certificates: OS certificates are out of scope
+OS-level certificates nobody controls are being counted. That's a separate body of work; leave the card as it is in this sprint.
+
 ## Web notes (2026-10-22)
 
 - The web app reads the endpoint through `app/api/v1/dashboard/insights/route.ts` and renders
@@ -224,3 +293,21 @@ shows its error state; the rest render.
     - App Usage (events column) shows the top 10 with Usage and Catalog chips.
   - Fixtures in `src/lib/dashboard/__fixtures__/` are generated from the API's own shape
     functions with SAMPLE data.
+- Revision 4 on web:
+  - Column 1 holds Fleet Status, Installs, Management Tools Logs and Check-in Gaps. Column 2
+    holds New Clients, the insight cards, then Reboot & Update Debt.
+  - Directory Services has no view control; it follows the global toggle.
+  - App Usage rows are a fixed grid: name | 10rem bar | hours (`1,200 h`) | devices.
+  - Card keys `managementToolLogs` and `directoryServices` are requested first. When the new
+    name is a 404, the client asks for `managementToolErrors` / `directoryJoin` instead. It also
+    reads the old names from a combined document, taking an old `directoryJoin {views}` view for
+    the global platform.
+  - Directory Services segments are read with an optional `children` (or `breakdown` / `trust`)
+    list under Domain Joined.
+  - `/identity?directory=` takes `cloud`, `domain`, `trusted`, `unconfirmed`, `broken`,
+    `standard` and `unjoined` (the Identity report's Directory Services classes; the labels
+    are accepted too), plus the earlier `psso`, `bound` and `unbound`.
+  - As a client-side safeguard, Management Tools Logs drops the `mdm` log root, strips
+    timestamp, offset and level prefixes from messages, and merges duplicates by tool and
+    message. The server-side fixes are still needed.
+
