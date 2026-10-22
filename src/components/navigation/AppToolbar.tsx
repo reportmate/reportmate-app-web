@@ -57,7 +57,7 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
   return (
     <>
       <header className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16 w-full">
             {/* Brand Section - Clickable to dashboard */}
             <Link href="/dashboard" className="flex items-center gap-4 hover:opacity-80 transition-opacity">

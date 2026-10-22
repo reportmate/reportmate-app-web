@@ -140,7 +140,7 @@ export default function ClientSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <div className="page-container py-6 px-4 sm:px-6 lg:px-8">
         {isFirstTime && canEdit && (
           <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 flex items-center justify-between">
             <div>

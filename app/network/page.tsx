@@ -448,7 +448,7 @@ function NetworkPageContent() {
   if (loading) {
     return (
       <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
-        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+        <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden animate-pulse">
             {/* Title Skeleton */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -560,7 +560,7 @@ function NetworkPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden">
           {/* Title Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">

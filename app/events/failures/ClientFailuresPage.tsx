@@ -168,7 +168,7 @@ export default function ClientFailuresPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+      <div className="flex-1 flex flex-col min-h-0 page-container px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
 
         {/* Outcome switch: rejected is the page's job, the other two are
             context. Every count is always shown so no side can go unnoticed. */}

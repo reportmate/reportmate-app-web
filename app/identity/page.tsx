@@ -410,7 +410,7 @@ function IdentityPageContent() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
         <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="page-container px-4 py-8">
           <LoadingSkeleton />
         </div>
       </div>
@@ -420,7 +420,7 @@ function IdentityPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">

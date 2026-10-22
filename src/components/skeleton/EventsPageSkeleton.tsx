@@ -3,7 +3,7 @@ import React from 'react'
 export const EventsPageSkeleton: React.FC = () => {
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+      <div className="flex-1 flex flex-col min-h-0 page-container px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
         {/* Mobile Card View */}
         <div className="md:hidden flex-1 overflow-auto">
           <div className="space-y-3">

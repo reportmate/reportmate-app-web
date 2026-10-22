@@ -138,7 +138,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
       <div className="sticky top-0 z-50 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         {/* Header Bar */}
         <div className="border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
                 {/* Breadcrumbs skeleton - Dashboard icon + chevron + Devices icon */}
@@ -179,7 +179,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             {/* Desktop tabs */}
             <nav className="hidden sm:flex -mb-px space-x-2 md:space-x-4 lg:space-x-6 xl:space-x-8 justify-start">
@@ -236,7 +236,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
         {/* Loading indicator */}
         <div className="mb-6 flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
           <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>

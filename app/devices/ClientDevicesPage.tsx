@@ -367,7 +367,7 @@ function DevicesPageContent() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
           {/* Content skeleton */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
               {/* Header section skeleton — title, subtitle, search box */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -457,7 +457,7 @@ function DevicesPageContent() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
         {inventory.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 py-16">
             <div className="text-center">
@@ -830,7 +830,7 @@ export default function ClientDevicesPage() {
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8 pt-8">
             <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
           </div>
         </div>

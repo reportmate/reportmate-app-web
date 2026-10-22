@@ -138,7 +138,7 @@ export default function CoveragePage() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black">
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-6">
 
         {/* Back link */}
         <div className="mb-4">
