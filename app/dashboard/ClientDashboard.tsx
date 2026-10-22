@@ -13,6 +13,7 @@ import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkelet
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import type { InsightCardKey } from "../../src/lib/dashboard/insights"
 import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
@@ -541,13 +542,79 @@ export default function ClientDashboard() {
     </ErrorBoundary>
   )
 
-  const column2 = (
-    <div className="space-y-8">
-      {newClients}
-      {COLUMN_2.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
-    </div>
+  const cards = (ids: readonly InsightCardKey[]) => ids.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)
+  const column1 = (
+    <>
+      {/* Device Status Widget */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
+        <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
+      </ErrorBoundary>
+
+      {/* Install Health replaces the Errors and Warnings tiles */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading install health</div>}>
+        <InstallHealthHero ctx={insightCtx} />
+      </ErrorBoundary>
+
+      {/* Management Tools Logs, then Check-in Gaps at the foot of column 1 */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading management tools logs</div>}>
+        <ManagementToolLogs ctx={insightCtx} />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading check-in gaps</div>}>
+        <CheckinGaps ctx={insightCtx} />
+      </ErrorBoundary>
+    </>
   )
-  const column3 = <div className="space-y-8">{column3Cards()}</div>
+  const column2Cards = (
+    <>
+      {newClients}
+      {cards(COLUMN_2)}
+    </>
+  )
+  const eventsColumn = (
+    <>
+      {/* Recent Events Table */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
+        <RecentEventsTable
+          events={filteredEvents}
+          connectionStatus={connectionStatus}
+          lastUpdateTime={lastUpdateTime}
+          mounted={mounted}
+          deviceNameMap={deviceNameMap}
+          isLoading={connectionStatus === 'connecting' && events.length === 0}
+          loadingProgress={loadingProgress}
+          loadingMessage={loadingMessage}
+        />
+      </ErrorBoundary>
+
+      {/* Platform Distribution - Full Width */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
+        <PlatformDistributionWidget devices={filteredDevices as any} loading={devicesLoading} />
+      </ErrorBoundary>
+
+      {/* OS Version Tracking - Conditional display based on platform filter */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
+        {(() => {
+          const showMac = platformFilter === 'all' || platformFilter === 'macOS'
+          const showWin = platformFilter === 'all' || platformFilter === 'Windows'
+          const gridCols = showMac && showWin ? 'lg:grid-cols-2 desktop:grid-cols-1 wide:grid-cols-2' : 'lg:grid-cols-1'
+          
+          return (
+            <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
+              {/* macOS Versions - only show when filtering macOS or all */}
+              {showMac && (
+                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
+              )}
+              
+              {/* Windows Versions - only show when filtering Windows or all */}
+              {showWin && (
+                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
+              )}
+            </div>
+          )
+        })()}
+      </ErrorBoundary>
+    </>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
@@ -574,105 +641,49 @@ export default function ClientDashboard() {
             />
           )
         })()}
-        {/* Layout per docs/DASHBOARD-WIDGETS.md, revision 5. Column 1: Fleet
-            Status, Installs, Management Tools Logs, Check-in Gaps. Column 2:
-            New Clients, Directory Services, Connectivity Problems, Protection
-            Gaps, Expiring Certificates. Column 3: Update Debt, Storage, App
-            Usage, Software Risk, Reboot Debt. Events column last. Narrower
-            layouts keep the same order in fewer columns. */}
-        <div
-          className={
-            layout === "wide"
-              ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start"
-              : layout === "desktop"
-                ? "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start"
-                : "grid grid-cols-1 lg:grid-cols-10 gap-8"
-          }
-        >
-          {/* Column 1 - Fleet Status, Installs, Management Tools Logs, Check-in Gaps */}
-          <div className={layout === "narrow" ? "lg:col-span-3 space-y-8" : "space-y-8"}>
-            {/* Device Status Widget */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
-              <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
-            </ErrorBoundary>
-
-            {/* Install Health replaces the Errors and Warnings tiles */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading install health</div>}>
-              <InstallHealthHero ctx={insightCtx} />
-            </ErrorBoundary>
-
-            {/* Management Tools Logs, then Check-in Gaps at the foot of column 1 */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading management tools logs</div>}>
-              <ManagementToolLogs ctx={insightCtx} />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading check-in gaps</div>}>
-              <CheckinGaps ctx={insightCtx} />
-            </ErrorBoundary>
+        {/* Layout per docs/DASHBOARD-WIDGETS.md: independent column stacks at
+            every width, never a grid row under the columns.
+            Wide (>= 2200px): column 1 | column 2 | column 3 | events.
+            Desktop (>= 1680px): column 1 + Uptime Overview | column 2 + App
+            Usage | events + Update Debt, Storage, Software Risk.
+            Laptop: column 1 + column 3 without App Usage | events + App Usage
+            + column 2 (2fr / 3fr), one stack after the other below the lg
+            breakpoint. Balanced by measured card heights. */}
+        {layout === "wide" && (
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start">
+            <div className="space-y-8">{column1}</div>
+            <div className="space-y-8">{column2Cards}</div>
+            <div className="space-y-8">{column3Cards()}</div>
+            <div className="space-y-8">{eventsColumn}</div>
           </div>
-
-
-          {/* Wide: column 2 (New Clients, Directory Services, Connectivity,
-              Protection Gaps, Certificates) and column 3 (Update Debt, Storage,
-              App Usage, Software Risk, Reboot Debt). Desktop: column 2 here,
-              column 3 four across below. */}
-          {layout !== "narrow" && column2}
-          {layout === "wide" && column3}
-
-          {/* Column C - Recent Events + Platform Distribution + OS Version Charts */}
-          <div className={layout === "narrow" ? "lg:col-span-7 space-y-8" : "space-y-8"}>
-            {/* Recent Events Table */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
-              <RecentEventsTable
-                events={filteredEvents}
-                connectionStatus={connectionStatus}
-                lastUpdateTime={lastUpdateTime}
-                mounted={mounted}
-                deviceNameMap={deviceNameMap}
-                isLoading={connectionStatus === 'connecting' && events.length === 0}
-                loadingProgress={loadingProgress}
-                loadingMessage={loadingMessage}
-              />
-            </ErrorBoundary>
-
-            {/* Platform Distribution - Full Width */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
-              <PlatformDistributionWidget devices={filteredDevices as any} loading={devicesLoading} />
-            </ErrorBoundary>
-
-            {/* OS Version Tracking - Conditional display based on platform filter */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
-              {(() => {
-                const showMac = platformFilter === 'all' || platformFilter === 'macOS'
-                const showWin = platformFilter === 'all' || platformFilter === 'Windows'
-                const gridCols = showMac && showWin ? 'lg:grid-cols-2 desktop:grid-cols-1 wide:grid-cols-2' : 'lg:grid-cols-1'
-                
-                return (
-                  <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-                    {/* macOS Versions - only show when filtering macOS or all */}
-                    {showMac && (
-                      <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
-                    )}
-                    
-                    {/* Windows Versions - only show when filtering Windows or all */}
-                    {showWin && (
-                      <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
-                    )}
-                  </div>
-                )
-              })()}
-            </ErrorBoundary>
-          </div>
-        </div>
+        )}
         {layout === "desktop" && (
-          <div className="mt-8 grid grid-cols-4 gap-8 items-start">
-            {column3Cards("col-span-2")}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start">
+            <div className="space-y-8">
+              {column1}
+              {cards(["rebootDebt"])}
+            </div>
+            <div className="space-y-8">
+              {column2Cards}
+              {appUsage}
+            </div>
+            <div className="space-y-8">
+              {eventsColumn}
+              {cards(["updateDebt", "storage", "softwareRisk"])}
+            </div>
           </div>
         )}
         {layout === "narrow" && (
-          <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            {newClients}
-            {COLUMN_2.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
-            {column3Cards("md:col-span-2")}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-8 items-start">
+            <div className="space-y-8">
+              {column1}
+              {cards(["updateDebt", "storage", "softwareRisk", "rebootDebt"])}
+            </div>
+            <div className="space-y-8">
+              {eventsColumn}
+              {appUsage}
+              {column2Cards}
+            </div>
           </div>
         )}
       </div>

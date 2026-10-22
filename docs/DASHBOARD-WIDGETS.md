@@ -391,3 +391,14 @@ Fix every dead or unfiltered link, and every target page that ignores its params
   - Management Tools Logs uses the Management shield in yellow. Its header, tool rows and
     messages link to `/management/logs?tool=&level=[&platform=][&message=<normalised text>]`.
 
+- Layout as column stacks: at every width the dashboard is independent stacks, never a grid
+  row under the columns.
+  - Wide: column 1 | column 2 | column 3 | events.
+  - Desktop: column 1 + Uptime Overview | column 2 + App Usage | events + Update Debt,
+    Storage, Software Risk.
+  - Laptop (2fr / 3fr):
+    - Left stack: column 1, then Update Debt, Storage, Software Risk, Uptime Overview.
+    - Right stack: events, App Usage, then column 2.
+  - Below the lg breakpoint the two laptop stacks follow one another.
+  - Balanced by card heights measured against production on 2026-10-22: at 1280 the stacks
+    are 4,132 / 4,164 px, and at 1728 they are 2,804 / 2,922 / 2,913 px.
