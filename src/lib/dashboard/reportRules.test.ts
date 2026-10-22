@@ -267,3 +267,21 @@ describe('Directory Services colours', () => {
     expect(new Set([c.trusted, c.unconfirmed, c.broken]).size).toBe(3)
   })
 })
+
+describe('Authentication (/identity?auth=)', () => {
+  const { authFromParam, authToParam, matchesAuth } = require('./reportRules') as typeof import('./reportRules')
+  it('reads and writes the keys', () => {
+    expect(authFromParam('modern')).toBe('Modern')
+    expect(authFromParam('Standard')).toBe('Standard')
+    expect(authFromParam('legacy')).toBe('Legacy')
+    expect(authFromParam('sso')).toBeNull()
+    expect(authToParam('Modern')).toBe('modern')
+    expect(authToParam(null)).toBeNull()
+  })
+  it("classifies as the Identity report does", () => {
+    expect(matchesAuth({ authMethod: 'Platform SSO' }, 'Modern')).toBe(true)
+    expect(matchesAuth({ adBound: true }, 'Legacy')).toBe(true)
+    expect(matchesAuth({ adBound: true }, 'Standard')).toBe(false)
+    expect(matchesAuth({}, 'Standard')).toBe(true)
+  })
+})

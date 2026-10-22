@@ -903,3 +903,33 @@ export const DIRECTORY_SERVICE_COLORS_BY_LABEL: Record<string, string> = Object.
     DIRECTORY_SERVICE_COLORS[key as DirectoryServiceKey],
   ]),
 );
+
+// MARK: - Authentication and admin accounts (`/identity?auth=`, `?admin=`)
+
+/** The Identity report's Authentication classes, as URL keys. */
+export const AUTH_LABELS = { modern: "Modern", legacy: "Legacy", standard: "Standard" } as const;
+export type AuthKey = keyof typeof AUTH_LABELS;
+
+/** `auth=` → the identity widget's label; takes the key or the label, any case. */
+export function authFromParam(value: string | null): string | null {
+  const v = (value || "").trim().toLowerCase();
+  const hit = (Object.keys(AUTH_LABELS) as AuthKey[]).find((k) => k === v);
+  return hit ? AUTH_LABELS[hit] : null;
+}
+
+export function authToParam(label: string | null): string | null {
+  const hit = (Object.keys(AUTH_LABELS) as AuthKey[]).find((k) => AUTH_LABELS[k] === label);
+  return hit ?? null;
+}
+
+/**
+ * The Identity report's rule: Modern is Platform SSO or Windows Hello for
+ * Business (`authMethod` set); Legacy is AD- or LDAP-bound without it;
+ * Standard is neither.
+ */
+export function matchesAuth(r: Row, label: string): boolean {
+  if (label === AUTH_LABELS.modern) return !!r.authMethod;
+  if (label === AUTH_LABELS.legacy) return !r.authMethod && !!(r.adBound || r.ldapBound);
+  if (label === AUTH_LABELS.standard) return !r.authMethod && !r.adBound && !r.ldapBound;
+  return true;
+}

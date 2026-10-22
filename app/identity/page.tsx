@@ -11,7 +11,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
-import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService, DIRECTORY_SERVICE_COLORS_BY_LABEL } from "@/src/lib/dashboard/reportRules"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService, DIRECTORY_SERVICE_COLORS_BY_LABEL, authFromParam, authToParam, matchesAuth } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
@@ -181,8 +181,9 @@ function IdentityPageContent() {
   // `directory=cloud|domain|trusted|unconfirmed|broken|standard|unjoined`: the
   // Directory Services widget's classes, the dashboard card's links.
   const [directoryFilter, setDirectoryFilter] = useState<string | null>(() => directoryServiceFromParam(searchParams.get('directory')))
-  const [authFilter, setAuthFilter] = useState<string | null>(null)
-  const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(null)
+  // `auth=modern|legacy|standard` and `admin=<account>`: the User Accounts card's links
+  const [authFilter, setAuthFilter] = useState<string | null>(() => authFromParam(searchParams.get('auth')))
+  const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(() => searchParams.get('admin')?.trim() || null)
   // Mac-only filter chips. Values: 'with-token' | 'missing-token' | null, and
   // 'escrowed' | 'not-escrowed' | null. Each operates independently.
   const [secureTokenFilter, setSecureTokenFilter] = useState<'with-token' | 'missing-token' | null>(null)
@@ -311,6 +312,8 @@ function IdentityPageContent() {
     set('admins', adminFilter === 'multiple-admins' ? 'extra' : adminCount)
     set('join', joinFilter.length > 0 ? JOIN_TYPES.filter(j => joinFilter.includes(j)).join(',') : null)
     set('directory', macDirectoryFilter.length > 0 ? macDirectoryFilter.join(',') : directoryServiceToParam(directoryFilter))
+    set('auth', authToParam(authFilter))
+    set('admin', adminAccountFilter)
     const kinds = new Set<string>()
     const raw: string[] = []
     for (const u of selectedUsages) {
@@ -326,7 +329,7 @@ function IdentityPageContent() {
       router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlHydrated, adminFilter, joinFilter, macDirectoryFilter, directoryFilter, selectedUsages])
+  }, [urlHydrated, adminFilter, joinFilter, macDirectoryFilter, directoryFilter, authFilter, adminAccountFilter, selectedUsages])
 
   // URL → state when the URL changes from outside (a dashboard deep link,
   // Back) while the page is open; the first render already read it, and the
@@ -342,6 +345,8 @@ function IdentityPageContent() {
     setJoinFilter(paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
     setMacDirectoryFilter(directoryFromParam(searchParams.get('directory')))
     setDirectoryFilter(directoryServiceFromParam(searchParams.get('directory')))
+    setAuthFilter(authFromParam(searchParams.get('auth')))
+    setAdminAccountFilter(searchParams.get('admin')?.trim() || null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuery])
 
@@ -399,15 +404,7 @@ function IdentityPageContent() {
     }
 
     // Widget click: auth filter
-    if (authFilter) {
-      if (authFilter === 'Modern') {
-        if (!d.authMethod) return false
-      } else if (authFilter === 'Legacy') {
-        if (d.authMethod || !(d.adBound || d.ldapBound)) return false
-      } else if (authFilter === 'Standard') {
-        if (d.authMethod || d.adBound || d.ldapBound) return false
-      }
-    }
+    if (authFilter && !matchesAuth(d, authFilter)) return false
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()

@@ -1159,6 +1159,105 @@
         }
       }
     },
+    "userAccounts": {
+      "generatedAt": "2026-10-22T15:00:00+00:00",
+      "total": 916,
+      "authentication": [
+        {
+          "key": "modern",
+          "label": "Modern",
+          "count": 520,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "modern"
+            }
+          }
+        },
+        {
+          "key": "standard",
+          "label": "Standard",
+          "count": 396,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "standard"
+            }
+          }
+        }
+      ],
+      "admins": [
+        {
+          "name": "admin",
+          "devices": 540,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "admin"
+            }
+          }
+        },
+        {
+          "name": "macadmins",
+          "devices": 500,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "macadmins"
+            }
+          }
+        },
+        {
+          "name": "winadmins",
+          "devices": 370,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "winadmins"
+            }
+          }
+        },
+        {
+          "name": "Intune",
+          "devices": 360,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "Intune"
+            }
+          }
+        },
+        {
+          "name": "support",
+          "devices": 12,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "support"
+            }
+          }
+        },
+        {
+          "name": "extra",
+          "devices": 3,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "extra"
+            }
+          }
+        }
+      ],
+      "extraAdmins": {
+        "count": 773,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "admins": "extra"
+          }
+        }
+      }
+    },
     "connectivityProblems": {
       "devices": 924,
       "weakSignal": {

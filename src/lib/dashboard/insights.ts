@@ -181,6 +181,18 @@ export interface DirectoryServicesCard {
   assigned: Counted;
 }
 
+/**
+ * User Accounts (revision 6), from the Identity report's Authentication and
+ * Administrator Accounts widgets. Shape assumed until the API's `userAccounts`
+ * card ships; normalizeCard reads the likely variants.
+ */
+export interface UserAccountsCard {
+  devices: number;
+  authentication: KeyedCount[];
+  admins: { name: string; devices: number; link: InsightLink }[];
+  extraAdmins: Counted;
+}
+
 export interface ConnectivityProblemsCard {
   devices: number;
   weakSignal: Counted;
@@ -218,6 +230,7 @@ export interface InsightCards {
   softwareRisk: SoftwareRiskCard | CardError;
   expiringCertificates: ExpiringCertificatesCard | CardError;
   directoryServices: DirectoryServicesCard | CardError;
+  userAccounts: UserAccountsCard | CardError;
   connectivityProblems: ConnectivityProblemsCard | CardError;
 }
 
@@ -283,6 +296,7 @@ export const INSIGHT_CARD_KEYS: InsightCardKey[] = [
   "softwareRisk",
   "expiringCertificates",
   "directoryServices",
+  "userAccounts",
   "connectivityProblems",
 ];
 
@@ -311,6 +325,27 @@ export const CARD_KEY_ALIASES: Partial<Record<InsightCardKey, string[]>> = {
  */
 export function normalizeCard(key: string, section: any, scope: string): any {
   if (!section || typeof section !== "object" || isCardError(section)) return section;
+  if (key === "userAccounts") {
+    const auth = section.authentication ?? section.auth ?? [];
+    const authList: any[] = Array.isArray(auth) ? auth : Array.isArray(auth?.segments) ? auth.segments : [];
+    const admins: any[] = section.admins ?? section.adminAccounts ?? section.topAdmins ?? [];
+    return {
+      ...section,
+      devices: section.devices ?? section.total ?? 0,
+      authentication: authList.map((a) => ({
+        ...a,
+        key: String(a.key ?? a.label ?? "").toLowerCase(),
+        label: a.label ?? a.key,
+        link: a.link ?? { path: "/identity", params: { auth: String(a.key ?? a.label ?? "").toLowerCase() } },
+      })),
+      admins: (Array.isArray(admins) ? admins : []).map((a) => ({
+        name: a.name ?? a.account ?? a.admin,
+        devices: a.devices ?? a.count,
+        link: a.link ?? { path: "/identity", params: { admin: a.name ?? a.account ?? a.admin } },
+      })),
+      extraAdmins: section.extraAdmins ?? { count: 0, link: { path: "/identity", params: { admins: "extra" } } },
+    };
+  }
   if (key === "directoryServices") {
     let view = section;
     if (section.views && typeof section.views === "object") {

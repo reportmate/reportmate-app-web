@@ -106,8 +106,8 @@ interface Device {
   inventoryState?: InventoryState
 }
 
-/** Revision 5's columns 2 and 3. Narrower layouts keep this order. */
-const COLUMN_2 = ["directoryServices", "connectivityProblems", "protectionGaps", "expiringCertificates"] as const
+/** Columns 2 and 3 (revisions 5 and 6). Narrower layouts keep this order. */
+const COLUMN_2 = ["directoryServices", "userAccounts", "connectivityProblems", "protectionGaps", "expiringCertificates"] as const
 const COLUMN_3_BEFORE_APP_USAGE = ["updateDebt", "storage"] as const
 const COLUMN_3_AFTER_APP_USAGE = ["softwareRisk", "rebootDebt"] as const
 

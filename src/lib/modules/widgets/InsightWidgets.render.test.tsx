@@ -44,13 +44,13 @@ function collectLinks(value: unknown, skip: (path: string[]) => boolean, path: s
 describe('InsightCards', () => {
   it('shows a skeleton per card until the first answer', () => {
     render(<Dashboard c={ctx({ loading: true })} />)
-    expect(screen.getAllByTestId('insight-skeleton')).toHaveLength(11)
+    expect(screen.getAllByTestId('insight-skeleton')).toHaveLength(12)
   })
 
-  it('renders the revision 5 cards from the API fixture', () => {
+  it('renders the revision 6 cards from the API fixture', () => {
     render(<Dashboard c={ctx({ data: doc })} />)
     for (const title of [
-      'Installs', 'Reboot Debt', 'Protection Gaps', 'Management Tools Logs', 'Storage',
+      'Installs', 'Uptime Overview', 'User Accounts', 'Protection Gaps', 'Management Tools Logs', 'Storage',
       'Check-in Gaps', 'Update Debt', 'Software Risk', 'Expiring Certificates', 'Directory Services', 'Connectivity Problems',
     ]) expect(screen.getByRole('heading', { name: title })).toBeTruthy()
     expect(screen.queryAllByTestId('insight-skeleton')).toHaveLength(0)
@@ -59,8 +59,11 @@ describe('InsightCards', () => {
   it('links every item where the server says', () => {
     render(<Dashboard c={ctx({ data: doc })} />)
     const rendered = new Set(hrefs())
-    // Management Tools Logs groups its messages; checked on its own below
-    const expected = collectLinks(fixture.cards, p => p[0] === 'managementToolLogs' && p[1] === 'topErrors')
+    // Management Tools Logs links to /management/logs (checked below); Directory
+    // Services' extra-admins chip moved to User Accounts
+    const expected = collectLinks(fixture.cards, p =>
+      p[0] === 'managementToolLogs' || (p[0] === 'directoryServices' && p[1] === 'extraAdmins') ||
+      (p[0] === 'userAccounts' && p[1] === 'admins' && Number(p[2]) >= 5))
     // The MDM agent's own log root is left out on purpose
     const missing = expected.map(linkHref).filter(h => !h.includes('tool=mdm') && !rendered.has(h))
     expect(missing).toEqual([])
@@ -93,8 +96,9 @@ describe('InsightCards', () => {
     expect(hrefs()).toEqual(expect.arrayContaining([
       '/identity?directory=cloud', '/identity?directory=domain', '/identity?directory=trusted',
       '/identity?directory=unconfirmed', '/identity?directory=broken', '/identity?directory=standard',
-      '/identity?directory=unjoined', '/identity?admins=extra',
+      '/identity?directory=unjoined',
     ]))
+    expect(hrefs()).not.toContain('/identity?admins=extra')
   })
 
   it('groups Management Tools Logs messages and leaves out the MDM agent', () => {
@@ -127,7 +131,7 @@ describe('InsightCards', () => {
 
   it('shows every card as failed with Retry when the first request fails', () => {
     render(<Dashboard c={ctx({ error: 'HTTP 503' })} />)
-    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(11)
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(12)
   })
 
   it('keeps every card on its last good data when a refresh fails', () => {
@@ -139,7 +143,7 @@ describe('InsightCards', () => {
   it('shows a card still on its own request as a skeleton (per-card loading)', () => {
     const cards = { ...doc.cards } as Record<string, unknown>
     delete cards.storage
-    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument, pending: new Set(['storage']) })} positions={[5]} />)
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument, pending: new Set(['storage']) })} positions={[6]} />)
     expect(screen.getByTestId('insight-skeleton')).toBeTruthy()
   })
 })
@@ -192,16 +196,16 @@ describe('AppUsageCard', () => {
   it('shows its error with Retry when the endpoint fails', async () => {
     global.fetch = jest.fn(async () => ({ ok: false, status: 404, json: async () => ({ error: 'Card endpoint not found' }) })) as unknown as typeof fetch
     render(<AppUsageCard platformFilter="macOS" />)
-    await waitFor(() => expect(screen.getByText(/Card endpoint not found \(HTTP 404\)/)).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('Not available on this server yet.')).toBeTruthy())
     expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
   })
 })
 
 describe('revision 5: Update Debt and Reboot Debt', () => {
   it('puts pending and deferred updates on Update Debt, and only uptime on Reboot Debt', () => {
-    render(<InsightCards ctx={ctx({ data: doc })} positions={[4, 7]} />)
+    render(<InsightCards ctx={ctx({ data: doc })} positions={[5, 8]} />)
     const update = screen.getByRole('heading', { name: 'Update Debt' }).closest('.rounded-xl') as HTMLElement
-    const reboot = screen.getByRole('heading', { name: 'Reboot Debt' }).closest('.rounded-xl') as HTMLElement
+    const reboot = screen.getByRole('heading', { name: 'Uptime Overview' }).closest('.rounded-xl') as HTMLElement
     const links = (el: HTMLElement) => [...el.querySelectorAll('a[href]')].map(a => a.getAttribute('href'))
     expect(links(update)).toEqual(expect.arrayContaining(['/system?pending=1-5,6-10,10%2B', '/system?deferred=1', '/system?patch=behind']))
     expect(links(reboot)).toEqual(expect.arrayContaining(['/system?uptime=30d%2B', '/system?uptime=2-4w']))
@@ -212,7 +216,7 @@ describe('revision 5: Update Debt and Reboot Debt', () => {
     const cards = JSON.parse(JSON.stringify(doc.cards))
     delete cards.updateDebt.pendingUpdates
     delete cards.updateDebt.deferredUpdates
-    render(<InsightCards ctx={ctx({ data: { ...doc, cards } })} positions={[4]} />)
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } })} positions={[5]} />)
     expect(hrefs()).toEqual(expect.arrayContaining(['/system?pending=1-5,6-10,10%2B', '/system?deferred=1']))
   })
 })
@@ -241,5 +245,34 @@ describe('cards with bad numbers', () => {
     const text = document.body.textContent || ''
     expect(text).not.toMatch(/NaN|Infinity/)
     expect(screen.getAllByText('—').length).toBeGreaterThan(3)
+  })
+})
+
+describe('revision 6', () => {
+  it('shows User Accounts with the Identity report links', () => {
+    render(<InsightCards ctx={ctx({ data: doc })} positions={[1]} />)
+    expect(screen.getByRole('heading', { name: 'User Accounts' })).toBeTruthy()
+    expect(hrefs()).toEqual(expect.arrayContaining([
+      '/identity?auth=modern', '/identity?auth=standard', '/identity?admin=admin', '/identity?admin=Intune', '/identity?admins=extra',
+    ]))
+    expect(hrefs()).not.toContain('/identity?admin=extra')
+  })
+
+  it('says a card the server does not have yet is not available', () => {
+    const cards = { ...doc.cards, userAccounts: { error: 'Unknown card (HTTP 404)' } }
+    render(<InsightCards ctx={ctx({ data: { ...doc, cards } as InsightsDocument })} positions={[1]} />)
+    expect(screen.getByText('Not available on this server yet.')).toBeTruthy()
+  })
+
+  it('points Management Tools Logs at the Fleet Management Tools report', () => {
+    render(<ManagementToolLogs ctx={ctx({ data: doc })} />)
+    expect(hrefs()).toEqual(expect.arrayContaining([
+      '/management/logs',
+      '/management/logs?tool=installs&level=error&platform=macOS',
+      '/management/logs?tool=installs&level=warning&platform=Windows',
+      '/management/logs?tool=reports&level=error',
+      '/management/logs?tool=installs&level=error&message=Device+registration+failed+for+%3Cguid%3E',
+    ]))
+    expect(hrefs().some(h => h?.startsWith('/devices?tool='))).toBe(false)
   })
 })

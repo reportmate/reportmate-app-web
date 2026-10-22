@@ -29,6 +29,7 @@ import {
   type RebootDebtCard,
   type SoftwareRiskCard,
   type StorageCard,
+  type UserAccountsCard,
   isCardError,
   linkHref,
   useAppUsage,
@@ -209,7 +210,9 @@ function InsightCard({
         ) : card.status === "error" ? (
           <div className="flex items-start justify-between gap-3">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Couldn&apos;t load this card: {card.error}
+              {/HTTP 404/.test(card.error)
+                ? "Not available on this server yet."
+                : <>Couldn&apos;t load this card: {card.error}</>}
             </p>
             <button
               type="button"
@@ -554,8 +557,8 @@ export function RebootDebt({ ctx }: { ctx: InsightContext }) {
   const d = card.status === "ready" ? card.data : null;
   return (
     <InsightCard
-      title="Reboot Debt"
-      subtitle="Devices that haven't restarted in a while"
+      title="Uptime Overview"
+      subtitle="How long devices have been up since their last restart"
       link="/system"
       tone="orange"
       icon={<Icon d={ICONS.refresh} />}
@@ -960,6 +963,18 @@ export function groupToolErrors(errors: ManagementToolErrorsCard["topErrors"]): 
   return [...groups.values()].sort((a, b) => b.devices - a.devices || b.lines - a.lines);
 }
 
+/**
+ * The Fleet Management Tools report (/management/logs) filtered to a tool,
+ * level and optionally one normalised message. The card links there rather
+ * than to the server's /devices?tool= links (revision 6).
+ */
+export function toolLogsHref(tool: string, level: "error" | "warning", platform?: string | null, message?: string): string {
+  const params = new URLSearchParams({ tool, level });
+  if (platform === "macOS" || platform === "Windows") params.set("platform", platform);
+  if (message) params.set("message", message);
+  return `/management/logs?${params.toString()}`;
+}
+
 /** The MDM agent's own logs (log root `mdm`) are left out; the card is about the management tools. */
 const isMdmRoot = (tool: string) => tool.toLowerCase() === "mdm";
 
@@ -974,9 +989,9 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
     <InsightCard
       title="Management Tools Logs"
       subtitle={`Errors and warnings in the tools' logs · last ${d?.windowHours ?? 24} h`}
-      link="/devices"
-      tone="red"
-      icon={<Icon d={ICONS.warning} />}
+      link="/management/logs"
+      tone="yellow"
+      icon={<Icon d={ICONS.shield} />}
       card={card}
     >
       {d && (
@@ -991,19 +1006,19 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
               </li>
               {tools.slice(0, 8).map((t) => (
                 <li key={`${t.tool}:${t.name}`} className="flex items-center gap-2 text-sm">
-                  <Link href={linkHref(t.link)} className={`flex-1 min-w-0 truncate py-0.5 text-gray-900 dark:text-gray-100 ${ROW_LINK}`}>
+                  <Link href={toolLogsHref(t.tool, "error", t.platform)} className={`flex-1 min-w-0 truncate py-0.5 text-gray-900 dark:text-gray-100 ${ROW_LINK}`}>
                     {t.name}
                     {t.platform && <span className="ml-1 text-xs text-gray-400">{t.platform}</span>}
                   </Link>
                   <Link
-                    href={linkHref(t.link)}
+                    href={toolLogsHref(t.tool, "error", t.platform)}
                     title={`${fmtCount(t.devicesWithErrors)} of ${fmtCount(t.devices)} devices with errors`}
                     className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithErrors ? TONES.red.text : "text-gray-400 dark:text-gray-500"}`}
                   >
                     {fmtCount(t.devicesWithErrors)}
                   </Link>
                   <Link
-                    href={linkHref(t.warningsLink)}
+                    href={toolLogsHref(t.tool, "warning", t.platform)}
                     title={`${fmtCount(t.devicesWithWarnings)} of ${fmtCount(t.devices)} devices with warnings`}
                     className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithWarnings ? TONES.yellow.text : "text-gray-400 dark:text-gray-500"}`}
                   >
@@ -1024,7 +1039,7 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
               <ul className="space-y-1.5">
                 {topErrors.map((m) => (
                   <li key={`${m.tool}:${m.message}`} className="text-sm">
-                    <Link href={linkHref(m.link)} className={`block py-0.5 ${ROW_LINK}`} title={m.message}>
+                    <Link href={toolLogsHref(m.tool, "error", undefined, m.message)} className={`block py-0.5 ${ROW_LINK}`} title={m.message}>
                       <span className="block truncate font-mono text-xs text-gray-900 dark:text-gray-100">{m.message}</span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {m.name} · {plural(m.devices, "device")} · {plural(m.lines, "line")}
@@ -1163,9 +1178,63 @@ function DirectoryServices({ ctx }: { ctx: InsightContext }) {
             </ul>
           )}
           <div className="flex flex-wrap gap-2 mt-4">
-            <StatChip value={d.extraAdmins.count} label="with extra local admins" tone="orange" link={linkHref(d.extraAdmins.link)} />
             <StatChip value={d.shared.count} label="shared" tone="blue" link={linkHref(d.shared.link)} />
             <StatChip value={d.assigned.count} label="assigned" tone="teal" link={linkHref(d.assigned.link)} />
+          </div>
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - User Accounts (column 2, under Directory Services)
+
+const AUTH_COLORS: Record<string, string> = {
+  modern: "#10b981",
+  standard: "#3b82f6",
+  legacy: "#f59e0b",
+};
+
+/**
+ * The Identity report's Authentication donut and Administrator Accounts, plus
+ * devices with extra local admins (moved here from Directory Services).
+ */
+function UserAccounts({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "userAccounts");
+  const d: UserAccountsCard | null = card.status === "ready" ? card.data : null;
+  return (
+    <InsightCard
+      title="User Accounts"
+      subtitle="Authentication and local administrator accounts"
+      link="/identity"
+      tone="indigo"
+      icon={<Icon d={ICONS.users} />}
+      card={card}
+    >
+      {d && (
+        <>
+          <SectionLabel>Authentication</SectionLabel>
+          <Donut
+            center={fmtCount(d.devices)}
+            data={d.authentication.map((a) => ({
+              label: a.label,
+              count: a.count,
+              color: AUTH_COLORS[a.key] ?? TONES.gray.hex,
+              link: linkHref(a.link),
+            }))}
+          />
+          {d.admins.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Administrator accounts</SectionLabel>
+              <BarList
+                color={TONES.indigo.hex}
+                labelWidth="w-32"
+                items={d.admins.slice(0, 5).map((a) => ({ label: a.name, count: a.devices, link: linkHref(a.link) }))}
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={d.extraAdmins.count} label="devices with extra local admins" tone="orange" link={linkHref(d.extraAdmins.link)} />
           </div>
         </>
       )}
@@ -1363,6 +1432,7 @@ function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
 
 const CARDS: { id: InsightCardKey; Card: React.FC<{ ctx: InsightContext }> }[] = [
   { id: "directoryServices", Card: DirectoryServices },
+  { id: "userAccounts", Card: UserAccounts },
   { id: "connectivityProblems", Card: ConnectivityProblems },
   { id: "protectionGaps", Card: ProtectionGaps },
   { id: "expiringCertificates", Card: ExpiringCertificates },
