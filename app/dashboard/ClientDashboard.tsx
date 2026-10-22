@@ -14,6 +14,7 @@ import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-p
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
 import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 /** The dashboard's own data, kept across navigation so a return renders instantly. */
 const DASHBOARD_CACHE_KEY = "dashboard:view"
@@ -515,7 +516,7 @@ export default function ClientDashboard() {
 
   // Show skeleton while data is loading
   if (devicesLoading) {
-    return <DashboardSkeleton />
+    return <SkeletonTimeout page><DashboardSkeleton /></SkeletonTimeout>
   }
 
   return (

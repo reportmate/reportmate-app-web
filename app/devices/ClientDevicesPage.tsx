@@ -13,6 +13,7 @@ import DeviceFilters, { FilterOptions } from "../../src/components/shared/Device
 import { useScrollCollapse } from "../../src/hooks/useScrollCollapse"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
 import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 interface InventoryItem {
   id: string
@@ -406,6 +407,7 @@ function DevicesPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
           {/* Content skeleton */}
@@ -493,6 +495,7 @@ function DevicesPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 

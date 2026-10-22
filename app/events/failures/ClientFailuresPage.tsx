@@ -9,6 +9,7 @@ import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { Search, X } from 'lucide-react'
 import { cachedAt, findNearestCached, peekCached, rememberCached, trackedFetch } from "../../../src/lib/data-cache"
 import { RefreshErrorBanner } from "../../../src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 interface IngestFailure {
   id: number
@@ -397,9 +398,11 @@ function ClientFailuresPageContent() {
 
           {/* Body */}
           {loading ? (
-            <div className="flex-1 flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
-            </div>
+            <SkeletonTimeout onRetry={() => { void fetchFailures() }}>
+              <div className="flex-1 flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+              </div>
+            </SkeletonTimeout>
           ) : error ? (
             <div className="flex-1 flex items-center justify-center py-16">
               <div className="text-center">

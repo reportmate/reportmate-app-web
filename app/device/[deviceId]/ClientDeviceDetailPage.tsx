@@ -27,6 +27,7 @@ import {
 import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
 import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
 import { safeHost } from "@/src/lib/security/safeUrl"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
@@ -672,7 +673,7 @@ export default function ClientDeviceDetailPage() {
     
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <DeviceDetailSkeleton isMac={isMac} />
+        <SkeletonTimeout page><DeviceDetailSkeleton isMac={isMac} /></SkeletonTimeout>
       </div>
     )
   }

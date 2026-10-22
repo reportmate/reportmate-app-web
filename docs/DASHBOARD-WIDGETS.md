@@ -206,3 +206,7 @@ shows its error state; the rest render.
     `app/api/v1/dashboard/insights/[card]/route.ts`, and paints each card as it lands.
   - It accepts the section bare or wrapped as `{card}`, `{data}` or `{cards: {key}}`.
   - The card keys in `INSIGHT_CARD_KEYS` are placeholders until the API's final keys land.
+- Every page's skeleton is wrapped in `SkeletonTimeout` (`src/components/ui/SkeletonTimeout.tsx`).
+  After 10 seconds it becomes "Still loading… · Retry", and an error that came back shows at once.
+  This covers the dashboard, devices, device detail, events, failures, installs, system,
+  hardware, security, management, identity, network and peripherals.

@@ -27,6 +27,7 @@ import {
 import { FitText } from "@/src/components/ui/FitText"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 const HARDWARE_URL = '/api/v1/hardware'
 
@@ -873,7 +874,7 @@ function HardwarePageContent() {
       : []),
   ]
 
-  if (loading) return <HardwarePageSkeleton />
+  if (loading) return <SkeletonTimeout page><HardwarePageSkeleton /></SkeletonTimeout>
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">

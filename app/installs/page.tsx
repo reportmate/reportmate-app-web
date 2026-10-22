@@ -17,6 +17,7 @@ import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/compo
 import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS } from '@/src/lib/dashboard/reportRules'
 import { cachedAt, peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
 import { RefreshErrorBanner } from '@/src/components/ui/RefreshErrorBanner'
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 // The filters payload (~17 MB) is kept parsed in memory for the tab, so a
 // return visit seeds from it instantly. Never stringified, never retried.
@@ -2192,6 +2193,7 @@ function InstallsPageContent() {
 
             {/* Skeleton Loading State - Shows full page structure while loading */}
             {filtersLoading && (
+              <SkeletonTimeout onRetry={() => { void fetchFilterOptions() }}>
               <div className="animate-pulse">
                 {/* Skeleton Widgets Accordion Header */}
                 <div className="border-b border-gray-200 dark:border-gray-700">
@@ -2487,6 +2489,7 @@ function InstallsPageContent() {
                   </table>
                 </div>
               </div>
+              </SkeletonTimeout>
             )}
 
             {/* Widgets Accordion - Collapsible section for Items with Errors/Warnings/Pending and Config Widgets */}

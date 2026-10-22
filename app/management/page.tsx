@@ -14,6 +14,7 @@ import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import { LAST_SEEN_LABELS, type LastSeenBucket, boolish, lastSeenBucket, lastSeenFromParam, managementProvider, paramList } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 const MANAGEMENT_URL = '/api/v1/management'
 
@@ -809,6 +810,7 @@ function ManagementPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden animate-pulse">
@@ -836,6 +838,7 @@ function ManagementPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 

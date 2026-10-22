@@ -14,6 +14,7 @@ import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-proce
 import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 const IDENTITY_URL = '/api/v1/identity'
 
@@ -484,12 +485,14 @@ function IdentityPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
         <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
         <div className="page-container px-4 py-8">
           <LoadingSkeleton />
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 

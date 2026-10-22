@@ -16,6 +16,7 @@ import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-proce
 import { connectionKind, isPoorNetworkQuality, signalPercent } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 const NETWORK_URL = '/api/v1/network'
 
@@ -519,6 +520,7 @@ function NetworkPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
         <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden animate-pulse">
@@ -608,6 +610,7 @@ function NetworkPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 

@@ -14,6 +14,7 @@ import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilt
 import { deviceRoom, paramList } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 const PERIPHERALS_URL = '/api/v1/peripherals'
 
@@ -378,12 +379,14 @@ function PeripheralsPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
         <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
         <div className="page-container px-4 py-8">
           <LoadingSkeleton />
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 

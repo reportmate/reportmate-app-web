@@ -16,6 +16,7 @@ import { extractInlineDetails, inlineLineClass } from "../../src/lib/eventInline
 import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
 import { Search, X } from 'lucide-react'
 import { peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 /** The default window: the last 48 hours, as YYYY-MM-DD bounds. */
 const defaultStartDate = () => new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -953,7 +954,7 @@ function EventsPageContent() {
   // REMOVED: No longer displaying counts - filters now work without count display
 
   if (loading) {
-    return <EventsPageSkeleton />
+    return <SkeletonTimeout page error={error} onRetry={() => fetchEvents(0, false)}><EventsPageSkeleton /></SkeletonTimeout>
   }
 
   // Show error inline in the table instead of full-page error
@@ -1989,7 +1990,7 @@ function EventsPageContent() {
 
 export default function EventsPage() {
   return (
-    <Suspense fallback={<EventsPageSkeleton />}>
+    <Suspense fallback={<SkeletonTimeout page><EventsPageSkeleton /></SkeletonTimeout>}>
       <EventsPageContent />
     </Suspense>
   )

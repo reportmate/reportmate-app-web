@@ -22,6 +22,7 @@ import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilt
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { InstalledUpdate, matchesSystemSearch, updatesToDisplay } from "@/src/lib/system/installedUpdates"
 import { osCurrency, paramList, uptimeBucketKey, pendingBucketKey, hasDeferredUpdates, UPTIME_KEYS, PENDING_KEYS } from "@/src/lib/dashboard/reportRules"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 interface SystemDevice {
   id: string
@@ -915,7 +916,7 @@ function SystemPageContent() {
   ]
 
   if (loading) {
-    return <LoadingSkeleton />
+    return <SkeletonTimeout page><LoadingSkeleton /></SkeletonTimeout>
   }
 
   return (

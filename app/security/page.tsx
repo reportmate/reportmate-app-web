@@ -20,6 +20,7 @@ import {
 } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 const SECURITY_URL = '/api/v1/security'
 
@@ -872,6 +873,7 @@ function SecurityPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
         <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
           <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
@@ -882,6 +884,7 @@ function SecurityPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 

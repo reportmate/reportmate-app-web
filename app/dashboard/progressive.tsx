@@ -26,6 +26,7 @@ import { WarningStatsWidget, ErrorStatsWidget } from "../../src/lib/modules/widg
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 export default function ProgressiveDashboard() {
   useComponentTracker('ProgressiveDashboard')
@@ -113,7 +114,7 @@ export default function ProgressiveDashboard() {
 
   // Show skeleton only while FAST devices are loading (<3 seconds)
   if (fastLoading) {
-    return <DashboardSkeleton />
+    return <SkeletonTimeout page><DashboardSkeleton /></SkeletonTimeout>
   }
 
   return (
