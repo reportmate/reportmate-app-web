@@ -85,6 +85,12 @@ describe('InsightCards', () => {
     expect(screen.queryByRole('radiogroup')).toBeNull()
     expect(screen.getByText('Cloud Joined')).toBeTruthy()
     expect(screen.getByText('Domain Joined: Broken')).toBeTruthy()
+    const swatch = (label: string) =>
+      (screen.getByText(label).previousElementSibling as HTMLElement).style.backgroundColor
+    expect(swatch('Cloud Joined')).toBe('rgb(16, 185, 129)')
+    expect(swatch('Domain Joined')).toBe('rgb(245, 158, 11)')
+    expect(swatch('Standard')).toBe('rgb(59, 130, 246)')
+    expect(swatch('Unjoined')).toBe('rgb(239, 68, 68)')
     expect(hrefs()).toEqual(expect.arrayContaining([
       '/identity?directory=cloud', '/identity?directory=domain', '/identity?directory=trusted',
       '/identity?directory=unconfirmed', '/identity?directory=broken', '/identity?directory=standard',

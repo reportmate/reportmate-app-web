@@ -880,3 +880,26 @@ export function matchesDirectoryService(r: Row, label: string): boolean {
     return domain && r.trustStatus !== "Healthy" && r.trustStatus !== "Broken";
   return r.enrollmentType === label;
 }
+
+/**
+ * The Identity report's Directory Services colours, by class key. The four
+ * top-level classes never share a colour; Domain Joined's trust breakdown
+ * has its own scale.
+ */
+export const DIRECTORY_SERVICE_COLORS: Record<DirectoryServiceKey, string> = {
+  cloud: "#10b981",
+  domain: "#f59e0b",
+  standard: "#3b82f6",
+  unjoined: "#ef4444",
+  trusted: "#eab308",
+  unconfirmed: "#f97316",
+  broken: "#ef4444",
+};
+
+/** The same colours by the widget's labels, for the identity page. */
+export const DIRECTORY_SERVICE_COLORS_BY_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(DIRECTORY_SERVICE_LABELS).map(([key, label]) => [
+    label,
+    DIRECTORY_SERVICE_COLORS[key as DirectoryServiceKey],
+  ]),
+);

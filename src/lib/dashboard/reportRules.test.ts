@@ -254,3 +254,16 @@ describe('Directory Services (/identity?directory=)', () => {
     expect(matchesDirectoryService({ enrollmentType: 'Unjoined' }, 'Unjoined')).toBe(true)
   })
 })
+
+describe('Directory Services colours', () => {
+  const { DIRECTORY_SERVICE_COLORS: c } = require('./reportRules') as typeof import('./reportRules')
+  it("match the Identity widget's colours, and no two classes share one", () => {
+    expect(c).toMatchObject({
+      cloud: '#10b981', domain: '#f59e0b', standard: '#3b82f6', unjoined: '#ef4444',
+      trusted: '#eab308', unconfirmed: '#f97316', broken: '#ef4444',
+    })
+    const top = [c.cloud, c.domain, c.standard, c.unjoined]
+    expect(new Set(top).size).toBe(4)
+    expect(new Set([c.trusted, c.unconfirmed, c.broken]).size).toBe(3)
+  })
+})

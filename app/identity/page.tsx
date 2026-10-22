@@ -11,7 +11,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
-import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService } from "@/src/lib/dashboard/reportRules"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService, DIRECTORY_SERVICE_COLORS_BY_LABEL } from "@/src/lib/dashboard/reportRules"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
@@ -773,19 +773,12 @@ function IdentityPageContent() {
                       if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
                       
                       const colorMap: Record<string, string> = {
-                        'Cloud Joined': '#10b981',
-                        'Domain Joined': '#f59e0b',
-                        'Standard': '#3b82f6',
-                        'Unjoined': '#ef4444',
+                        ...DIRECTORY_SERVICE_COLORS_BY_LABEL,
                       }
 
                       // Trust sub-counts for domain/hybrid
                       const { trusted, broken, unconfirmed } = identityStats.trustCounts
-                      const trustColors: Record<string, string> = {
-                        'Trusted': '#eab308',
-                        'Unconfirmed': '#f97316',
-                        'Broken': '#ef4444',
-                      }
+                      const trustColors: Record<string, string> = DIRECTORY_SERVICE_COLORS_BY_LABEL
                       // Categories that can expand to show trust sub-items
                       const expandableCategories = ['Domain Joined']
                       // Always show all 3 trust sub-items when expanded (even if count 0)

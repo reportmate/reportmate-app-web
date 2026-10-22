@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState } from "react";
 import { SKELETON_LIMIT_MS } from "../../data-cache";
+import { DIRECTORY_SERVICE_COLORS } from "../../dashboard/reportRules";
 import Link from "next/link";
 import {
   APP_USAGE_DAYS,
@@ -1103,15 +1104,7 @@ function Storage({ ctx }: { ctx: InsightContext }) {
 
 // MARK: - Directory Services (the Identity report's classes)
 
-const DIRECTORY_COLORS: Record<string, string> = {
-  cloud: "#3b82f6",
-  domain: "#6366f1",
-  trusted: "#10b981",
-  unconfirmed: "#eab308",
-  broken: "#ef4444",
-  standard: "#14b8a6",
-  unjoined: "#9ca3af",
-};
+const DIRECTORY_COLORS: Record<string, string> = DIRECTORY_SERVICE_COLORS;
 
 /**
  * Directory Services, with the Identity report's dataset, rules and names:
