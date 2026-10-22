@@ -30,6 +30,7 @@ import {
   type SoftwareRiskCard,
   type StorageCard,
   type UserAccountsCard,
+  type InsightLink,
   isCardError,
   linkHref,
   useAppUsage,
@@ -975,6 +976,14 @@ export function toolLogsHref(tool: string, level: "error" | "warning", platform?
   return `/management/logs?${params.toString()}`;
 }
 
+/**
+ * The server's link when it already points at /management/logs (API #163 on),
+ * otherwise the report filtered to the tool and level.
+ */
+function logsLink(link: InsightLink | undefined, tool: string, level: "error" | "warning", platform?: string | null): string {
+  return link?.path === "/management/logs" ? linkHref(link) : toolLogsHref(tool, level, platform);
+}
+
 /** The MDM agent's own logs (log root `mdm`) are left out; the card is about the management tools. */
 const isMdmRoot = (tool: string) => tool.toLowerCase() === "mdm";
 
@@ -1006,19 +1015,19 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
               </li>
               {tools.slice(0, 8).map((t) => (
                 <li key={`${t.tool}:${t.name}`} className="flex items-center gap-2 text-sm">
-                  <Link href={toolLogsHref(t.tool, "error", t.platform)} className={`flex-1 min-w-0 truncate py-0.5 text-gray-900 dark:text-gray-100 ${ROW_LINK}`}>
+                  <Link href={logsLink(t.link, t.tool, "error", t.platform)} className={`flex-1 min-w-0 truncate py-0.5 text-gray-900 dark:text-gray-100 ${ROW_LINK}`}>
                     {t.name}
                     {t.platform && <span className="ml-1 text-xs text-gray-400">{t.platform}</span>}
                   </Link>
                   <Link
-                    href={toolLogsHref(t.tool, "error", t.platform)}
+                    href={logsLink(t.link, t.tool, "error", t.platform)}
                     title={`${fmtCount(t.devicesWithErrors)} of ${fmtCount(t.devices)} devices with errors`}
                     className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithErrors ? TONES.red.text : "text-gray-400 dark:text-gray-500"}`}
                   >
                     {fmtCount(t.devicesWithErrors)}
                   </Link>
                   <Link
-                    href={toolLogsHref(t.tool, "warning", t.platform)}
+                    href={logsLink(t.warningsLink, t.tool, "warning", t.platform)}
                     title={`${fmtCount(t.devicesWithWarnings)} of ${fmtCount(t.devices)} devices with warnings`}
                     className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithWarnings ? TONES.yellow.text : "text-gray-400 dark:text-gray-500"}`}
                   >
@@ -1039,7 +1048,7 @@ export function ManagementToolLogs({ ctx }: { ctx: InsightContext }) {
               <ul className="space-y-1.5">
                 {topErrors.map((m) => (
                   <li key={`${m.tool}:${m.message}`} className="text-sm">
-                    <Link href={toolLogsHref(m.tool, "error", undefined, m.message)} className={`block py-0.5 ${ROW_LINK}`} title={m.message}>
+                    <Link href={logsLink(m.link, m.tool, "error", undefined)} className={`block py-0.5 ${ROW_LINK}`} title={m.message}>
                       <span className="block truncate font-mono text-xs text-gray-900 dark:text-gray-100">{m.message}</span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {m.name} · {plural(m.devices, "device")} · {plural(m.lines, "line")}
@@ -1215,21 +1224,21 @@ function UserAccounts({ ctx }: { ctx: InsightContext }) {
         <>
           <SectionLabel>Authentication</SectionLabel>
           <Donut
-            center={fmtCount(d.devices)}
-            data={d.authentication.map((a) => ({
+            center={fmtCount(d.devices ?? (d as { total?: number }).total)}
+            data={(d.authentication ?? []).map((a) => ({
               label: a.label,
               count: a.count,
               color: AUTH_COLORS[a.key] ?? TONES.gray.hex,
               link: linkHref(a.link),
             }))}
           />
-          {d.admins.length > 0 && (
+          {d.adminAccounts?.length > 0 && (
             <div className="mt-4">
               <SectionLabel>Administrator accounts</SectionLabel>
               <BarList
                 color={TONES.indigo.hex}
                 labelWidth="w-32"
-                items={d.admins.slice(0, 5).map((a) => ({ label: a.name, count: a.devices, link: linkHref(a.link) }))}
+                items={d.adminAccounts.slice(0, 5).map((a) => ({ label: a.name, count: a.devices, link: linkHref(a.link) }))}
               />
             </div>
           )}

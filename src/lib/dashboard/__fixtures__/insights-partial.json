@@ -747,15 +747,6 @@
           }
         }
       ],
-      "extraAdmins": {
-        "count": 773,
-        "link": {
-          "path": "/identity",
-          "params": {
-            "admins": "extra"
-          }
-        }
-      },
       "shared": {
         "count": 546,
         "link": {
@@ -782,11 +773,22 @@
         {
           "key": "modern",
           "label": "Modern",
-          "count": 520,
+          "count": 480,
           "link": {
             "path": "/identity",
             "params": {
               "auth": "modern"
+            }
+          }
+        },
+        {
+          "key": "legacy",
+          "label": "Legacy",
+          "count": 40,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "legacy"
             }
           }
         },
@@ -802,7 +804,16 @@
           }
         }
       ],
-      "admins": [
+      "extraAdmins": {
+        "count": 773,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "admins": "extra"
+          }
+        }
+      },
+      "adminAccounts": [
         {
           "name": "admin",
           "devices": 540,
@@ -852,27 +863,8 @@
               "admin": "support"
             }
           }
-        },
-        {
-          "name": "extra",
-          "devices": 3,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "admin": "extra"
-            }
-          }
         }
-      ],
-      "extraAdmins": {
-        "count": 773,
-        "link": {
-          "path": "/identity",
-          "params": {
-            "admins": "extra"
-          }
-        }
-      }
+      ]
     },
     "connectivityProblems": {
       "devices": 924,

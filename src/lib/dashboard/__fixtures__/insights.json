@@ -429,15 +429,17 @@
           "errorLines": 400,
           "warningLines": 700,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "mdm",
               "level": "error"
             }
           },
           "warningsLink": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "mdm",
               "level": "warning"
             }
@@ -453,16 +455,18 @@
           "errorLines": 40,
           "warningLines": 900,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "error",
               "platform": "macOS"
             }
           },
           "warningsLink": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "warning",
               "platform": "macOS"
@@ -479,16 +483,18 @@
           "errorLines": 31,
           "warningLines": 88,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "error",
               "platform": "Windows"
             }
           },
           "warningsLink": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "warning",
               "platform": "Windows"
@@ -505,15 +511,17 @@
           "errorLines": 3,
           "warningLines": 9,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "reports",
               "level": "error"
             }
           },
           "warningsLink": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "reports",
               "level": "warning"
             }
@@ -529,16 +537,18 @@
           "errorLines": 0,
           "warningLines": 1,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "notifications",
               "level": "error",
               "platform": "macOS"
             }
           },
           "warningsLink": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "notifications",
               "level": "warning",
               "platform": "macOS"
@@ -554,11 +564,12 @@
           "devices": 4,
           "lines": 10,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "error",
-              "platform": "Windows"
+              "message": "msg000000000"
             }
           },
           "sampleDevice": {
@@ -571,7 +582,8 @@
                 "level": "error"
               }
             }
-          }
+          },
+          "id": "msg000000000"
         },
         {
           "message": "<ts> -<n>:<n> [ERR] Device registration failed for <guid>",
@@ -580,11 +592,12 @@
           "devices": 5,
           "lines": 13,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "error",
-              "platform": "Windows"
+              "message": "msg000000001"
             }
           },
           "sampleDevice": {
@@ -597,7 +610,8 @@
                 "level": "error"
               }
             }
-          }
+          },
+          "id": "msg000000001"
         },
         {
           "message": "Download failed for <item>",
@@ -606,11 +620,12 @@
           "devices": 7,
           "lines": 22,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "installs",
               "level": "error",
-              "platform": "Windows"
+              "message": "msg000000002"
             }
           },
           "sampleDevice": {
@@ -623,7 +638,8 @@
                 "level": "error"
               }
             }
-          }
+          },
+          "id": "msg000000002"
         },
         {
           "message": "Enrollment check-in returned <n>",
@@ -632,10 +648,12 @@
           "devices": 25,
           "lines": 300,
           "link": {
-            "path": "/devices",
+            "path": "/management/logs",
             "params": {
+              "hours": "24",
               "tool": "mdm",
-              "level": "error"
+              "level": "error",
+              "message": "msg000000003"
             }
           },
           "sampleDevice": {
@@ -648,7 +666,8 @@
                 "level": "error"
               }
             }
-          }
+          },
+          "id": "msg000000003"
         }
       ],
       "generatedAt": "2026-10-22T15:00:00+00:00"
@@ -1131,15 +1150,6 @@
           }
         }
       ],
-      "extraAdmins": {
-        "count": 773,
-        "link": {
-          "path": "/identity",
-          "params": {
-            "admins": "extra"
-          }
-        }
-      },
       "shared": {
         "count": 546,
         "link": {
@@ -1166,11 +1176,22 @@
         {
           "key": "modern",
           "label": "Modern",
-          "count": 520,
+          "count": 480,
           "link": {
             "path": "/identity",
             "params": {
               "auth": "modern"
+            }
+          }
+        },
+        {
+          "key": "legacy",
+          "label": "Legacy",
+          "count": 40,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "legacy"
             }
           }
         },
@@ -1186,7 +1207,16 @@
           }
         }
       ],
-      "admins": [
+      "extraAdmins": {
+        "count": 773,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "admins": "extra"
+          }
+        }
+      },
+      "adminAccounts": [
         {
           "name": "admin",
           "devices": 540,
@@ -1236,27 +1266,8 @@
               "admin": "support"
             }
           }
-        },
-        {
-          "name": "extra",
-          "devices": 3,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "admin": "extra"
-            }
-          }
         }
-      ],
-      "extraAdmins": {
-        "count": 773,
-        "link": {
-          "path": "/identity",
-          "params": {
-            "admins": "extra"
-          }
-        }
-      }
+      ]
     },
     "connectivityProblems": {
       "devices": 924,

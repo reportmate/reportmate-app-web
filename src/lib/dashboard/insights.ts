@@ -189,7 +189,7 @@ export interface DirectoryServicesCard {
 export interface UserAccountsCard {
   devices: number;
   authentication: KeyedCount[];
-  admins: { name: string; devices: number; link: InsightLink }[];
+  adminAccounts: { name: string; devices: number; link: InsightLink }[];
   extraAdmins: Counted;
 }
 
@@ -328,7 +328,7 @@ export function normalizeCard(key: string, section: any, scope: string): any {
   if (key === "userAccounts") {
     const auth = section.authentication ?? section.auth ?? [];
     const authList: any[] = Array.isArray(auth) ? auth : Array.isArray(auth?.segments) ? auth.segments : [];
-    const admins: any[] = section.admins ?? section.adminAccounts ?? section.topAdmins ?? [];
+    const admins: any[] = section.adminAccounts ?? section.admins ?? section.topAdmins ?? [];
     return {
       ...section,
       devices: section.devices ?? section.total ?? 0,
@@ -338,7 +338,7 @@ export function normalizeCard(key: string, section: any, scope: string): any {
         label: a.label ?? a.key,
         link: a.link ?? { path: "/identity", params: { auth: String(a.key ?? a.label ?? "").toLowerCase() } },
       })),
-      admins: (Array.isArray(admins) ? admins : []).map((a) => ({
+      adminAccounts: (Array.isArray(admins) ? admins : []).map((a) => ({
         name: a.name ?? a.account ?? a.admin,
         devices: a.devices ?? a.count,
         link: a.link ?? { path: "/identity", params: { admin: a.name ?? a.account ?? a.admin } },

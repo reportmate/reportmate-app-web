@@ -44,7 +44,7 @@ describe('the API fixture', () => {
     expect(Object.values(fixture.cards).some(isCardError)).toBe(false)
   })
   it('links only to reports that read their parameters', () => {
-    const reports = /^\/(system|security|management|hardware|installs|events\/failures|devices|identity|network|device\/[^/]+|applications\/usage\/[^/]+)$/
+    const reports = /^\/(system|security|management|management\/logs|hardware|installs|events\/failures|devices|identity|network|device\/[^/]+|applications\/usage\/[^/]+)$/
     for (const link of collectLinks(fixture.cards)) {
       expect(link.path).toMatch(reports)
       for (const v of Object.values(link.params)) expect(typeof v).toBe('string')

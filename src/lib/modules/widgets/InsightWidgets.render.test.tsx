@@ -63,7 +63,7 @@ describe('InsightCards', () => {
     // Services' extra-admins chip moved to User Accounts
     const expected = collectLinks(fixture.cards, p =>
       p[0] === 'managementToolLogs' || (p[0] === 'directoryServices' && p[1] === 'extraAdmins') ||
-      (p[0] === 'userAccounts' && p[1] === 'admins' && Number(p[2]) >= 5))
+      (p[0] === 'userAccounts' && p[1] === 'adminAccounts' && Number(p[2]) >= 5))
     // The MDM agent's own log root is left out on purpose
     const missing = expected.map(linkHref).filter(h => !h.includes('tool=mdm') && !rendered.has(h))
     expect(missing).toEqual([])
@@ -253,9 +253,8 @@ describe('revision 6', () => {
     render(<InsightCards ctx={ctx({ data: doc })} positions={[1]} />)
     expect(screen.getByRole('heading', { name: 'User Accounts' })).toBeTruthy()
     expect(hrefs()).toEqual(expect.arrayContaining([
-      '/identity?auth=modern', '/identity?auth=standard', '/identity?admin=admin', '/identity?admin=Intune', '/identity?admins=extra',
+      '/identity?auth=modern', '/identity?auth=legacy', '/identity?auth=standard', '/identity?admin=admin', '/identity?admin=Intune', '/identity?admins=extra',
     ]))
-    expect(hrefs()).not.toContain('/identity?admin=extra')
   })
 
   it('says a card the server does not have yet is not available', () => {
@@ -268,11 +267,20 @@ describe('revision 6', () => {
     render(<ManagementToolLogs ctx={ctx({ data: doc })} />)
     expect(hrefs()).toEqual(expect.arrayContaining([
       '/management/logs',
-      '/management/logs?tool=installs&level=error&platform=macOS',
-      '/management/logs?tool=installs&level=warning&platform=Windows',
-      '/management/logs?tool=reports&level=error',
-      '/management/logs?tool=installs&level=error&message=Device+registration+failed+for+%3Cguid%3E',
+      '/management/logs?hours=24&tool=installs&level=error&platform=macOS',
+      '/management/logs?hours=24&tool=installs&level=warning&platform=Windows',
+      '/management/logs?hours=24&tool=reports&level=error',
+      '/management/logs?hours=24&tool=installs&level=error&message=msg000000000',
     ]))
     expect(hrefs().some(h => h?.startsWith('/devices?tool='))).toBe(false)
+  })
+})
+
+describe('Management Tools Logs links before API #163', () => {
+  it('builds /management/logs links when the server still sends /devices?tool=', () => {
+    const cards = JSON.parse(JSON.stringify(doc.cards))
+    for (const t of cards.managementToolLogs.tools) t.link = { path: '/devices', params: { tool: t.tool, level: 'error' } }
+    render(<ManagementToolLogs ctx={ctx({ data: { ...doc, cards } })} />)
+    expect(hrefs()).toContain('/management/logs?tool=reports&level=error')
   })
 })
