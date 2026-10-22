@@ -2,15 +2,24 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
+import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABELS, type AdminsParam, adminsFromParam, matchesAdmins, macDirectory, MAC_DIRECTORY_KEYS, MAC_DIRECTORY_LABELS, type MacDirectory, directoryServiceFromParam, directoryServiceToParam, matchesDirectoryService, DIRECTORY_SERVICE_COLORS_BY_LABEL, authFromParam, authToParam, matchesAuth } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
+
+const IDENTITY_URL = '/api/v1/identity'
+
+const JOIN_TYPES: JoinType[] = ['entra', 'domain', 'hybrid', 'workgroup']
 
 interface IdentityDevice {
   id: string
@@ -134,12 +143,35 @@ function LoadingSkeleton() {
 
 function IdentityPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => peekCached(IDENTITY_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>([])
+  const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>(() => peekCached<IdentityDevice[]>(IDENTITY_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const [adminFilter, setAdminFilter] = useState('all')
+  // `admins=extra` deep-links to the existing "more than one admin" filter;
+  // `admins=2|3|4+` to an exact admin count (4+ is four or more).
+  const [adminFilter, setAdminFilter] = useState<string>(() => {
+    const admins = adminsFromParam(searchParams.get('admins'))
+    return admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all'
+  })
+  const adminCount = adminFilter.startsWith('count:') ? (adminFilter.slice(6) as AdminsParam) : null
+  // `join=entra,hybrid,…`: join type exactly as reportRules.joinType reads it
+  // (the directory donut folds hybrid into Domain Joined; this does not).
+  const [joinFilter, setJoinFilter] = useState<JoinType[]>(() =>
+    paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
+  // `directory=psso,bound,unbound`: a Mac's directory state as the API's
+  // Directory Join card reads it (reportRules.macDirectory); Macs only.
+  const directoryFromParam = (value: string | null): MacDirectory[] => {
+    const values = paramList(value).map(v => v.toLowerCase())
+    return MAC_DIRECTORY_KEYS.filter(k => values.includes(k))
+  }
+  const [macDirectoryFilter, setMacDirectoryFilter] = useState<MacDirectory[]>(() => directoryFromParam(searchParams.get('directory')))
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
@@ -147,9 +179,12 @@ function IdentityPageContent() {
   // Local Admins report mode (flat admin x device view)
   const [showAdminsReport, setShowAdminsReport] = useState(false)
   // Widget click filters
-  const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
-  const [authFilter, setAuthFilter] = useState<string | null>(null)
-  const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(null)
+  // `directory=cloud|domain|trusted|unconfirmed|broken|standard|unjoined`: the
+  // Directory Services widget's classes, the dashboard card's links.
+  const [directoryFilter, setDirectoryFilter] = useState<string | null>(() => directoryServiceFromParam(searchParams.get('directory')))
+  // `auth=modern|legacy|standard` and `admin=<account>`: the User Accounts card's links
+  const [authFilter, setAuthFilter] = useState<string | null>(() => authFromParam(searchParams.get('auth')))
+  const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(() => searchParams.get('admin')?.trim() || null)
   // Mac-only filter chips. Values: 'with-token' | 'missing-token' | null, and
   // 'escrowed' | 'not-escrowed' | null. Each operates independently.
   const [secureTokenFilter, setSecureTokenFilter] = useState<'with-token' | 'missing-token' | null>(null)
@@ -185,8 +220,9 @@ function IdentityPageContent() {
       return next
     })
   }
-  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
+  const hasActiveWidgetFilter = adminFilter !== 'all' || joinFilter.length > 0 || macDirectoryFilter.length > 0 || directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
   const clearWidgetFilters = () => {
+    setAdminFilter('all'); setJoinFilter([]); setMacDirectoryFilter([])
     setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null); setShowAdminsReport(false)
     setSecureTokenFilter(null); setBootstrapTokenFilter(null)
   }
@@ -214,31 +250,112 @@ function IdentityPageContent() {
   useEffect(() => {
     const fetchIdentity = async () => {
       try {
-        const response = await fetch('/api/v1/identity', {
+        const response = await trackedFetch(IDENTITY_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: peekCached(IDENTITY_URL) !== undefined })
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
         
         const data = await response.json()
-        setIdentityDevices(data)
+        setIdentityDevices(rememberCached(IDENTITY_URL, data))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching identity:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(IDENTITY_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchIdentity()
-  }, [])
+  }, [reloadKey])
+
+  // `usage=shared|assigned` names a usage kind; the Selections filter holds raw
+  // inventory values, so select every value of that kind once the rows are in.
+  // `usages=` carries raw values that have no kind.
+  const [urlHydrated, setUrlHydrated] = useState(false)
+  const unmatchedUsageKinds = useRef<string[]>([])
+  // Query strings this page wrote itself, so the URL → state effect below skips them
+  const ownUrlWrites = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (loading || urlHydrated) return
+    setUrlHydrated(true)
+    const kinds = paramList(searchParams.get('usage')).map(v => v.toLowerCase())
+    const raw = paramList(searchParams.get('usages'))
+    if (kinds.length === 0 && raw.length === 0) return
+    const values = new Set(raw)
+    for (const d of identityDevices) {
+      const kind = usageKind(d)
+      if (d.usage && kind && kinds.includes(kind)) values.add(d.usage)
+    }
+    if (values.size > 0) setSelectedUsages(Array.from(values).sort())
+    // No row carries a requested kind yet: keep `usage=` in the URL rather than drop it
+    else unmatchedUsageKinds.current = kinds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, urlHydrated, identityDevices])
+
+  // Keep the deep-link filters in the URL. Waits for the usage hydration so
+  // the first write does not drop `usage=` before the rows arrive.
+  useEffect(() => {
+    if (!urlHydrated) return
+    const params = new URLSearchParams(searchParams.toString())
+    const set = (key: string, value: string | null) => {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    set('admins', adminFilter === 'multiple-admins' ? 'extra' : adminCount)
+    set('join', joinFilter.length > 0 ? JOIN_TYPES.filter(j => joinFilter.includes(j)).join(',') : null)
+    set('directory', macDirectoryFilter.length > 0 ? macDirectoryFilter.join(',') : directoryServiceToParam(directoryFilter))
+    set('auth', authToParam(authFilter))
+    set('admin', adminAccountFilter)
+    const kinds = new Set<string>()
+    const raw: string[] = []
+    for (const u of selectedUsages) {
+      const kind = usageKind({ usage: u })
+      if (kind) kinds.add(kind)
+      else raw.push(u)
+    }
+    if (kinds.size > 0 || raw.length > 0) unmatchedUsageKinds.current = []
+    set('usage', kinds.size > 0
+      ? ['shared', 'assigned'].filter(k => kinds.has(k)).join(',')
+      : unmatchedUsageKinds.current.length ? unmatchedUsageKinds.current.join(',') : null)
+    set('usages', raw.length > 0 ? raw.join(',') : null)
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      ownUrlWrites.current.add(next)
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlHydrated, adminFilter, joinFilter, macDirectoryFilter, directoryFilter, authFilter, adminAccountFilter, selectedUsages])
+
+  // URL → state when the URL changes from outside (a dashboard deep link,
+  // Back) while the page is open; the first render already read it, and the
+  // page's own writes are recognised and skipped.
+  const currentQuery = searchParams.toString()
+  const lastAppliedQuery = useRef(currentQuery)
+  useEffect(() => {
+    if (lastAppliedQuery.current === currentQuery) return
+    lastAppliedQuery.current = currentQuery
+    if (ownUrlWrites.current.delete(currentQuery)) return
+    const admins = adminsFromParam(searchParams.get('admins'))
+    setAdminFilter(admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all')
+    setJoinFilter(paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
+    setMacDirectoryFilter(directoryFromParam(searchParams.get('directory')))
+    setDirectoryFilter(directoryServiceFromParam(searchParams.get('directory')))
+    setAuthFilter(authFromParam(searchParams.get('auth')))
+    setAdminAccountFilter(searchParams.get('admin')?.trim() || null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuery])
 
   // Platform-filtered devices (for widgets — no search/admin filter)
   const platformFilteredDevices = identityDevices.filter(d => {
@@ -265,22 +382,16 @@ function IdentityPageContent() {
     if (adminFilter === 'has-admins' && d.adminUsers === 0) return false
     if (adminFilter === 'no-admins' && d.adminUsers > 0) return false
     if (adminFilter === 'multiple-admins' && d.adminUsers <= 1) return false
-    
-    // Widget click: directory filter
-    if (directoryFilter) {
-      // Trust sub-statuses for domain joined / hybrid
-      if (directoryFilter === 'Broken') {
-        if (d.enrollmentType !== 'Domain Joined' || d.trustStatus !== 'Broken') return false
-      } else if (directoryFilter === 'Unconfirmed') {
-        if (d.enrollmentType !== 'Domain Joined') return false
-        if (d.trustStatus === 'Healthy' || d.trustStatus === 'Broken') return false
-      } else if (directoryFilter === 'Trusted') {
-        if (d.enrollmentType !== 'Domain Joined' || d.trustStatus !== 'Healthy') return false
-      } else {
-        if (d.enrollmentType !== directoryFilter) return false
-      }
+    if (adminCount && !matchesAdmins(d, adminCount)) return false
+    if (joinFilter.length > 0 && !joinFilter.includes(joinType(d))) return false
+    if (macDirectoryFilter.length > 0) {
+      const dir = macDirectory(d)
+      if (!dir || !macDirectoryFilter.includes(dir)) return false
     }
     
+    // Widget click or `directory=`: a Directory Services class (reportRules)
+    if (directoryFilter && !matchesDirectoryService(d, directoryFilter)) return false
+
     // Widget click: admin account filter
     if (adminAccountFilter) {
       if (!matchesAdminFilter(d, adminAccountFilter)) return false
@@ -300,15 +411,7 @@ function IdentityPageContent() {
     }
 
     // Widget click: auth filter
-    if (authFilter) {
-      if (authFilter === 'Modern') {
-        if (!d.authMethod) return false
-      } else if (authFilter === 'Legacy') {
-        if (d.authMethod || !(d.adBound || d.ldapBound)) return false
-      } else if (authFilter === 'Standard') {
-        if (d.authMethod || d.adBound || d.ldapBound) return false
-      }
-    }
+    if (authFilter && !matchesAuth(d, authFilter)) return false
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
@@ -408,19 +511,21 @@ function IdentityPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
         <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="page-container px-4 py-8">
           <LoadingSkeleton />
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -436,6 +541,13 @@ function IdentityPageContent() {
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       User accounts, sessions, and identity management across {filteredDevices.length} devices
                     </p>
+                    <RefreshErrorBanner
+                      error={refreshError}
+                      updatedAt={cachedAt(IDENTITY_URL)}
+                      retrying={retrying}
+                      onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                      className="mt-2 w-fit"
+                    />
                   </div>
                 </div>
               </div>
@@ -523,7 +635,7 @@ function IdentityPageContent() {
                     d.adminUsers || 0,
                     d.currentlyLoggedIn || 0,
                     d.lastSeen || ''
-                  ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                  ].map(csvCell).join(','))
                   
                   const csv = [headers.join(','), ...rows].join('\n')
                   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -573,6 +685,9 @@ function IdentityPageContent() {
                 <span className="font-medium">Filters Active</span>
                 <span className="text-yellow-600 dark:text-yellow-300">
                   {[
+                    adminFilter === 'multiple-admins' ? 'More than one admin' : adminFilter === 'no-admins' ? 'No admin users' : adminCount ? ADMINS_LABELS[adminCount] : null,
+                    joinFilter.length > 0 ? `Join: ${joinFilter.map(j => JOIN_LABELS[j]).join(', ')}` : null,
+                    macDirectoryFilter.length > 0 ? `Mac directory: ${macDirectoryFilter.map(k => MAC_DIRECTORY_LABELS[k]).join(', ')}` : null,
                     directoryFilter,
                     authFilter,
                     adminAccountFilter ? `Admin: ${adminAccountFilter}` : null,
@@ -662,19 +777,12 @@ function IdentityPageContent() {
                       if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
                       
                       const colorMap: Record<string, string> = {
-                        'Cloud Joined': '#10b981',
-                        'Domain Joined': '#f59e0b',
-                        'Standard': '#3b82f6',
-                        'Unjoined': '#ef4444',
+                        ...DIRECTORY_SERVICE_COLORS_BY_LABEL,
                       }
 
                       // Trust sub-counts for domain/hybrid
                       const { trusted, broken, unconfirmed } = identityStats.trustCounts
-                      const trustColors: Record<string, string> = {
-                        'Trusted': '#eab308',
-                        'Unconfirmed': '#f97316',
-                        'Broken': '#ef4444',
-                      }
+                      const trustColors: Record<string, string> = DIRECTORY_SERVICE_COLORS_BY_LABEL
                       // Categories that can expand to show trust sub-items
                       const expandableCategories = ['Domain Joined']
                       // Always show all 3 trust sub-items when expanded (even if count 0)
@@ -1007,7 +1115,7 @@ function IdentityPageContent() {
                     r.device.serialNumber || '',
                     r.device.platform || '',
                     r.device.lastSeen || '',
-                  ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                  ].map(csvCell).join(','))
                   const csv = [headers.join(','), ...csvRows].join('\n')
                   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
                   const url = URL.createObjectURL(blob)

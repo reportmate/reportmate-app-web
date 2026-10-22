@@ -1,0 +1,902 @@
+{
+  "generatedAt": "2026-10-22T15:00:00+00:00",
+  "platform": "all",
+  "includeArchived": false,
+  "computeSeconds": 2.7,
+  "cards": {
+    "installHealth": {
+      "devices": 926,
+      "withErrors": {
+        "count": 6,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "errors"
+          }
+        }
+      },
+      "withWarnings": {
+        "count": 8,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "warnings"
+          }
+        }
+      },
+      "errorItems": {
+        "count": 9,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "errors"
+          }
+        }
+      },
+      "warningItems": {
+        "count": 218,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "warnings"
+          }
+        }
+      },
+      "pending": {
+        "items": 92,
+        "devices": 49,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "pending"
+          }
+        }
+      },
+      "silentAgents": {
+        "count": 11,
+        "thresholdDays": 7,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "stale": "1"
+          }
+        }
+      },
+      "topFailing": [
+        {
+          "name": "SampleAppA",
+          "devices": 3,
+          "link": {
+            "path": "/installs",
+            "params": {
+              "item": "SampleAppA",
+              "filter": "errors"
+            }
+          }
+        },
+        {
+          "name": "SampleAppB",
+          "devices": 1,
+          "link": {
+            "path": "/installs",
+            "params": {
+              "item": "SampleAppB",
+              "filter": "errors"
+            }
+          }
+        }
+      ],
+      "byAgent": [
+        {
+          "agent": "munki",
+          "name": "Munki",
+          "platform": "macOS",
+          "devices": 550,
+          "withErrors": {
+            "count": 1,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "munki"
+              }
+            }
+          },
+          "withWarnings": {
+            "count": 7,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "munki"
+              }
+            }
+          },
+          "errorItems": {
+            "count": 1,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "munki"
+              }
+            }
+          },
+          "warningItems": {
+            "count": 209,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "munki"
+              }
+            }
+          },
+          "pending": {
+            "items": 80,
+            "devices": 40,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "pending",
+                "agent": "munki"
+              }
+            }
+          },
+          "silentAgents": {
+            "count": 4,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "stale": "1",
+                "agent": "munki"
+              }
+            }
+          }
+        },
+        {
+          "agent": "cimian",
+          "name": "Cimian",
+          "platform": "Windows",
+          "devices": 376,
+          "withErrors": {
+            "count": 5,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "cimian"
+              }
+            }
+          },
+          "withWarnings": {
+            "count": 1,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "cimian"
+              }
+            }
+          },
+          "errorItems": {
+            "count": 8,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "cimian"
+              }
+            }
+          },
+          "warningItems": {
+            "count": 9,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "cimian"
+              }
+            }
+          },
+          "pending": {
+            "items": 12,
+            "devices": 9,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "pending",
+                "agent": "cimian"
+              }
+            }
+          },
+          "silentAgents": {
+            "count": 7,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "stale": "1",
+                "agent": "cimian"
+              }
+            }
+          }
+        }
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "rebootDebt": {
+      "devices": 931,
+      "uptime30dPlus": {
+        "count": 38,
+        "link": {
+          "path": "/system",
+          "params": {
+            "uptime": "30d+"
+          }
+        }
+      },
+      "uptime2to4w": {
+        "count": 122,
+        "link": {
+          "path": "/system",
+          "params": {
+            "uptime": "2-4w"
+          }
+        }
+      },
+      "pendingUpdates": {
+        "count": 290,
+        "link": {
+          "path": "/system",
+          "params": {
+            "pending": "1-5,6-10,10+"
+          }
+        }
+      },
+      "deferredUpdates": {
+        "count": 12,
+        "link": {
+          "path": "/system",
+          "params": {
+            "deferred": "1"
+          }
+        }
+      },
+      "uptimeBuckets": [
+        {
+          "key": "lt1d",
+          "label": "< 1 day",
+          "count": 474,
+          "link": {
+            "path": "/system",
+            "params": {
+              "uptime": "lt1d"
+            }
+          }
+        },
+        {
+          "key": "1-3d",
+          "label": "1-3 days",
+          "count": 96,
+          "link": {
+            "path": "/system",
+            "params": {
+              "uptime": "1-3d"
+            }
+          }
+        },
+        {
+          "key": "3-7d",
+          "label": "3-7 days",
+          "count": 98,
+          "link": {
+            "path": "/system",
+            "params": {
+              "uptime": "3-7d"
+            }
+          }
+        },
+        {
+          "key": "1-2w",
+          "label": "1-2 weeks",
+          "count": 95,
+          "link": {
+            "path": "/system",
+            "params": {
+              "uptime": "1-2w"
+            }
+          }
+        },
+        {
+          "key": "2-4w",
+          "label": "2-4 weeks",
+          "count": 122,
+          "link": {
+            "path": "/system",
+            "params": {
+              "uptime": "2-4w"
+            }
+          }
+        },
+        {
+          "key": "30d+",
+          "label": "30+ days",
+          "count": 38,
+          "link": {
+            "path": "/system",
+            "params": {
+              "uptime": "30d+"
+            }
+          }
+        }
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "protectionGaps": {
+      "devices": 931,
+      "gaps": [
+        {
+          "key": "firewall",
+          "label": "Firewall off",
+          "count": 571,
+          "total": 931,
+          "link": {
+            "path": "/security",
+            "params": {
+              "firewall": "off"
+            }
+          }
+        },
+        {
+          "key": "encryption",
+          "label": "Disk encryption off",
+          "count": 151,
+          "total": 931,
+          "link": {
+            "path": "/security",
+            "params": {
+              "encryption": "off"
+            }
+          }
+        },
+        {
+          "key": "secureBoot",
+          "label": "Secure Boot off",
+          "count": 80,
+          "total": 381,
+          "link": {
+            "path": "/security",
+            "params": {
+              "secureBoot": "off"
+            }
+          }
+        },
+        {
+          "key": "antivirus",
+          "label": "Antivirus off",
+          "count": 1,
+          "total": 381,
+          "link": {
+            "path": "/security",
+            "params": {
+              "antivirus": "off"
+            }
+          }
+        },
+        {
+          "key": "sip",
+          "label": "System Integrity Protection off",
+          "count": 1,
+          "total": 550,
+          "link": {
+            "path": "/security",
+            "params": {
+              "sip": "off"
+            }
+          }
+        }
+      ],
+      "withThreats": {
+        "count": 4,
+        "link": {
+          "path": "/security",
+          "params": {
+            "threats": "1"
+          }
+        }
+      },
+      "criticalCves": {
+        "count": 0,
+        "link": {
+          "path": "/security",
+          "params": {
+            "cve": "critical"
+          }
+        }
+      },
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "managementToolLogs": {
+      "error": "Database unavailable",
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "storage": {
+      "error": "Timed out after 20s",
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "checkinGaps": {
+      "hours": 24,
+      "checkinsAllPlatforms": true,
+      "rejected": {
+        "count": 22,
+        "link": {
+          "path": "/events/failures",
+          "params": {
+            "hours": "24"
+          }
+        }
+      },
+      "retried": {
+        "count": 30,
+        "link": {
+          "path": "/events/failures",
+          "params": {
+            "hours": "24",
+            "outcome": "retried"
+          }
+        }
+      },
+      "accepted": {
+        "count": 40,
+        "link": {
+          "path": "/events/failures",
+          "params": {
+            "hours": "24",
+            "outcome": "accepted"
+          }
+        }
+      },
+      "reasons": [
+        {
+          "reason": "invalid_passphrase",
+          "count": 16,
+          "devices": 5,
+          "link": {
+            "path": "/events/failures",
+            "params": {
+              "hours": "24",
+              "reason": "invalid_passphrase"
+            }
+          }
+        },
+        {
+          "reason": "missing_credentials",
+          "count": 6,
+          "devices": 1,
+          "link": {
+            "path": "/events/failures",
+            "params": {
+              "hours": "24",
+              "reason": "missing_credentials"
+            }
+          }
+        }
+      ],
+      "stale": {
+        "count": 48,
+        "link": {
+          "path": "/devices",
+          "params": {
+            "status": "stale"
+          }
+        }
+      },
+      "missing": {
+        "count": 96,
+        "link": {
+          "path": "/devices",
+          "params": {
+            "status": "missing"
+          }
+        }
+      },
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "updateDebt": {
+      "devices": 771,
+      "rated": 771,
+      "onLatest": 609,
+      "pctOnLatest": 79,
+      "minDevices": 5,
+      "behind": {
+        "count": 162,
+        "link": {
+          "path": "/system",
+          "params": {
+            "patch": "behind"
+          }
+        }
+      },
+      "unsupportedMac": {
+        "count": 1,
+        "link": {
+          "path": "/system",
+          "params": {
+            "os": "unsupported"
+          }
+        }
+      },
+      "windows10": {
+        "count": 3,
+        "link": {
+          "path": "/system",
+          "params": {
+            "os": "windows10"
+          }
+        }
+      },
+      "lagging": [
+        {
+          "version": "26.4",
+          "label": "macOS 26.4",
+          "devices": 150,
+          "link": {
+            "path": "/system",
+            "params": {
+              "osVersion": "26.4"
+            }
+          }
+        },
+        {
+          "version": "11.26200",
+          "label": "Windows 11 build 26200",
+          "devices": 12,
+          "link": {
+            "path": "/system",
+            "params": {
+              "osVersion": "11.26200"
+            }
+          }
+        }
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00",
+      "pendingUpdates": {
+        "count": 290,
+        "link": {
+          "path": "/system",
+          "params": {
+            "pending": "1-5,6-10,10+"
+          }
+        }
+      },
+      "deferredUpdates": {
+        "count": 12,
+        "link": {
+          "path": "/system",
+          "params": {
+            "deferred": "1"
+          }
+        }
+      }
+    },
+    "softwareRisk": {
+      "devices": 931,
+      "criticalCves": {
+        "count": 0,
+        "link": {
+          "path": "/security",
+          "params": {
+            "cve": "critical"
+          }
+        }
+      },
+      "exploitedCves": {
+        "count": 0,
+        "link": {
+          "path": "/security",
+          "params": {
+            "cve": "exploited"
+          }
+        }
+      },
+      "itemsBehind": [
+        {
+          "name": "SampleAppC",
+          "devices": 1,
+          "link": {
+            "path": "/installs",
+            "params": {
+              "item": "SampleAppC"
+            }
+          }
+        }
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "expiringCertificates": {
+      "devices": 931,
+      "windowDays": 30,
+      "expiring": {
+        "certificates": 613,
+        "devices": 385,
+        "link": {
+          "path": "/security",
+          "params": {
+            "certs": "expiring"
+          }
+        }
+      },
+      "expiredUser": {
+        "devices": 369,
+        "link": {
+          "path": "/security",
+          "params": {
+            "certs": "expired"
+          }
+        }
+      },
+      "soonest": [
+        {
+          "commonName": "Sample Root CA",
+          "daysUntilExpiry": 0,
+          "devices": 200,
+          "link": {
+            "path": "/security",
+            "params": {
+              "certSearch": "Sample Root CA",
+              "certStatus": "expiring"
+            }
+          }
+        },
+        {
+          "commonName": "Sample Device Cert",
+          "daysUntilExpiry": 12,
+          "devices": 3,
+          "link": {
+            "path": "/security",
+            "params": {
+              "certSearch": "Sample Device Cert",
+              "certStatus": "expiring"
+            }
+          }
+        }
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
+    "directoryServices": {
+      "generatedAt": "2026-10-22T15:00:00+00:00",
+      "devices": 916,
+      "segments": [
+        {
+          "key": "cloud",
+          "label": "Cloud Joined",
+          "count": 313,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "cloud"
+            }
+          }
+        },
+        {
+          "key": "domain",
+          "label": "Domain Joined",
+          "count": 54,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "domain"
+            }
+          },
+          "children": [
+            {
+              "key": "trusted",
+              "label": "Trusted",
+              "count": 40,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "trusted"
+                }
+              }
+            },
+            {
+              "key": "unconfirmed",
+              "label": "Unconfirmed",
+              "count": 10,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "unconfirmed"
+                }
+              }
+            },
+            {
+              "key": "broken",
+              "label": "Broken",
+              "count": 4,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "broken"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "key": "standard",
+          "label": "Standard",
+          "count": 200,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "standard"
+            }
+          }
+        },
+        {
+          "key": "unjoined",
+          "label": "Unjoined",
+          "count": 349,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "directory": "unjoined"
+            }
+          }
+        }
+      ],
+      "shared": {
+        "count": 546,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "usage": "shared"
+          }
+        }
+      },
+      "assigned": {
+        "count": 363,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "usage": "assigned"
+          }
+        }
+      }
+    },
+    "userAccounts": {
+      "generatedAt": "2026-10-22T15:00:00+00:00",
+      "total": 916,
+      "authentication": [
+        {
+          "key": "modern",
+          "label": "Modern",
+          "count": 480,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "modern"
+            }
+          }
+        },
+        {
+          "key": "legacy",
+          "label": "Legacy",
+          "count": 40,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "legacy"
+            }
+          }
+        },
+        {
+          "key": "standard",
+          "label": "Standard",
+          "count": 396,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "auth": "standard"
+            }
+          }
+        }
+      ],
+      "extraAdmins": {
+        "count": 773,
+        "link": {
+          "path": "/identity",
+          "params": {
+            "admins": "extra"
+          }
+        }
+      },
+      "adminAccounts": [
+        {
+          "name": "admin",
+          "devices": 540,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "admin"
+            }
+          }
+        },
+        {
+          "name": "macadmins",
+          "devices": 500,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "macadmins"
+            }
+          }
+        },
+        {
+          "name": "winadmins",
+          "devices": 370,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "winadmins"
+            }
+          }
+        },
+        {
+          "name": "Intune",
+          "devices": 360,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "Intune"
+            }
+          }
+        },
+        {
+          "name": "support",
+          "devices": 12,
+          "link": {
+            "path": "/identity",
+            "params": {
+              "admin": "support"
+            }
+          }
+        }
+      ]
+    },
+    "connectivityProblems": {
+      "devices": 924,
+      "weakSignal": {
+        "count": 3,
+        "link": {
+          "path": "/network",
+          "params": {
+            "signal": "weak"
+          }
+        }
+      },
+      "poorQuality": {
+        "count": 17,
+        "measured": 600,
+        "link": {
+          "path": "/network",
+          "params": {
+            "quality": "poor"
+          }
+        }
+      },
+      "onVpn": {
+        "count": 41,
+        "link": {
+          "path": "/network",
+          "params": {
+            "vpn": "1"
+          }
+        }
+      },
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    }
+  }
+}

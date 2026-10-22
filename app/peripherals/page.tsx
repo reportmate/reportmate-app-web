@@ -2,15 +2,21 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
+import { deviceRoom, paramList } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+
+const PERIPHERALS_URL = '/api/v1/peripherals'
 
 interface Peripheral {
   id: string
@@ -54,6 +60,10 @@ const PERIPHERAL_TYPES = [
 ] as const
 
 type PeripheralTypeKey = typeof PERIPHERAL_TYPES[number]['key']
+
+// `kind=printers,displays` maps onto the type pills; unknown keys are ignored.
+const typesFromParam = (value: string | null): PeripheralTypeKey[] =>
+  paramList(value).filter((k): k is PeripheralTypeKey => PERIPHERAL_TYPES.some(t => t.key === k))
 
 const countOf = (peripheral: Peripheral, field: string): number => {
   const value = (peripheral as any)[field]
@@ -137,12 +147,17 @@ function LoadingSkeleton() {
 
 function PeripheralsPageContent() {
   const searchParams = useSearchParams()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => peekCached(PERIPHERALS_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [peripherals, setPeripherals] = useState<Peripheral[]>([])
+  const [peripherals, setPeripherals] = useState<Peripheral[]>(() => peekCached<Peripheral[]>(PERIPHERALS_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // Multi-select peripheral-type pills, replacing the old dropdown
-  const [selectedTypes, setSelectedTypes] = useState<PeripheralTypeKey[]>([])
+  const [selectedTypes, setSelectedTypes] = useState<PeripheralTypeKey[]>(() => typesFromParam(searchParams.get('kind')))
+  const router = useRouter()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
@@ -157,7 +172,9 @@ function PeripheralsPageContent() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  // `room=<room>[,<room>]` is the Selections "Locations" pill, matched with
+  // reportRules' deviceRoom so the dashboard's count is the rows shown here.
+  const [selectedLocations, setSelectedLocations] = useState<string[]>(() => paramList(searchParams.get('room')))
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   const toggleStatus = (s: string) => setSelectedStatuses(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
@@ -169,7 +186,34 @@ function PeripheralsPageContent() {
   const clearAllSelections = () => {
     setSelectedStatuses([]); setSelectedUsages([]); setSelectedCatalogs([])
     setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
+    setSelectedTypes([])
   }
+
+  // URL → state when the query changes from outside (a dashboard deep link
+  // while the page is open); this page's own writes are skipped.
+  const lastWrittenQuery = useRef<string | null>(null)
+  useEffect(() => {
+    if (searchParams.toString() === lastWrittenQuery.current) return
+    setSelectedTypes(typesFromParam(searchParams.get('kind')))
+    setSelectedLocations(paramList(searchParams.get('room')))
+  }, [searchParams])
+
+  // State → URL: defaults omitted, unrelated params (platform, from) kept,
+  // replaced only when something changed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const set = (key: string, values: string[]) => {
+      if (values.length) params.set(key, values.join(','))
+      else params.delete(key)
+    }
+    set('kind', selectedTypes)
+    set('room', selectedLocations)
+    // Commas stay literal so lists read `kind=printers,displays`, as the contract writes them.
+    const next = params.toString().replace(/%2C/gi, ',')
+    if (next === window.location.search.replace(/^\?/, '')) return
+    lastWrittenQuery.current = next
+    router.replace(next ? `${window.location.pathname}?${next}` : window.location.pathname, { scroll: false })
+  }, [selectedTypes, selectedLocations, router])
 
   // Status is derived from lastSeen, the same rule every other report uses
   const statusOf = (peripheral: Peripheral) =>
@@ -192,31 +236,35 @@ function PeripheralsPageContent() {
   useEffect(() => {
     const fetchPeripherals = async () => {
       try {
-        const response = await fetch('/api/v1/peripherals', {
+        const response = await trackedFetch(PERIPHERALS_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: peekCached(PERIPHERALS_URL) !== undefined })
         
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
         
         const data = await response.json()
-        setPeripherals(data)
+        setPeripherals(rememberCached(PERIPHERALS_URL, data))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching peripherals:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(PERIPHERALS_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchPeripherals()
-  }, [])
+  }, [reloadKey])
 
   const getTotalDevices = (peripheral: Peripheral): number =>
     PERIPHERAL_TYPES.reduce((sum, type) => sum + countOf(peripheral, type.field), 0)
@@ -250,7 +298,7 @@ function PeripheralsPageContent() {
     if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(peripheral))) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(peripheral.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(peripheral.catalog || '')) return false
-    if (selectedLocations.length > 0 && !selectedLocations.includes(peripheral.location || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(deviceRoom(peripheral))) return false
     if (selectedAreas.length > 0 && !selectedAreas.includes(peripheral.area || peripheral.department || '')) return false
     if (selectedFleets.length > 0 && !selectedFleets.includes(peripheral.fleet || '')) return false
 
@@ -331,19 +379,21 @@ function PeripheralsPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
         <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="page-container px-4 py-8">
           <LoadingSkeleton />
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -352,6 +402,13 @@ function PeripheralsPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   USB, Bluetooth, and other connected devices {filteredPeripherals.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(PERIPHERALS_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-4">
                 {/* Search */}
@@ -410,11 +467,11 @@ function PeripheralsPageContent() {
               usages: Array.from(new Set(peripherals.map(p => p.usage).filter(Boolean) as string[])).sort(),
               catalogs: Array.from(new Set(peripherals.map(p => p.catalog).filter(Boolean) as string[])).sort(),
               areas: Array.from(new Set(peripherals.map(p => p.area || p.department).filter(Boolean) as string[])).sort(),
-              locations: Array.from(new Set(peripherals.map(p => p.location).filter(Boolean) as string[])).sort(),
+              locations: Array.from(new Set(peripherals.map(p => deviceRoom(p)).filter(Boolean))).sort(),
               fleets: Array.from(new Set(peripherals.map(p => p.fleet).filter(Boolean) as string[])).sort(),
             }
             const locCounts: Record<string, number> = {}
-            peripherals.forEach(p => { if (p.location) locCounts[p.location] = (locCounts[p.location] || 0) + 1 })
+            peripherals.forEach(p => { const room = deviceRoom(p); if (room) locCounts[room] = (locCounts[room] || 0) + 1 })
             return (
               <DeviceFilters
                 filterOptions={sharedFilterOptions}

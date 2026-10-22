@@ -27,6 +27,8 @@ import {
 import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
 import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
 import { safeHost } from "@/src/lib/security/safeUrl"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { toolLevelFromParam, toolRootFromParam, type ToolLevel } from "@/src/lib/dashboard/reportRules"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
@@ -251,6 +253,21 @@ export default function ClientDeviceDetailPage() {
   // Tab state — always starts as 'info' (SSR-safe), synced to URL hash via effect below
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('info')
+  // Deep link from the Management Tools card: `?tab=management&tool=<root>&level=error|warning`
+  // opens the Management tab with its log viewer on that tool and level.
+  const tabParam = searchParams?.get('tab') ?? null
+  const logTool = toolRootFromParam(searchParams?.get('tool') ?? null)
+  const logLevel = toolLevelFromParam(searchParams?.get('level') ?? null)
+  const handleLogSelectionChange = (tool: string | null, level: ToolLevel | null) => {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (tool) url.searchParams.set('tool', tool)
+    else url.searchParams.delete('tool')
+    if (level) url.searchParams.set('level', level)
+    else url.searchParams.delete('level')
+    if (url.href === window.location.href) return
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
+  }
   
   // UI State
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
@@ -406,12 +423,16 @@ export default function ClientDeviceDetailPage() {
     return hoverColorMap[accentColor as keyof typeof hoverColorMap] || hoverColorMap.blue
   }
   
-  // Unified hash-to-tab sync: runs on mount, deviceId change, and browser back/forward
+  // Unified hash-to-tab sync: runs on mount, deviceId change, and browser back/forward.
+  // With no tab hash, a `?tab=` query parameter (dashboard deep links) picks the tab.
   useEffect(() => {
     const syncHashToTab = () => {
       const hash = window.location.hash.replace('#', '') as TabType
+      const queryTab = (new URLSearchParams(window.location.search).get('tab') || '').toLowerCase() as TabType
       if (hash && tabs.some(tab => tab.id === hash)) {
         setActiveTab(hash)
+      } else if (queryTab && tabs.some(tab => tab.id === queryTab)) {
+        setActiveTab(queryTab)
       } else {
         setActiveTab('info')
       }
@@ -427,7 +448,7 @@ export default function ClientDeviceDetailPage() {
       window.removeEventListener('hashchange', syncHashToTab)
       window.removeEventListener('popstate', syncHashToTab)
     }
-  }, [deviceId])
+  }, [deviceId, tabParam])
 
   // The Management tab's log viewer shows each tool's installed version from
   // the installs module when the client did not report one on the log root.
@@ -579,9 +600,12 @@ export default function ClientDeviceDetailPage() {
   const handleTabChange = async (tabId: TabType) => {
     setActiveTab(tabId)
     if (typeof window !== 'undefined') {
-      // Strip filter param from URL when switching tabs — it's only for initial deep-linking
+      // Strip the deep-link params when switching tabs — they're only for initial deep-linking
       const url = new URL(window.location.href)
       url.searchParams.delete('filter')
+      url.searchParams.delete('tab')
+      url.searchParams.delete('tool')
+      url.searchParams.delete('level')
       url.hash = tabId
       window.history.pushState(null, '', url.toString())
     }
@@ -672,7 +696,7 @@ export default function ClientDeviceDetailPage() {
     
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <DeviceDetailSkeleton isMac={isMac} />
+        <SkeletonTimeout page><DeviceDetailSkeleton isMac={isMac} /></SkeletonTimeout>
       </div>
     )
   }
@@ -778,7 +802,7 @@ export default function ClientDeviceDetailPage() {
       <div className="sticky top-16 z-30 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         {/* Header Bar */}
         <div className="border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
@@ -1088,7 +1112,7 @@ export default function ClientDeviceDetailPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             {/* Desktop tabs - Icon + Hover Labels (always collapsed, expands on hover) */}
             <nav ref={tabsContainerRef} className="hidden sm:flex -mb-px space-x-2 md:space-x-4 lg:space-x-6 xl:space-x-8 justify-start items-center">
@@ -1167,7 +1191,7 @@ export default function ClientDeviceDetailPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
         {/* Info Tab - Always loaded fast */}
         {activeTab === 'info' && (
           <InfoTab device={deviceInfo} />
@@ -1230,6 +1254,9 @@ export default function ClientDeviceDetailPage() {
           <ManagementTab
             device={deviceInfo as unknown as Record<string, unknown>}
             installs={isModuleLoaded('installs') ? (getModuleData('installs') as unknown) : undefined}
+            logTool={logTool}
+            logLevel={logLevel}
+            onLogSelectionChange={handleLogSelectionChange}
           />
         )}
 

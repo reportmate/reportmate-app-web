@@ -15,6 +15,16 @@ import { EventDetails } from "../../src/lib/modules/widgets/EventDetails"
 import { extractInlineDetails, inlineLineClass } from "../../src/lib/eventInlineDetails"
 import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
 import { Search, X } from 'lucide-react'
+import { peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+
+/** The default window: the last 48 hours, as YYYY-MM-DD bounds. */
+const defaultStartDate = () => new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0]
+const defaultEndDate = () => new Date().toISOString().split('T')[0]
+
+/** What the page keeps across navigation for one date window. */
+interface EventsView { events: Event[]; offset: number; hasMore: boolean }
+const eventsCacheKey = (start: string, end: string) => `/api/events#${start}|${end}`
 
 const VALID_EVENT_KINDS: ReadonlyArray<string> = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
@@ -148,8 +158,11 @@ const getEventMessage = (event: BundledEvent): string => {
 
 
 function EventsPageContent() {
-  const [events, setEvents] = useState<Event[]>([])
-  const [loading, setLoading] = useState(true)
+  // The last view of the default window shows instantly on return; the
+  // mount fetch below refreshes its newest page in the background.
+  const [cachedView] = useState(() => peekCached<EventsView>(eventsCacheKey(defaultStartDate(), defaultEndDate())))
+  const [events, setEvents] = useState<Event[]>(() => cachedView?.events ?? [])
+  const [loading, setLoading] = useState(!cachedView)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Multi-select filters: success, warning, error on by default; system (the
@@ -180,8 +193,8 @@ function EventsPageContent() {
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
   const [payloadSearches, setPayloadSearches] = useState<Record<string, string>>({})
   const [, setTotalEvents] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
-  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(() => cachedView?.hasMore ?? true)
+  const [offset, setOffset] = useState(() => cachedView?.offset ?? 0)
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Ref for infinite scroll sentinel
@@ -200,7 +213,7 @@ function EventsPageContent() {
   // Cache every event fetched for the current date window, keyed by id. Type
   // toggles are answered from this cache so the table re-renders in the same
   // frame; the server round-trip only tops the cache up in the background.
-  const allEventsCache = useRef<Event[]>([])
+  const allEventsCache = useRef<Event[]>(cachedView?.events ?? [])
   // Debounce handle for the background top-up fetch that follows a type toggle
   const filterFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -217,14 +230,8 @@ function EventsPageContent() {
   }, [])
 
   // Date range state (default to last 48 hours)
-  const [startDate, setStartDate] = useState(() => {
-    const date = new Date()
-    date.setTime(date.getTime() - (48 * 60 * 60 * 1000)) // 48 hours ago in milliseconds
-    return date.toISOString().split('T')[0] // YYYY-MM-DD format
-  })
-  const [endDate, setEndDate] = useState(() => {
-    return new Date().toISOString().split('T')[0] // Today
-  })
+  const [startDate, setStartDate] = useState(defaultStartDate)
+  const [endDate, setEndDate] = useState(defaultEndDate)
   
   // Filter counts from API (show total counts regardless of current page)
   // REMOVED: No longer displaying counts in filter buttons
@@ -299,7 +306,7 @@ function EventsPageContent() {
       
       // Use Next.js API route with pagination and date filtering parameters
       const apiUrl = `/api/events?${queryParams.toString()}`
-      const response = await fetch(apiUrl)
+      const response = await trackedFetch(apiUrl, undefined, { background: isLoadMore || isFilterChange })
       if (!response.ok) {
         throw new Error('Failed to fetch events')
       }
@@ -380,8 +387,30 @@ function EventsPageContent() {
     return () => clearInterval(timer)
   }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE, LIVE_REFRESH_MS, mergeIntoCache])
 
-  // Initial fetch on mount or date range change (full skeleton)
+  // Initial fetch on mount or date range change. A window seen before in this
+  // tab renders from the cache and only its newest page is fetched again.
   useEffect(() => {
+    const cached = peekCached<EventsView>(eventsCacheKey(startDate, endDate))
+    if (cached) {
+      allEventsCache.current = cached.events
+      setEvents(cached.events)
+      setOffset(cached.offset)
+      setHasMore(cached.hasMore)
+      setLoading(false)
+      const queryParams = new URLSearchParams({ limit: String(EVENTS_PER_PAGE), offset: '0' })
+      if (startDate) queryParams.append('startDate', new Date(startDate + 'T00:00:00.000Z').toISOString())
+      if (endDate) queryParams.append('endDate', new Date(endDate + 'T23:59:59.999Z').toISOString())
+      if (activeFilters.size > 0) queryParams.append('type', [...activeFilters].join(','))
+      trackedFetch(`/api/events?${queryParams.toString()}`, undefined, { background: true })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (data?.success && Array.isArray(data.events)) {
+            setEvents(mergeIntoCache(data.events.filter((event: Event) => VALID_EVENT_KINDS.includes(event.kind?.toLowerCase()))))
+          }
+        })
+        .catch(() => { /* the live poll retries */ })
+      return
+    }
     allEventsCache.current = []
     setEvents([])
     setOffset(0)
@@ -412,6 +441,12 @@ function EventsPageContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilters])
+
+  // Keep this window's view for the next visit
+  useEffect(() => {
+    if (loading) return
+    rememberCached<EventsView>(eventsCacheKey(startDate, endDate), { events: allEventsCache.current, offset, hasMore })
+  }, [events, offset, hasMore, loading, startDate, endDate])
 
   // Keep refs in sync with state so the observer callback always sees fresh values
   useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
@@ -919,7 +954,7 @@ function EventsPageContent() {
   // REMOVED: No longer displaying counts - filters now work without count display
 
   if (loading) {
-    return <EventsPageSkeleton />
+    return <SkeletonTimeout page error={error} onRetry={() => fetchEvents(0, false)}><EventsPageSkeleton /></SkeletonTimeout>
   }
 
   // Show error inline in the table instead of full-page error
@@ -929,7 +964,7 @@ function EventsPageContent() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8">
             <div className="flex items-center gap-4 h-16">
               <Link
                 href="/dashboard"
@@ -977,7 +1012,7 @@ function EventsPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+      <div className="flex-1 flex flex-col min-h-0 page-container px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
 
 
         {/* Events Table */}
@@ -1955,7 +1990,7 @@ function EventsPageContent() {
 
 export default function EventsPage() {
   return (
-    <Suspense fallback={<EventsPageSkeleton />}>
+    <Suspense fallback={<SkeletonTimeout page><EventsPageSkeleton /></SkeletonTimeout>}>
       <EventsPageContent />
     </Suspense>
   )

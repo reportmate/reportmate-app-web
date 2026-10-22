@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { getDevicePlatform } from '../../../providers/PlatformFilterProvider'
 
 interface Device {
@@ -344,21 +345,48 @@ const PlatformIcon: React.FC<{ platform: string; className?: string }> = ({ plat
   )
 }
 
-const DrillDownBar: React.FC<{ label: string; count: number; total: number }> = ({ label, count, total }) => {
+const DrillDownBar: React.FC<{ label: string; count: number; total: number; href?: string }> = ({ label, count, total, href }) => {
   const pct = total > 0 ? (count / total) * 100 : 0
-  return (
-    <div className="flex items-center gap-2 text-xs">
+  const body = (
+    <>
       <span className="w-40 flex-shrink-0 text-gray-600 dark:text-gray-400 truncate" title={label}>{label}</span>
       <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
         <div className="h-full rounded-full transition-all duration-300 bg-purple-800" style={{ width: `${pct}%` }} />
       </div>
       <span className="w-8 text-right tabular-nums text-gray-500 dark:text-gray-400">{count}</span>
-    </div>
+    </>
+  )
+  return href ? (
+    <Link href={href} className="flex items-center gap-2 text-xs rounded px-1 -mx-1 hover:bg-gray-100 dark:hover:bg-gray-700/60">
+      {body}
+    </Link>
+  ) : (
+    <div className="flex items-center gap-2 text-xs">{body}</div>
   )
 }
 
+/** Platform as the global `platform` URL parameter spells it. */
+const platformParam = (platform: string): string | null =>
+  platform === 'macOS' ? 'mac' : platform === 'Windows' ? 'win' : null
+
+/** A /devices (or /hardware for architecture) link narrowed to one drill-down value. */
+const drillDownHref = (dimension: 'architecture' | 'usage' | 'catalog' | 'department', value: string, platform?: string, usage?: string): string => {
+  const params = new URLSearchParams()
+  const p = platform ? platformParam(platform) : null
+  if (p) params.set('platform', p)
+  if (usage) params.set('usage', usage)
+  if (dimension === 'architecture') {
+    const arm = value === 'arm64'
+    const family = platform === 'Windows' ? (arm ? 'ARM64' : 'x64') : (arm ? 'Apple Silicon' : 'Intel')
+    params.set('arch', family)
+    return `/hardware?${params.toString()}`
+  }
+  params.set(dimension === 'department' ? 'area' : dimension, value)
+  return `/devices?${params.toString()}`
+}
+
 // Sub-component: collapsible section inside an expanded platform card
-const DrillDownSection: React.FC<{ title: string; data: { [key: string]: number }; total: number }> = ({ title, data, total }) => {
+const DrillDownSection: React.FC<{ title: string; data: { [key: string]: number }; total: number; hrefFor?: (label: string) => string }> = ({ title, data, total, hrefFor }) => {
   const entries = Object.entries(data).sort((a, b) => b[1] - a[1])
   if (entries.length === 0) return null
   return (
@@ -366,7 +394,7 @@ const DrillDownSection: React.FC<{ title: string; data: { [key: string]: number 
       <h5 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">{title}</h5>
       <div className="space-y-1">
         {entries.map(([label, count]) => (
-          <DrillDownBar key={label} label={label} count={count} total={total} />
+          <DrillDownBar key={label} label={label} count={count} total={total} href={hrefFor?.(label)} />
         ))}
       </div>
     </div>
@@ -472,6 +500,7 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
   if (singlePlatformMode && usageStats.length > 0) {
     const platform = platformStats[0]
     const displayName = platform.platform === 'macOS' ? 'Macintosh' : platform.platform
+    const singlePlatform = platform.platform
     const totalDevices = platform.count
     // A bar either has a real usage value or it is not a bar; the unclassified
     // remainder is a footnote, not a category.
@@ -517,7 +546,14 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
                 </div>
 
                 <div className="flex-shrink-0 flex items-center gap-3">
-                  <span className="font-semibold text-lg tabular-nums text-gray-900 dark:text-white">{stats.count}</span>
+                  <Link
+                    href={drillDownHref('usage', stats.usage, singlePlatform)}
+                    onClick={e => e.stopPropagation()}
+                    title={`Open ${stats.usage} devices`}
+                    className="font-semibold text-lg tabular-nums text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
+                  >
+                    {stats.count}
+                  </Link>
                 </div>
 
                 <svg
@@ -530,9 +566,9 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
 
               {isExpanded && (
                 <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-4">
-                  <DrillDownSection title="Architecture" data={stats.architectures} total={stats.count} />
-                  <DrillDownSection title="Catalog" data={stats.catalogs} total={stats.count} />
-                  <DrillDownSection title="Department" data={stats.departments} total={stats.count} />
+                  <DrillDownSection title="Architecture" data={stats.architectures} total={stats.count} hrefFor={v => drillDownHref('architecture', v, singlePlatform, stats.usage)} />
+                  <DrillDownSection title="Catalog" data={stats.catalogs} total={stats.count} hrefFor={v => drillDownHref('catalog', v, singlePlatform, stats.usage)} />
+                  <DrillDownSection title="Department" data={stats.departments} total={stats.count} hrefFor={v => drillDownHref('department', v, singlePlatform, stats.usage)} />
                 </div>
               )}
             </div>
@@ -637,7 +673,14 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
 
               {/* Device count - prominent */}
               <div className="flex-shrink-0 flex items-center gap-3">
-                <span className="font-semibold text-lg tabular-nums text-gray-900 dark:text-white">{stats.count}</span>
+                <Link
+                  href={platformParam(stats.platform) ? `/devices?platform=${platformParam(stats.platform)}` : '/devices'}
+                  onClick={e => e.stopPropagation()}
+                  title={`Open ${displayName} devices`}
+                  className="font-semibold text-lg tabular-nums text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
+                >
+                  {stats.count}
+                </Link>
               </div>
 
               {/* Expand chevron */}
@@ -653,16 +696,16 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
             {isExpanded && (
               <div className="border-t border-gray-200 dark:border-gray-700 px-4 py-4 bg-gray-50/50 dark:bg-gray-800/50 space-y-4">
                 {/* Architecture breakdown */}
-                <DrillDownSection title="Architecture" data={stats.architectures} total={stats.count} />
+                <DrillDownSection title="Architecture" data={stats.architectures} total={stats.count} hrefFor={v => drillDownHref('architecture', v, stats.platform)} />
 
                 {/* Usage breakdown */}
-                <DrillDownSection title="Usage" data={stats.usages} total={stats.count} />
+                <DrillDownSection title="Usage" data={stats.usages} total={stats.count} hrefFor={v => drillDownHref('usage', v, stats.platform)} />
 
                 {/* Catalog breakdown */}
-                <DrillDownSection title="Catalog" data={stats.catalogs} total={stats.count} />
+                <DrillDownSection title="Catalog" data={stats.catalogs} total={stats.count} hrefFor={v => drillDownHref('catalog', v, stats.platform)} />
 
                 {/* Department breakdown */}
-                <DrillDownSection title="Department" data={stats.departments} total={stats.count} />
+                <DrillDownSection title="Department" data={stats.departments} total={stats.count} hrefFor={v => drillDownHref('department', v, stats.platform)} />
               </div>
             )}
           </div>

@@ -15,6 +15,7 @@ import { ExtensionsTable } from '../tables/ExtensionsTable'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
 import { formatLicenseSource } from '../../lib/modules/graphs/LicenseSourceChart'
+import { cveHref } from '../../lib/security/safeUrl'
 
 // Extract build number from Windows version string (e.g., "10.0.26200" → "26200")
 function extractBuildNumber(version: string | undefined): string {
@@ -577,7 +578,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                     <td className="px-3 py-3 whitespace-nowrap">
                       {update.kbNumber ? (
                         <a
-                          href={`https://support.microsoft.com/help/${update.kbNumber.replace('KB', '')}`}
+                          href={`https://support.microsoft.com/help/${encodeURIComponent(update.kbNumber.replace('KB', ''))}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm font-mono text-blue-600 dark:text-blue-400 hover:underline"
@@ -613,7 +614,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                           {update.cves.slice(0, 2).map((cve) => (
                             <a
                               key={cve}
-                              href={`https://msrc.microsoft.com/update-guide/vulnerability/${cve}`}
+                              href={cveHref(cve, undefined, 'windows')}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-mono text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:underline"

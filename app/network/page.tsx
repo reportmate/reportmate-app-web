@@ -2,9 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { extractNetwork } from "@/src/lib/data-processing/modules/network"
 import { useDeviceData } from "@/src/hooks/useDeviceData"
 import { usePlatformFilterSafe, getDevicePlatform } from "@/src/providers/PlatformFilterProvider"
@@ -13,6 +13,13 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
+import { connectionKind, isPoorNetworkQuality, signalPercent } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
+
+const NETWORK_URL = '/api/v1/network'
 
 interface NetworkDevice {
   id: string
@@ -31,19 +38,52 @@ interface NetworkDevice {
   raw: any
 }
 
-/** A device's signal strength as a percentage, whichever type the client sent. */
-function signalPercent(device: { networkInfo: { signalStrength?: string | number } }): number {
-  const value = Number(device.networkInfo.signalStrength)
-  return Number.isFinite(value) ? value : 0
+type ConnectionFilter = 'all' | 'wired' | 'wireless' | 'vpn'
+type SignalBucket = 'excellent' | 'good' | 'fair' | 'poor'
+
+/**
+ * The Signal Quality widget's buckets. signalStrength arrives as a number from
+ * one client and as a string from the other, so reportRules reads it as a
+ * number. "Poor" is reportRules' isWeakSignal, the dashboard's `signal=weak`.
+ */
+function signalBucket(device: { networkInfo: unknown }): SignalBucket | null {
+  const signal = signalPercent(device)
+  if (signal >= 75) return 'excellent'
+  if (signal >= 50) return 'good'
+  if (signal >= 25) return 'fair'
+  if (signal > 0) return 'poor'
+  return null
 }
 
+// `connection=wired|wifi` maps onto the page's Wired / Wireless toggle;
+// `signal=weak` onto the Signal Quality widget's Poor row.
+// `vpn=1` (the dashboard's Connectivity Problems link) is the VPN toggle too.
+const connectionFromParams = (params: URLSearchParams): ConnectionFilter =>
+  params.get('vpn') === '1' ? 'vpn' : connectionFromParam(params.get('connection'))
+const connectionFromParam = (value: string | null): ConnectionFilter =>
+  value === 'wired' ? 'wired' : value === 'wifi' || value === 'wireless' ? 'wireless' : value === 'vpn' ? 'vpn' : 'all'
+const connectionToParam = (filter: ConnectionFilter): string | null =>
+  filter === 'wired' ? 'wired' : filter === 'wireless' ? 'wifi' : filter === 'vpn' ? 'vpn' : null
+const signalFromParam = (value: string | null): SignalBucket | null =>
+  value === 'weak' || value === 'poor' ? 'poor'
+    : value === 'excellent' || value === 'good' || value === 'fair' ? value : null
+const signalToParam = (bucket: SignalBucket | null): string | null =>
+  bucket === 'poor' ? 'weak' : bucket
+
 function NetworkPageContent() {
-  const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>([])
-  const [loading, setLoading] = useState(true)
+  const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>(() => peekCached<NetworkDevice[]>(NETWORK_URL) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(NETWORK_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless' | 'vpn'>('all')
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const [connectionFilter, setConnectionFilter] = useState<ConnectionFilter>(() => connectionFromParams(searchParams))
+  const [signalFilter, setSignalFilter] = useState<SignalBucket | null>(() => signalFromParam(searchParams.get('signal')))
+  const [poorQualityOnly, setPoorQualityOnly] = useState(() => searchParams.get('quality') === 'poor')
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
@@ -124,6 +164,8 @@ function NetworkPageContent() {
     setSelectedAreas([])
     setSelectedFleets([])
     setConnectionFilter('all')
+    setSignalFilter(null)
+    setPoorQualityOnly(false)
     setSearchQuery('')
   }
 
@@ -137,15 +179,46 @@ function NetworkPageContent() {
     if (urlSearch) setSearchQuery(urlSearch)
   }, [searchParams])
 
+  // URL → state when the query changes from outside (a dashboard deep link
+  // while the page is open). Our own writes are skipped by comparing against
+  // the last query string this page wrote.
+  const lastWrittenQuery = useRef<string | null>(null)
+  useEffect(() => {
+    const current = searchParams.toString()
+    if (current === lastWrittenQuery.current) return
+    setConnectionFilter(connectionFromParams(searchParams))
+    setSignalFilter(signalFromParam(searchParams.get('signal')))
+    setPoorQualityOnly(searchParams.get('quality') === 'poor')
+  }, [searchParams])
+
+  // State → URL. Reads the live query so unrelated params (platform, from)
+  // survive, omits defaults, and only replaces when something changed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const set = (key: string, value: string | null) => {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    set('connection', connectionFilter === 'vpn' ? null : connectionToParam(connectionFilter))
+    set('vpn', connectionFilter === 'vpn' ? '1' : null)
+    set('signal', signalToParam(signalFilter))
+    set('quality', poorQualityOnly ? 'poor' : null)
+    // Commas stay literal so lists read `kind=printers,displays`, as the contract writes them.
+    const next = params.toString().replace(/%2C/gi, ',')
+    if (next === window.location.search.replace(/^\?/, '')) return
+    lastWrittenQuery.current = next
+    router.replace(next ? `${window.location.pathname}?${next}` : window.location.pathname, { scroll: false })
+  }, [connectionFilter, signalFilter, poorQualityOnly, router])
+
   useEffect(() => {
     const fetchNetworkDevices = async () => {
       try {
         // Use the network API to get device data with network modules
-        const response = await fetch('/api/v1/network', {
+        const response = await trackedFetch(NETWORK_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
-        })
+        }, { background: peekCached(NETWORK_URL) !== undefined })
         
         if (!response.ok) {
           throw new Error(`API request failed: ${response.status}`)
@@ -154,7 +227,8 @@ function NetworkPageContent() {
         const data = await response.json()
         
         if (Array.isArray(data)) {
-          setNetworkDevices(data)
+          setNetworkDevices(rememberCached(NETWORK_URL, data))
+          setRefreshError(null)
           setError(null)
         } else {
           throw new Error('Invalid API response format')
@@ -162,15 +236,21 @@ function NetworkPageContent() {
         
       } catch (error) {
         console.error('Failed to fetch network devices:', error)
-        setError(error instanceof Error ? error.message : 'Unknown error')
-        setNetworkDevices([])
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(NETWORK_URL) === undefined) {
+          setError(error instanceof Error ? error.message : 'Unknown error')
+          setNetworkDevices([])
+        } else {
+          setRefreshError(error instanceof Error ? error.message : String(error))
+        }
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchNetworkDevices()
-  }, [])
+  }, [reloadKey])
 
   // Filter and process network devices
   const processedNetworkDevices = networkDevices.map(networkDevice => {
@@ -292,19 +372,10 @@ function NetworkPageContent() {
     // Signal quality distribution. signalStrength arrives as a number from one
     // client and as a string from the other, so it is read as a number here
     // rather than compared across types.
-    signalExcellent: platformFilteredDevices.filter(n => signalPercent(n) >= 75).length,
-    signalGood: platformFilteredDevices.filter(n => {
-      const signal = signalPercent(n)
-      return signal >= 50 && signal < 75
-    }).length,
-    signalFair: platformFilteredDevices.filter(n => {
-      const signal = signalPercent(n)
-      return signal >= 25 && signal < 50
-    }).length,
-    signalPoor: platformFilteredDevices.filter(n => {
-      const signal = signalPercent(n)
-      return signal > 0 && signal < 25
-    }).length
+    signalExcellent: platformFilteredDevices.filter(n => signalBucket(n) === 'excellent').length,
+    signalGood: platformFilteredDevices.filter(n => signalBucket(n) === 'good').length,
+    signalFair: platformFilteredDevices.filter(n => signalBucket(n) === 'fair').length,
+    signalPoor: platformFilteredDevices.filter(n => signalBucket(n) === 'poor').length
   }
 
   const filteredNetworkDevices = processedNetworkDevices.filter(n => {
@@ -324,16 +395,13 @@ function NetworkPageContent() {
     }
 
     // Connection type filter
+    // Wired / Wireless use reportRules' connectionKind, the dashboard's
+    // `connection=wired|wifi` classification.
     if (connectionFilter !== 'all') {
-      const connectionType = n.networkInfo.connectionType?.toLowerCase() || ''
       if (connectionFilter === 'wired') {
-        if (!(connectionType.includes('ethernet') || connectionType.includes('wired'))) {
-          return false
-        }
+        if (connectionKind(n) !== 'wired') return false
       } else if (connectionFilter === 'wireless') {
-        if (!(connectionType.includes('wireless') || connectionType.includes('wifi'))) {
-          return false
-        }
+        if (connectionKind(n) !== 'wifi') return false
       } else if (connectionFilter === 'vpn') {
         if (!n.networkInfo.vpnActive) {
           return false
@@ -348,6 +416,12 @@ function NetworkPageContent() {
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
     if (selectedAreas.length > 0 && !selectedAreas.includes(inventory?.area || inventory?.department || '')) return false
     if (selectedFleets.length > 0 && !selectedFleets.includes(inventory?.fleet || '')) return false
+
+    // Signal Quality widget filter (Poor is `signal=weak`)
+    if (signalFilter && signalBucket(n) !== signalFilter) return false
+
+    // `quality=poor`: speed test rated Low (reportRules, same rule as the API card)
+    if (poorQualityOnly && !isPoorNetworkQuality(n)) return false
 
     // Network quality widget filter
     if (speedFilter) {
@@ -447,8 +521,9 @@ function NetworkPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
-        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+        <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
           <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden animate-pulse">
             {/* Title Skeleton */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -536,6 +611,7 @@ function NetworkPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 
@@ -560,7 +636,7 @@ function NetworkPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden">
           {/* Title Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -570,6 +646,13 @@ function NetworkPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   IP addresses, MAC addresses, and connectivity status {filteredNetworkDevices.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(NETWORK_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               {loading ? (
                 /* Loading Progress Bar */
@@ -649,6 +732,16 @@ function NetworkPageContent() {
                         </span>
                       )}
                     </button>
+                    {poorQualityOnly && (
+                      <button
+                        onClick={() => setPoorQualityOnly(false)}
+                        title="Remove this filter"
+                        className="px-3 py-1.5 text-sm rounded-lg border bg-red-100 border-red-300 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200 flex items-center gap-1.5"
+                      >
+                        Poor network quality
+                        <span aria-hidden="true">&times;</span>
+                      </button>
+                    )}
                   </div>
                   
                   {/* Export to CSV Button */}
@@ -671,7 +764,7 @@ function NetworkPageContent() {
                           nq?.downlinkCapacity ? parseFloat(nq.downlinkCapacity).toString() : '',
                           nq?.uplinkCapacity ? parseFloat(nq.uplinkCapacity).toString() : '',
                           nq?.idleLatency || ''
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                        ].map(csvCell).join(',')
                       })
                       
                       const csv = [headers.join(','), ...rows].join('\n')
@@ -825,35 +918,26 @@ function NetworkPageContent() {
                   {/* Signal Quality Widget */}
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Signal Quality</h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Excellent</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalExcellent}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-teal-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Good</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalGood}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Fair</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalFair}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Poor</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalPoor}</span>
-                      </div>
+                    <div className="space-y-1">
+                      {([
+                        { key: 'excellent' as const, label: 'Excellent', color: 'bg-green-500', count: wirelessStats.signalExcellent },
+                        { key: 'good' as const, label: 'Good', color: 'bg-teal-500', count: wirelessStats.signalGood },
+                        { key: 'fair' as const, label: 'Fair', color: 'bg-yellow-500', count: wirelessStats.signalFair },
+                        { key: 'poor' as const, label: 'Poor', color: 'bg-red-500', count: wirelessStats.signalPoor },
+                      ]).map(({ key, label, color, count }) => (
+                        <button
+                          key={key}
+                          onClick={() => setSignalFilter(signalFilter === key ? null : key)}
+                          aria-pressed={signalFilter === key}
+                          className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${signalFilter === key ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2.5 h-2.5 rounded-full ${color}`}></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>

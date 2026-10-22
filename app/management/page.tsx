@@ -2,15 +2,46 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { CopyButton } from "@/src/components/ui/CopyButton"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
+import { LAST_SEEN_LABELS, type LastSeenBucket, boolish, lastSeenBucket, lastSeenFromParam, managementProvider, paramList } from "@/src/lib/dashboard/reportRules"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { ManagementShieldIcon, ManagementViewSwitch } from "@/src/components/management/ManagementViewSwitch"
+import { csvCell } from "@/src/lib/csv"
+import { ToolLogsReport } from "@/src/components/management/ToolLogsReport"
+
+const MANAGEMENT_URL = '/api/v1/management'
+
+// The dashboard deep-links here with `?provider=`, `?enrolled=0|1` and
+// `?enrollmentType=` (docs/DASHBOARD-WIDGETS.md). `provider` selects bars in the
+// Providers widget, grouped with managementProvider() exactly as the card
+// counts; the other two show as removable pills in the Filters Active bar.
+// `lastSeen=24h|1-7d|7d+` buckets lastSeen age the way the API's Unmanaged
+// Devices card does. `platform` belongs to the global toggle, which also
+// accepts `platform=macOS|Windows`.
+const OWNED_PARAMS = ['provider', 'enrolled', 'enrollmentType', 'lastSeen']
+
+/** Query string with commas left readable (`provider=Unmanaged,Apple`). */
+const commaQuery = (qs: string) => qs.replace(/%2C/gi, ',')
+
+function parseManagementParams(sp: URLSearchParams) {
+  const enrolled = sp.get('enrolled')
+  return {
+    providers: paramList(sp.get('provider')),
+    enrolled: enrolled === '0' || enrolled === '1' ? enrolled : '',
+    enrollmentTypes: paramList(sp.get('enrollmentType')),
+    lastSeen: lastSeenFromParam(sp.get('lastSeen')),
+  }
+}
 
 interface Management {
   id: string
@@ -26,6 +57,8 @@ interface Management {
   intuneId: string
   tenantName: string
   isEnrolled: boolean
+  /** Provider as the dashboard card groups it (managementProvider): "Unmanaged" when not enrolled. */
+  providerGroup: string
   platform?: string
   // Inventory fields
   usage?: string
@@ -125,12 +158,27 @@ function LoadingSkeleton() {
 
 function ManagementPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [initialUrl] = useState(() => parseManagementParams(new URLSearchParams(searchParams.toString())))
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => peekCached(MANAGEMENT_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [management, setManagement] = useState<Management[]>([])
+  const [management, setManagement] = useState<Management[]>(() => peekCached<Management[]>(MANAGEMENT_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const [providerFilter, setProviderFilter] = useState('all')
+  // Selected Providers-widget bars (`provider=`); empty means all
+  const [providerFilters, setProviderFilters] = useState<string[]>(initialUrl.providers)
+  // `enrolled=0|1` and `enrollmentType=` (raw enrollmentType values)
+  const [enrolledFilter, setEnrolledFilter] = useState(initialUrl.enrolled)
+  const [enrollmentTypeFilters, setEnrollmentTypeFilters] = useState<string[]>(initialUrl.enrollmentTypes)
+  const [lastSeenFilter, setLastSeenFilter] = useState<LastSeenBucket | null>(initialUrl.lastSeen)
+  // Clicking a bar selects just that provider; clicking a selected bar removes it.
+  const selectProvider = (label: string) =>
+    setProviderFilters(prev => (prev.includes(label) ? prev.filter(p => p !== label) : [label]))
   const [enrollmentStatusFilter, setEnrollmentStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   
@@ -215,12 +263,44 @@ function ManagementPageContent() {
     setSelectedLocations([])
     setSelectedFleets([])
     setSelectedUsages([])
-    setProviderFilter('all')
+    setProviderFilters([])
+    setEnrolledFilter('')
+    setEnrollmentTypeFilters([])
+    setLastSeenFilter(null)
     setEnrollmentStatusFilter('all')
     setTypeFilter('all')
     setSearchQuery('')
   }
   
+  // URL sync: state → URL on every change (router.replace, defaults omitted,
+  // other parameters such as `platform` and `from` kept); URL → state only when
+  // the URL changes to something this page did not write, so the effects never loop.
+  const lastUrlRef = useRef(commaQuery(searchParams.toString()))
+
+  useEffect(() => {
+    const current = commaQuery(searchParams.toString())
+    if (current === lastUrlRef.current) return
+    lastUrlRef.current = current
+    const parsed = parseManagementParams(new URLSearchParams(current))
+    setProviderFilters(parsed.providers)
+    setEnrolledFilter(parsed.enrolled)
+    setEnrollmentTypeFilters(parsed.enrollmentTypes)
+    setLastSeenFilter(parsed.lastSeen)
+  }, [searchParams])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    for (const key of OWNED_PARAMS) params.delete(key)
+    if (providerFilters.length) params.set('provider', providerFilters.join(','))
+    if (enrolledFilter) params.set('enrolled', enrolledFilter)
+    if (enrollmentTypeFilters.length) params.set('enrollmentType', enrollmentTypeFilters.join(','))
+    if (lastSeenFilter) params.set('lastSeen', lastSeenFilter)
+    const next = commaQuery(params.toString())
+    if (next === commaQuery(window.location.search.replace(/^\?/, ''))) return
+    lastUrlRef.current = next
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+  }, [providerFilters, enrolledFilter, enrollmentTypeFilters, lastSeenFilter, pathname, router])
+
   // Handle column sort click
   const handleSort = (column: 'device' | 'provider' | 'status' | 'type' | 'deviceId') => {
     if (sortColumn === column) {
@@ -236,11 +316,11 @@ function ManagementPageContent() {
       try {
                 
         // OPTIMIZED: Single consolidated API call for management data with inventory
-        const response = await fetch('/api/v1/management', { 
+        const response = await trackedFetch(MANAGEMENT_URL, { 
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-        })
+        }, { background: peekCached(MANAGEMENT_URL) !== undefined })
         
         if (!response.ok) throw new Error(`Management API failed: ${response.status}`)
         
@@ -273,6 +353,7 @@ function ManagementPageContent() {
             intuneId: mgmt.intuneId || 'N/A',
             tenantName: mgmt.tenantName || '',
             isEnrolled: mgmt.isEnrolled || false,
+            providerGroup: managementProvider(mgmt),
             // Detect platform from multiple sources (API field > OS name > provider heuristic)
             platform: mgmt.platform || 
               mgmt.osName ||
@@ -292,17 +373,21 @@ function ManagementPageContent() {
           }
         })
         
-        setManagement(combinedData)
+        setManagement(rememberCached(MANAGEMENT_URL, combinedData))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching management:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(MANAGEMENT_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchManagement()
-  }, [])
+  }, [reloadKey])
 
   // Subset of management filtered by the global platform filter only — used by widgets
   // so that widget counts respond to the ?platform= URL param (and the platform nav toggle)
@@ -358,15 +443,19 @@ function ManagementPageContent() {
 
   // Get unique providers with counts. "Unmanaged" (no provider detected) is
   // included so it shows as its own bar in the Providers widget.
+  // Grouped with managementProvider(), so the bars match the dashboard card and
+  // `?provider=` links: a device that is not enrolled counts as "Unmanaged".
   const providers = Array.from(new Set(
-    platformFilteredManagement.map(m => m.provider).filter(Boolean)
+    platformFilteredManagement.map(m => m.providerGroup).filter(Boolean)
   )).sort()
 
   // Calculate provider counts
   const providerCounts = providers.reduce((acc, provider) => {
-    acc[provider] = platformFilteredManagement.filter(m => m.provider === provider).length
+    acc[provider] = platformFilteredManagement.filter(m => m.providerGroup === provider).length
     return acc
   }, {} as Record<string, number>)
+  // A provider from the URL with no devices still shows (at 0) so it can be cleared.
+  for (const p of providerFilters) if (!(p in providerCounts)) providerCounts[p] = 0
 
   // Filter management first, then calculate counts based on filtered data
   const baseFilteredManagement = management.filter(m => {
@@ -389,7 +478,16 @@ function ManagementPageContent() {
     }
 
     // Provider filter
-    if (providerFilter !== 'all' && m.provider !== providerFilter) return false
+    if (providerFilters.length > 0 && !providerFilters.includes(m.providerGroup)) return false
+
+    // `enrolled=0|1`
+    if (enrolledFilter && boolish(m.isEnrolled) !== (enrolledFilter === '1')) return false
+
+    // `enrollmentType=` (raw values, comma-separated)
+    if (enrollmentTypeFilters.length > 0 && !enrollmentTypeFilters.includes(m.enrollmentType)) return false
+
+    // `lastSeen=24h|1-7d|7d+`
+    if (lastSeenFilter && lastSeenBucket(m.lastSeen) !== lastSeenFilter) return false
     
     // Enrollment Status filter
     if (enrollmentStatusFilter !== 'all' && m.enrollmentStatus !== enrollmentStatusFilter) return false
@@ -662,13 +760,13 @@ function ManagementPageContent() {
     data, 
     colors,
     onFilter,
-    selectedFilter
+    selectedFilters = []
   }: { 
     title: string; 
     data: { label: string; value: number }[]; 
     colors: Record<string, string>;
     onFilter?: (label: string) => void;
-    selectedFilter?: string;
+    selectedFilters?: string[];
   }) => {
     const total = data.reduce((sum, item) => sum + item.value, 0)
     
@@ -680,13 +778,13 @@ function ManagementPageContent() {
             const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0
             const color = colors[item.label] || colors['default'] || 'bg-gray-500'
             const _bgClass = color.replace('text-', 'bg-').replace('800', '600').replace('900', '600') // Simple heuristic for bar color
-            const isSelected = selectedFilter === item.label
+            const isSelected = selectedFilters.includes(item.label)
             
             return (
               <div 
                 key={item.label}
                 className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
-                onClick={() => onFilter && onFilter(isSelected ? 'all' : item.label)}
+                onClick={() => onFilter && onFilter(item.label)}
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={item.label}>
@@ -715,8 +813,9 @@ function ManagementPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden animate-pulse">
             
             {/* Title Section with Loading Progress */}
@@ -742,6 +841,7 @@ function ManagementPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 
@@ -750,7 +850,7 @@ function ManagementPageContent() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                 <Link
@@ -781,7 +881,7 @@ function ManagementPageContent() {
             </div>
           </div>
         </header>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -806,17 +906,27 @@ function ManagementPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           
           {/* Title Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management Service</h2>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ManagementShieldIcon />
+                  <ManagementViewSwitch current="enrollment" />
+                </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Enrollment status and type, providers, and configurations {filteredManagement.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(MANAGEMENT_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               {loading ? (
                 /* Loading Progress Bar */
@@ -867,7 +977,7 @@ function ManagementPageContent() {
                         m.usage || '',
                         m.catalog || '',
                         m.location || ''
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      ].map(csvCell).join(','))
                       
                       const csv = [headers.join(','), ...rows].join('\n')
                       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -894,7 +1004,10 @@ function ManagementPageContent() {
           </div>
           
           {/* Active Filters Indicator with Clear Button */}
-          {(providerFilter !== 'all' || 
+          {(providerFilters.length > 0 ||
+            enrolledFilter !== '' ||
+            enrollmentTypeFilters.length > 0 || 
+            lastSeenFilter !== null ||
             enrollmentStatusFilter !== 'all' || 
             typeFilter !== 'all' || 
             searchQuery !== '' ||
@@ -913,6 +1026,31 @@ function ManagementPageContent() {
                 <span className="text-yellow-700 dark:text-yellow-300">
                   Showing {filteredManagement.length} of {management.length} devices
                 </span>
+                {[
+                  ...(enrolledFilter
+                    ? [{ key: 'enrolled', label: enrolledFilter === '1' ? 'Enrolled' : 'Not enrolled', clear: () => setEnrolledFilter('') }]
+                    : []),
+                  ...(lastSeenFilter
+                    ? [{ key: 'lastSeen', label: LAST_SEEN_LABELS[lastSeenFilter], clear: () => setLastSeenFilter(null) }]
+                    : []),
+                  ...enrollmentTypeFilters.map(t => ({
+                    key: `enrollmentType=${t}`,
+                    label: `Enrollment type: ${t}`,
+                    clear: () => setEnrollmentTypeFilters(prev => prev.filter(x => x !== t)),
+                  })),
+                ].map(pill => (
+                  <span key={pill.key} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-800/40 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700">
+                    {pill.label}
+                    <button
+                      onClick={pill.clear}
+                      className="hover:text-yellow-950 dark:hover:text-white"
+                      aria-label={`Remove filter ${pill.label}`}
+                      title="Remove filter"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
               </div>
               <button
                 onClick={clearAllFilters}
@@ -982,8 +1120,8 @@ function ManagementPageContent() {
                     'Apple': 'text-gray-600',
                     'default': 'text-purple-600'
                   }}
-                  onFilter={setProviderFilter}
-                  selectedFilter={providerFilter}
+                  onFilter={selectProvider}
+                  selectedFilters={providerFilters}
                 />
 
                 {/* Widget 2: Enrollment Status Donut (Swapped) */}
@@ -1246,10 +1384,16 @@ function ManagementPageContent() {
   )
 }
 
+/** `tab=logs` is the Logs tab (the Fleet Management Tools report); otherwise Enrollment. */
+function ManagementTabs() {
+  const searchParams = useSearchParams()
+  return searchParams.get('tab') === 'logs' ? <ToolLogsReport /> : <ManagementPageContent />
+}
+
 export default function ManagementPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
-      <ManagementPageContent />
+      <ManagementTabs />
     </Suspense>
   )
 }

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useCallback, useMemo, Suspense } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
@@ -10,6 +10,13 @@ import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilt
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
+import {
+  SECURITY_PARAM_RULES,
+  num,
+  paramList,
+  securityThreats,
+  type Row,
+} from "@/src/lib/dashboard/reportRules"
 import {
   CERT_CLASS_ALL,
   certClassLabel,
@@ -19,6 +26,12 @@ import {
   parseCertDeepLink,
   type CertClass,
 } from "@/src/lib/security/certificates"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
+
+const SECURITY_URL = '/api/v1/security'
 
 // ============ TYPE DEFINITIONS ============
 
@@ -159,6 +172,77 @@ interface CertificateResult {
 }
 
 type SortColumn = 'device' | 'encryption' | 'protection' | 'detection' | 'firewall' | 'tampering' | 'remote' | 'certificates' | 'cve'
+
+// ============ URL PARAMETERS ============
+// The dashboard deep-links here with `?encryption=off`, `?certs=expired`, and so
+// on (docs/DASHBOARD-WIDGETS.md). Each parameter filters with the predicate in
+// SECURITY_PARAM_RULES, the same one the dashboard card counts with. Where a
+// widget slice means exactly that predicate, the parameter selects the slice;
+// the rest show as removable pills in the Filters Active bar.
+
+type WidgetKey = 'encryption' | 'detection' | 'firewall' | 'cert' | 'cve'
+
+const PARAM_WIDGET: Record<string, Record<string, { widget: WidgetKey; label: string }>> = {
+  encryption: { off: { widget: 'encryption', label: 'Not Encrypted' } },
+  firewall: { off: { widget: 'firewall', label: 'Disabled' } },
+  threats: { '1': { widget: 'detection', label: 'Threats Detected' } },
+  certs: { expired: { widget: 'cert', label: 'Has Expired' } },
+  cve: { critical: { widget: 'cve', label: 'Critical' } },
+}
+
+const PARAM_PILL_LABELS: Record<string, Record<string, string>> = {
+  encryption: { off: 'Encryption off' },
+  firewall: { off: 'Firewall off' },
+  antivirus: { off: 'Antivirus off' },
+  sip: { off: 'SIP off' },
+  secureBoot: { off: 'Secure Boot off' },
+  threats: { '1': 'Active threats' },
+  certs: { expired: 'Certificates expired', expiring: 'Certificates expiring' },
+  cve: { critical: 'Critical CVEs', exploited: 'Actively exploited CVEs' },
+}
+
+const SECURITY_PARAM_KEYS = Object.keys(SECURITY_PARAM_RULES)
+const CERT_STATUSES = ['all', 'valid', 'expiring', 'expired'] as const
+const OWNED_PARAMS = [...SECURITY_PARAM_KEYS, 'certSearch', 'certStatus']
+
+type ParamFilters = Record<string, string[]>
+
+interface UrlFilterState {
+  widgets: Record<WidgetKey, string>
+  extra: ParamFilters
+  certSearch: string
+  certStatus: string
+}
+
+function parseSecurityParams(sp: URLSearchParams): UrlFilterState {
+  const widgets: Record<WidgetKey, string> = { encryption: '', detection: '', firewall: '', cert: '', cve: '' }
+  const extra: ParamFilters = {}
+  for (const key of SECURITY_PARAM_KEYS) {
+    const values = paramList(sp.get(key)).filter(v => SECURITY_PARAM_RULES[key][v])
+    // A single value that a widget slice already means selects that slice.
+    const mapped = values.length === 1 ? PARAM_WIDGET[key]?.[values[0]] : undefined
+    if (mapped) widgets[mapped.widget] = mapped.label
+    else if (values.length) extra[key] = values
+  }
+  const certStatus = sp.get('certStatus') || 'all'
+  return {
+    widgets,
+    extra,
+    certSearch: sp.get('certSearch') || '',
+    certStatus: (CERT_STATUSES as readonly string[]).includes(certStatus) ? certStatus : 'all',
+  }
+}
+
+/** Query string with commas left readable (`cve=critical,exploited`). */
+const commaQuery = (qs: string) => qs.replace(/%2C/gi, ',')
+
+/** True when a row passes every non-widget parameter; values within one parameter are OR'd. */
+function matchesParamFilters(d: Row, extra: ParamFilters): boolean {
+  for (const [key, values] of Object.entries(extra)) {
+    if (!values.some(v => SECURITY_PARAM_RULES[key]?.[v]?.(d))) return false
+  }
+  return true
+}
 
 // ============ LOADING SKELETON ============
 
@@ -323,13 +407,18 @@ function SecurityPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+  const [initialUrl] = useState(() => parseSecurityParams(new URLSearchParams(searchParams.toString())))
   // Certificate deep links: certs=expired|expiring, certSearch, certStatus, certClass=all
   const [initialCertLink] = useState(() => parseCertDeepLink(searchParams))
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   // Data
-  const [devices, setDevices] = useState<SecurityDevice[]>([])
-  const [loading, setLoading] = useState(true)
+  const [devices, setDevices] = useState<SecurityDevice[]>(() => peekCached<SecurityDevice[]>(SECURITY_URL) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(SECURITY_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   // Filters
@@ -342,14 +431,16 @@ function SecurityPageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
 
   // Widget click-filters
-  const [encryptionFilter, setEncryptionFilter] = useState('')
+  const [encryptionFilter, setEncryptionFilter] = useState(initialUrl.widgets.encryption)
   const [protectionFilter, setProtectionFilter] = useState('')
-  const [detectionFilter, setDetectionFilter] = useState('')
-  const [firewallFilter, setFirewallFilter] = useState('')
+  const [detectionFilter, setDetectionFilter] = useState(initialUrl.widgets.detection)
+  const [firewallFilter, setFirewallFilter] = useState(initialUrl.widgets.firewall)
   const [tamperingFilter, setTamperingFilter] = useState('')
   const [remoteFilter, setRemoteFilter] = useState('')
-  const [certFilter, setCertFilter] = useState<string>(initialCertLink.certFilter)
-  const [cveFilter, setCveFilter] = useState('')
+  const [certFilter, setCertFilter] = useState<string>(initialUrl.widgets.cert || initialCertLink.certFilter)
+  const [cveFilter, setCveFilter] = useState(initialUrl.widgets.cve)
+  // URL parameters with no matching widget slice (antivirus=off, sip=off, …)
+  const [paramFilters, setParamFilters] = useState<ParamFilters>(initialUrl.extra)
 
   // Sorting
   const [sortColumn, setSortColumn] = useState<SortColumn>('device')
@@ -358,7 +449,7 @@ function SecurityPageContent() {
   // Accordion
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
-  const [certSearchExpanded, setCertSearchExpanded] = useState(!!(initialCertLink.certSearch || initialCertLink.certStatus !== 'all'))
+  const [certSearchExpanded, setCertSearchExpanded] = useState(!!(initialUrl.certSearch || initialUrl.certStatus !== 'all'))
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -366,8 +457,13 @@ function SecurityPageContent() {
   )
 
   // Certificate search
-  const [certSearchQuery, setCertSearchQuery] = useState(initialCertLink.certSearch)
-  const [certSearchStatus, setCertSearchStatus] = useState<string>(initialCertLink.certStatus)
+  const [certSearchQuery, setCertSearchQuery] = useState(initialUrl.certSearch)
+  const [certSearchStatus, setCertSearchStatus] = useState(initialUrl.certStatus)
+  // The search last run, which is what `certSearch` / `certStatus` record in the URL
+  // (seeded from the URL so the parameters survive until that search runs).
+  const [certSearchApplied, setCertSearchApplied] = useState<{ query: string; status: string } | null>(() =>
+    initialUrl.certSearch || initialUrl.certStatus !== 'all' ? { query: initialUrl.certSearch, status: initialUrl.certStatus } : null
+  )
   // Off by default: only actionable certificates. On = certClass=all in the URL.
   const [showSystemManaged, setShowSystemManaged] = useState(initialCertLink.showSystemManaged)
   const [certResults, setCertResults] = useState<CertificateResult[]>([])
@@ -375,7 +471,19 @@ function SecurityPageContent() {
   const [certSearchPerformed, setCertSearchPerformed] = useState(false)
   const [selectedCertName, setSelectedCertName] = useState<string | null>(null)
 
-  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || remoteFilter || certFilter || cveFilter)
+  const paramPills = Object.entries(paramFilters).flatMap(([key, values]) =>
+    values.map(value => ({ key, value, label: PARAM_PILL_LABELS[key]?.[value] || `${key}: ${value}` }))
+  )
+  const removeParamFilter = (key: string, value: string) =>
+    setParamFilters(prev => {
+      const next = { ...prev }
+      const remaining = (prev[key] || []).filter(v => v !== value)
+      if (remaining.length) next[key] = remaining
+      else delete next[key]
+      return next
+    })
+
+  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || remoteFilter || certFilter || cveFilter || paramPills.length)
 
   const clearWidgetFilters = () => {
     setEncryptionFilter('')
@@ -386,6 +494,7 @@ function SecurityPageContent() {
     setRemoteFilter('')
     setCertFilter('')
     setCveFilter('')
+    setParamFilters({})
   }
 
   // ============ DATA FETCHING ============
@@ -393,27 +502,31 @@ function SecurityPageContent() {
   useEffect(() => {
     const fetchSecurity = async () => {
       try {
-        const response = await fetch('/api/v1/security', {
+        const response = await trackedFetch(SECURITY_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-        })
+        }, { background: peekCached(SECURITY_URL) !== undefined })
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
         const data = await response.json()
         const enriched = data.map((s: SecurityDevice) => ({
           ...s,
           status: calculateDeviceStatus(s.lastSeen, {}, false, s.inventoryState)
         }))
-        setDevices(enriched)
+        setDevices(rememberCached(SECURITY_URL, enriched))
+        setRefreshError(null)
       } catch (err) {
         console.error('Error fetching security:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(SECURITY_URL) === undefined) setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
     fetchSecurity()
-  }, [])
+  }, [reloadKey])
 
   // ============ CERTIFICATE SEARCH ============
 
@@ -421,6 +534,7 @@ function SecurityPageContent() {
     if (!certSearchQuery.trim() && certSearchStatus === 'all') return
     setCertSearchLoading(true)
     setCertSearchPerformed(true)
+    setCertSearchApplied({ query: certSearchQuery.trim(), status: certSearchStatus })
     try {
       const params = new URLSearchParams()
       if (certSearchQuery.trim()) params.set('search', certSearchQuery.trim())
@@ -443,20 +557,27 @@ function SecurityPageContent() {
     }
   }, [certSearchQuery, certSearchStatus, showSystemManaged])
 
-  // Auto-search when status filter changes (if there's already a search query)
+  // Auto-search when status filter changes (if there's already a search query).
+  // Skips the first run: a search that arrives in the URL runs once, below.
+  const certStatusMountedRef = useRef(false)
   useEffect(() => {
+    if (!certStatusMountedRef.current) {
+      certStatusMountedRef.current = true
+      return
+    }
     if (certSearchQuery.trim() && certSearchStatus !== 'all') {
       searchCertificates()
     }
   }, [certSearchStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Deep link (certSearch / certStatus): run the search once on arrival. A
-  // link carrying both is already searched by the status effect above.
+  // `?certSearch=` / `?certStatus=`: run the search on load (and when a link
+  // changes them while the page is open).
+  const [pendingCertSearch, setPendingCertSearch] = useState(!!(initialUrl.certSearch || initialUrl.certStatus !== 'all'))
   useEffect(() => {
-    const { certSearch, certStatus } = initialCertLink
-    if (certSearch.trim() && certStatus !== 'all') return
-    if (certSearch.trim() || certStatus !== 'all') searchCertificates()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!pendingCertSearch) return
+    setPendingCertSearch(false)
+    searchCertificates()
+  }, [pendingCertSearch, searchCertificates])
 
   // Re-run a search already on screen when the class toggle changes
   useEffect(() => {
@@ -517,9 +638,63 @@ function SecurityPageContent() {
     setSelectedLocations([]); setSelectedFleets([]); setSelectedUsages([])
     setEncryptionFilter(''); setProtectionFilter(''); setDetectionFilter('')
     setFirewallFilter(''); setTamperingFilter(''); setRemoteFilter('')
-    setCertFilter(''); setCveFilter(''); setSearchQuery('')
+    setCertFilter(''); setCveFilter(''); setSearchQuery(''); setParamFilters({})
     setSelectedCertName(null); setCertResults([]); setCertSearchQuery(''); setCertSearchPerformed(false)
+    setCertSearchStatus('all'); setCertSearchApplied(null)
   }
+
+  // ============ URL SYNC ============
+  // State → URL on every filter change (router.replace, defaults omitted, other
+  // parameters such as `platform` and `from` kept). URL → state only when the
+  // URL changes to something this page did not write, e.g. a dashboard link
+  // followed while the page is already open, so the two effects never loop.
+
+  const lastUrlRef = useRef(commaQuery(searchParams.toString()))
+
+  useEffect(() => {
+    const current = commaQuery(searchParams.toString())
+    if (current === lastUrlRef.current) return
+    lastUrlRef.current = current
+    const parsed = parseSecurityParams(new URLSearchParams(current))
+    setEncryptionFilter(parsed.widgets.encryption)
+    setDetectionFilter(parsed.widgets.detection)
+    setFirewallFilter(parsed.widgets.firewall)
+    setCertFilter(parsed.widgets.cert)
+    setCveFilter(parsed.widgets.cve)
+    setParamFilters(parsed.extra)
+    const applied = certSearchApplied ?? { query: '', status: 'all' }
+    if (parsed.certSearch !== applied.query || parsed.certStatus !== applied.status) {
+      setCertSearchQuery(parsed.certSearch)
+      setCertSearchStatus(parsed.certStatus)
+      if (parsed.certSearch || parsed.certStatus !== 'all') {
+        setCertSearchExpanded(true)
+        setPendingCertSearch(true)
+      } else {
+        setCertSearchApplied(null); setCertResults([]); setCertSearchPerformed(false); setSelectedCertName(null)
+      }
+    }
+  }, [searchParams]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    for (const key of OWNED_PARAMS) params.delete(key)
+    const widgetState: Record<WidgetKey, string> = {
+      encryption: encryptionFilter, detection: detectionFilter, firewall: firewallFilter, cert: certFilter, cve: cveFilter,
+    }
+    for (const key of SECURITY_PARAM_KEYS) {
+      const values = Object.entries(PARAM_WIDGET[key] || {})
+        .filter(([, m]) => widgetState[m.widget] === m.label)
+        .map(([value]) => value)
+      for (const v of paramFilters[key] || []) if (!values.includes(v)) values.push(v)
+      if (values.length) params.set(key, values.join(','))
+    }
+    if (certSearchApplied?.query) params.set('certSearch', certSearchApplied.query)
+    if (certSearchApplied && certSearchApplied.status !== 'all') params.set('certStatus', certSearchApplied.status)
+    const next = commaQuery(params.toString())
+    if (next === commaQuery(window.location.search.replace(/^\?/, ''))) return
+    lastUrlRef.current = next
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+  }, [encryptionFilter, detectionFilter, firewallFilter, certFilter, cveFilter, paramFilters, certSearchApplied, pathname, router])
 
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
@@ -563,12 +738,18 @@ function SecurityPageContent() {
   // Detection: prefer active-threat count (excludes ASR blocks which are protection working).
   // Falls back to legacy detectionCount when activeThreatCount isn't in the payload.
   const getDetectionLabel = (d: SecurityDevice): string => {
-    const active = d.activeThreatCount ?? d.detectionCount ?? 0
-    return active > 0 ? 'Threats Detected' : 'Clean'
+    // Same reader as `threats=1` (securityThreats).
+    return securityThreats(d as unknown as Row) > 0 ? 'Threats Detected' : 'Clean'
   }
 
+  // Encryption / Firewall slices use the `encryption=off` / `firewall=off` predicates.
+  const getEncryptionLabel = (d: SecurityDevice): string =>
+    SECURITY_PARAM_RULES.encryption.off(d as unknown as Row) ? 'Not Encrypted' : 'Encrypted'
+  const getFirewallLabel = (d: SecurityDevice): string =>
+    SECURITY_PARAM_RULES.firewall.off(d as unknown as Row) ? 'Disabled' : 'Enabled'
+
   const getCveLabel = (d: SecurityDevice): string => {
-    if (d.criticalCveCount > 0) return 'Critical'
+    if (num(d.criticalCveCount) > 0) return 'Critical'
     if (d.cveCount > 0) return 'Has CVEs'
     return 'None'
   }
@@ -604,10 +785,10 @@ function SecurityPageContent() {
     return counts
   }
 
-  const encryptionCounts = countBy(d => d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted')
+  const encryptionCounts = countBy(getEncryptionLabel)
   const protectionCounts = countBy(getProtectionLabel)
   const detectionCounts = countBy(getDetectionLabel)
-  const firewallCounts = countBy(d => d.firewallEnabled ? 'Enabled' : 'Disabled')
+  const firewallCounts = countBy(getFirewallLabel)
   const tamperingCounts = countBy(getTamperLabel)
   const remoteCounts = countBy(getRemoteLabel)
   const certCounts = countBy(getCertLabel)
@@ -643,14 +824,16 @@ function SecurityPageContent() {
     if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
     if (selectedUsages.length > 0 && d.usage && !selectedUsages.includes(d.usage)) return false
     // Widget filters
-    if (encryptionFilter && (d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted') !== encryptionFilter) return false
+    if (encryptionFilter && getEncryptionLabel(d) !== encryptionFilter) return false
     if (protectionFilter && getProtectionLabel(d) !== protectionFilter) return false
     if (detectionFilter && getDetectionLabel(d) !== detectionFilter) return false
-    if (firewallFilter && (d.firewallEnabled ? 'Enabled' : 'Disabled') !== firewallFilter) return false
+    if (firewallFilter && getFirewallLabel(d) !== firewallFilter) return false
     if (tamperingFilter && getTamperLabel(d) !== tamperingFilter) return false
     if (remoteFilter && getRemoteLabel(d) !== remoteFilter) return false
     if (certFilter && getCertLabel(d) !== certFilter) return false
     if (cveFilter && getCveLabel(d) !== cveFilter) return false
+    // URL parameters without a widget slice (SECURITY_PARAM_RULES)
+    if (!matchesParamFilters(d as unknown as Row, paramFilters)) return false
     // Certificate search filter (from grouped cert results)
     if (certFilterSerials && !certFilterSerials.has(d.serialNumber)) return false
     // Search
@@ -683,13 +866,13 @@ function SecurityPageContent() {
   // ============ CSV EXPORT ============
 
   const exportCSV = () => {
-    const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`
+    const esc = csvCell
     const headers = ['Device Name','Serial Number','Platform','Encryption','Protection Name','Protection Status','Detections','Tampering','Firewall','Access','Expired Certs','Expiring Certs','Vulnerabilities','Critical Vulnerabilities']
     const rows = filteredDevices.map(d => [
       esc(d.deviceName), esc(d.serialNumber), esc(normalizePlatform(d.platform)),
-      d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted',
-      esc(d.antivirusName), d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled',
-      d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : '',
+      esc(d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted'),
+      esc(d.antivirusName), esc(d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled'),
+      esc(d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : ''),
       esc((() => {
         const main = isWin(d)
           ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`
@@ -699,10 +882,10 @@ function SecurityPageContent() {
         if (fwStatus === 'Not Set') return `${main} / FW Off`
         return main
       })()),
-      d.firewallEnabled ? 'On' : 'Off',
-      [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
-      String(getExpiredCertCount(d)), String(d.expiringSoonCertCount),
-      String(d.cveCount), String(d.criticalCveCount),
+      esc(d.firewallEnabled ? 'On' : 'Off'),
+      esc([d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None'),
+      esc(getExpiredCertCount(d)), esc(d.expiringSoonCertCount),
+      esc(d.cveCount), esc(d.criticalCveCount),
     ].join(','))
     const csv = [headers.join(','), ...rows].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -727,8 +910,9 @@ function SecurityPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
-        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+        <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
           <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"></div>
@@ -737,12 +921,13 @@ function SecurityPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
 
           {/* Header */}
@@ -753,6 +938,13 @@ function SecurityPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Security posture across {filteredDevices.length} device{filteredDevices.length !== 1 ? 's' : ''}
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(SECURITY_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative">
@@ -814,6 +1006,19 @@ function SecurityPageContent() {
                 <span className="text-yellow-600 dark:text-yellow-300">
                   {[encryptionFilter, protectionFilter, detectionFilter, firewallFilter, tamperingFilter, remoteFilter, certFilter, cveFilter].filter(Boolean).join(', ')}
                 </span>
+                {paramPills.map(p => (
+                  <span key={`${p.key}=${p.value}`} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-800/40 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700">
+                    {p.label}
+                    <button
+                      onClick={() => removeParamFilter(p.key, p.value)}
+                      className="hover:text-yellow-950 dark:hover:text-white"
+                      aria-label={`Remove filter ${p.label}`}
+                      title="Remove filter"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
               </div>
               <button
                 onClick={clearWidgetFilters}

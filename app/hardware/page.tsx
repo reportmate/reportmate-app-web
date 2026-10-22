@@ -2,9 +2,15 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
+import {
+  archFamily, isLowMemory, isLowStorageBucket, paramList,
+  storageFreeBucket, storageCapacityBucket,
+  STORAGE_FREE_KEYS, STORAGE_FREE_LABELS, STORAGE_CAPACITY_KEYS, STORAGE_CAPACITY_LABELS,
+  type StorageFreeKey, type StorageCapacityKey,
+} from "@/src/lib/dashboard/reportRules"
 import { HardwarePageSkeleton } from "@/src/components/skeleton/HardwarePageSkeleton"
 import { usePlatformFilterSafe, normalizePlatform, getDevicePlatformLabel } from "@/src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
@@ -24,6 +30,12 @@ import {
   DeviceTypeDonutChart 
 } from "@/src/lib/modules/graphs"
 import { FitText } from "@/src/components/ui/FitText"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
+
+const HARDWARE_URL = '/api/v1/hardware'
 
 interface HardwareRecord {
   id: string
@@ -58,11 +70,24 @@ interface HardwareRecord {
 }
 
 function HardwarePageContent() {
-  const [hardware, setHardware] = useState<HardwareRecord[]>([])
-  const [loading, setLoading] = useState(true)
+  const [hardware, setHardware] = useState<HardwareRecord[]>(() => peekCached<HardwareRecord[]>(HARDWARE_URL) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(HARDWARE_URL) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [processorFilter, setProcessorFilter] = useState<string>('all')
+  // Dashboard deep-link filters (?arch=, ?storage=low|lt5|5-10|10-20|20+,
+  // ?capacity=le256|512|1t|2t+, ?memory=le8). They use
+  // the dashboard's own rules, so they sit beside the charts' buckets rather
+  // than in them, and show as removable pills under the search row.
+  const [selectedArchFamilies, setSelectedArchFamilies] = useState<string[]>([])
+  const [lowStorageOnly, setLowStorageOnly] = useState(false)
+  const [storageFreeKeys, setStorageFreeKeys] = useState<StorageFreeKey[]>([])
+  const [capacityKeys, setCapacityKeys] = useState<StorageCapacityKey[]>([])
+  const [lowMemoryOnly, setLowMemoryOnly] = useState(false)
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Accordion states
@@ -208,7 +233,10 @@ function HardwarePageContent() {
     selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length +
     selectedGraphics.length + selectedPlatforms.length + selectedChipConfigs.length + selectedStatuses.length +
     selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
-    selectedAreas.length + selectedFleets.length
+    selectedAreas.length + selectedFleets.length +
+    selectedArchFamilies.length + (lowStorageOnly ? 1 : 0) + (lowMemoryOnly ? 1 : 0) +
+    storageFreeKeys.length + capacityKeys.length +
+    (processorFilter !== 'all' ? 1 : 0)
 
   const clearAllFilters = () => {
     setSelectedModels([])
@@ -226,26 +254,78 @@ function HardwarePageContent() {
     setSelectedLocations([])
     setSelectedAreas([])
     setSelectedFleets([])
+    setSelectedArchFamilies([])
+    setLowStorageOnly(false)
+    setStorageFreeKeys([])
+    setCapacityKeys([])
+    setLowMemoryOnly(false)
+    setProcessorFilter('all')
     setSearchQuery('')
   }
   
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const lastWrittenQuery = useRef<string | null>(null)
+  const urlHydrated = useRef(false)
+  const skipNextUrlWrite = useRef(false)
 
+  // URL → state: on mount and when the URL changes from outside (a dashboard
+  // deep link, Back). The page's own writes are recognised and skipped.
   useEffect(() => {
-    const urlSearch = searchParams.get('search')
-    if (urlSearch) setSearchQuery(urlSearch)
-    const urlProcessor = searchParams.get('processor')
-    if (urlProcessor) setProcessorFilter(urlProcessor)
+    if (urlHydrated.current && searchParams.toString() === lastWrittenQuery.current) return
+    setSearchQuery(searchParams.get('search') || '')
+    setProcessorFilter(searchParams.get('processor') || 'all')
+    setSelectedArchFamilies(paramList(searchParams.get('arch')))
+    // storage= takes `low` (the card's under-10% total) and the free-space
+    // bucket keys, comma-separated; capacity= the capacity bucket keys
+    const storageValues = paramList(searchParams.get('storage')).map(v => v.toLowerCase())
+    setLowStorageOnly(storageValues.includes('low'))
+    setStorageFreeKeys(STORAGE_FREE_KEYS.filter(k => storageValues.includes(k)))
+    const capacityValues = paramList(searchParams.get('capacity')).map(v => v.toLowerCase())
+    setCapacityKeys(STORAGE_CAPACITY_KEYS.filter(k => capacityValues.includes(k)))
+    setLowMemoryOnly(searchParams.get('memory') === 'le8')
+    // type=laptop|desktop is the Device Type chart's own selection
+    const typeLabels: Record<string, string> = { laptop: 'Laptop', desktop: 'Desktop' }
+    setSelectedDeviceTypes(
+      paramList(searchParams.get('type')).map(t => typeLabels[t.toLowerCase()]).filter(Boolean)
+    )
+    urlHydrated.current = true
+    skipNextUrlWrite.current = true
   }, [searchParams])
+
+  // State → URL: defaults omitted, other parameters (platform, from) kept,
+  // replace rather than push so filter changes stay out of history.
+  useEffect(() => {
+    if (!urlHydrated.current) return
+    if (skipNextUrlWrite.current) { skipNextUrlWrite.current = false; return }
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      const put = (key: string, value: string | null) => (value ? params.set(key, value) : params.delete(key))
+      put('search', searchQuery.trim())
+      put('processor', processorFilter !== 'all' ? processorFilter : null)
+      put('arch', selectedArchFamilies.join(','))
+      put('storage', [...(lowStorageOnly ? ['low'] : []), ...storageFreeKeys].join(',') || null)
+      put('capacity', capacityKeys.join(',') || null)
+      put('memory', lowMemoryOnly ? 'le8' : null)
+      put('type', selectedDeviceTypes.map(t => t.toLowerCase()).join(','))
+      const next = params.toString().replace(/%2C/gi, ',')
+      if (next === window.location.search.replace(/^\?/, '')) return
+      lastWrittenQuery.current = next
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery, processorFilter, selectedArchFamilies, lowStorageOnly, storageFreeKeys, capacityKeys,
+      lowMemoryOnly, selectedDeviceTypes, pathname, router])
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const hardwareResponse = await fetch('/api/v1/hardware', {
+        const hardwareResponse = await trackedFetch(HARDWARE_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
-        })
+        }, { background: peekCached(HARDWARE_URL) !== undefined })
         
         if (!hardwareResponse.ok) {
           throw new Error(`Hardware API request failed: ${hardwareResponse.status}`)
@@ -277,21 +357,28 @@ function HardwarePageContent() {
             }
           })
           
-          setHardware(processedData)
+          setHardware(rememberCached(HARDWARE_URL, processedData))
+          setRefreshError(null)
           setError(null)
         } else {
           throw new Error('Invalid hardware API response format')
         }
       } catch (error) {
         console.error('Failed to fetch data:', error)
-        setError(error instanceof Error ? error.message : 'Unknown error')
-        setHardware([])
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(HARDWARE_URL) === undefined) {
+          setError(error instanceof Error ? error.message : 'Unknown error')
+          setHardware([])
+        } else {
+          setRefreshError(error instanceof Error ? error.message : String(error))
+        }
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
     fetchData()
-  }, [])
+  }, [reloadKey])
 
   const processedHardware = hardware.map(hardwareRecord => {
     let architecture = 'Unknown'
@@ -363,7 +450,16 @@ function HardwarePageContent() {
       performanceCores,
       efficiencyCores,
       graphicsCores,
-      graphicsMetalSupport
+      graphicsMetalSupport,
+      // Dashboard rules, read from the record as the API sent it (before the
+      // architecture normalisation above), the same object the card counts.
+      archFamily: archFamily(hardwareRecord),
+      // Measured exactly as the API's storage SQL does, so storage=low is
+      // lt5 + 5-10 and matches the card's Low storage count.
+      lowStorage: isLowStorageBucket(hardwareRecord),
+      storageFreeBucket: storageFreeBucket(hardwareRecord),
+      storageCapacityBucket: storageCapacityBucket(hardwareRecord),
+      lowMemory: isLowMemory(hardwareRecord),
     }
   })
 
@@ -674,6 +770,13 @@ function HardwarePageContent() {
     if (selectedGraphics.length > 0 && !selectedGraphics.includes(getGraphicsName(h))) return false
     if (selectedChipConfigs.length > 0 && !selectedChipConfigs.includes(getChipSku(h))) return false
 
+    // Dashboard deep-link filters
+    if (selectedArchFamilies.length > 0 && !selectedArchFamilies.some(a => a.toLowerCase() === h.archFamily.toLowerCase())) return false
+    if (lowStorageOnly && !h.lowStorage) return false
+    if (storageFreeKeys.length > 0 && !(h.storageFreeBucket && storageFreeKeys.includes(h.storageFreeBucket))) return false
+    if (capacityKeys.length > 0 && !(h.storageCapacityBucket && capacityKeys.includes(h.storageCapacityBucket))) return false
+    if (lowMemoryOnly && !h.lowMemory) return false
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       const processorSearchStr = typeof h.processor === 'string' ? h.processor.toLowerCase() : 
@@ -782,11 +885,35 @@ function HardwarePageContent() {
     try { await navigator.clipboard.writeText(text) } catch { /* fallback */ }
   }
 
-  if (loading) return <HardwarePageSkeleton />
+  // Removable pills for the active filters that have no chart selection showing them
+  const deepLinkPills: { key: string; label: string; clear: () => void }[] = [
+    ...selectedArchFamilies.map(a => ({
+      key: `arch-${a}`,
+      label: a,
+      clear: () => setSelectedArchFamilies(prev => prev.filter(x => x !== a)),
+    })),
+    ...(lowStorageOnly ? [{ key: 'storage', label: 'Low storage (under 10% free)', clear: () => setLowStorageOnly(false) }] : []),
+    ...storageFreeKeys.map(k => ({
+      key: `storage-${k}`,
+      label: STORAGE_FREE_LABELS[k],
+      clear: () => setStorageFreeKeys(prev => prev.filter(x => x !== k)),
+    })),
+    ...capacityKeys.map(k => ({
+      key: `capacity-${k}`,
+      label: `Capacity: ${STORAGE_CAPACITY_LABELS[k]}`,
+      clear: () => setCapacityKeys(prev => prev.filter(x => x !== k)),
+    })),
+    ...(lowMemoryOnly ? [{ key: 'memory', label: '8 GB memory or less', clear: () => setLowMemoryOnly(false) }] : []),
+    ...(processorFilter !== 'all'
+      ? [{ key: 'processor', label: `Processor: ${processorFilter}`, clear: () => setProcessorFilter('all') }]
+      : []),
+  ]
+
+  if (loading) return <SkeletonTimeout page><HardwarePageSkeleton /></SkeletonTimeout>
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden">
           
           {/* Title Section */}
@@ -797,6 +924,13 @@ function HardwarePageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Processor, memory, storage, and architecture details - {filteredHardware.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(HARDWARE_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-4">
                 <div className="relative max-w-xs">
@@ -806,12 +940,34 @@ function HardwarePageContent() {
                   <input type="text" placeholder="Search devices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
                 </div>
                 {(totalActiveFilters > 0 || searchQuery) && <button onClick={clearAllFilters} className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap">Clear Selection</button>}
-                <button onClick={() => { const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Model', 'Processor', 'Memory', 'Storage', 'Architecture']; const rows = filteredHardware.map(h => [h.deviceName || '', h.serialNumber || '', h.assetTag || '', getDeviceModel(h), getProcessorName(h), formatMemory(h.memory), formatStorage(h.storage), h.architecture || ''].map(f => `"${String(f).replace(/"/g, '""')}"`).join(',')); const csv = [headers.join(','), ...rows].join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `hardware-report-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }} className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2" title="Export to CSV">
+                <button onClick={() => { const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Model', 'Processor', 'Memory', 'Storage', 'Architecture']; const rows = filteredHardware.map(h => [h.deviceName || '', h.serialNumber || '', h.assetTag || '', getDeviceModel(h), getProcessorName(h), formatMemory(h.memory), formatStorage(h.storage), h.architecture || ''].map(csvCell).join(',')); const csv = [headers.join(','), ...rows].join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `hardware-report-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }} className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2" title="Export to CSV">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   Export CSV
                 </button>
               </div>
             </div>
+            {deepLinkPills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {deepLinkPills.map(pill => (
+                  <span
+                    key={pill.key}
+                    className="inline-flex items-center gap-1 pl-3 pr-1 py-1 text-xs font-medium rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200 border border-orange-200 dark:border-orange-800"
+                  >
+                    {pill.label}
+                    <button
+                      type="button"
+                      onClick={pill.clear}
+                      aria-label={`Remove filter: ${pill.label}`}
+                      className="rounded-full p-0.5 hover:bg-orange-200 dark:hover:bg-orange-800"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Selections accordion (shared component) */}

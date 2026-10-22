@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } from 'react'
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '@/src/lib/time'
@@ -14,6 +14,124 @@ import { getDevicePlatform, usePlatformFilterSafe } from '@/src/providers/Platfo
 import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
+import { hasManagedItem, isSilentAgent, SILENT_AGENT_DAYS, installAgent, installAgentFromParam, INSTALL_AGENT_LABELS, type InstallAgent } from '@/src/lib/dashboard/reportRules'
+import { cachedAt, peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
+import { RefreshErrorBanner } from '@/src/components/ui/RefreshErrorBanner'
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from '@/src/lib/csv'
+
+// The filters payload (~17 MB) is kept parsed in memory for the tab, so a
+// return visit seeds from it instantly. Never stringified, never retried.
+const INSTALLS_FILTERS_URL = '/api/v1/installs/filters'
+// Helper function to classify item status
+const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
+  const status = (item.currentStatus || item.status || '').toLowerCase()
+  
+  // Check for errors first
+  if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
+    return 'error'
+  }
+  // Check for warnings
+  if (status.includes('warning') || status === 'needs-attention') {
+    return 'warning'
+  }
+  // Check for pending removals (separate from other pending)
+  if (status.includes('will-be-removed') || status.includes('removal-requested')) {
+    return 'removed'
+  }
+  // Check for other pending statuses
+  if (status.includes('will-be-installed') || status.includes('update-available') || 
+      status.includes('update_available') || status.includes('pending') || status.includes('scheduled') || 
+      status === 'managed-update-available') {
+    return 'pending'
+  }
+  // Everything else is installed
+  return 'installed'
+}
+
+/**
+ * One Config Report row per device with Munki or Cimian data. Pure, so a
+ * background refresh of the devices can rebuild the report without resetting
+ * the page.
+ */
+function buildConfigReport(devices: any[]): any[] {
+  return devices.map((device: any) => {
+    const cimianConfig = device.modules?.installs?.cimian
+    const munkiConfig = device.modules?.installs?.munki
+    
+    // Prefer Cimian over Munki
+    const config = cimianConfig || munkiConfig
+    const isCimian = !!cimianConfig
+    
+    // Use pre-computed item counts from API (falls back to counting items if available)
+    const counts = config?.itemCounts
+    let installedCount = 0
+    let pendingCount = 0
+    let errorCount = 0
+    let warningCount = 0
+    let removedCount = 0
+    let totalPackages = 0
+    
+    if (counts) {
+      // Use server-side pre-computed counts
+      installedCount = counts.installed || 0
+      pendingCount = counts.pending || 0
+      errorCount = counts.error || 0
+      warningCount = counts.warning || 0
+      removedCount = counts.removed || 0
+      totalPackages = counts.total || 0
+    } else if (config?.items) {
+      // Fallback: count from items array (legacy responses)
+      const items = config.items || []
+      totalPackages = items.length
+      items.forEach((item: any) => {
+        const classification = classifyItemStatus(item)
+        switch (classification) {
+          case 'installed': installedCount++; break
+          case 'pending': pendingCount++; break
+          case 'error': errorCount++; break
+          case 'warning': warningCount++; break
+          case 'removed': removedCount++; break
+        }
+      })
+    }
+    
+    // Get most recent session
+    const sessions = config?.sessions || []
+    const latestSession = sessions.length > 0 ? sessions[0] : null
+    
+    return {
+      deviceId: device.deviceId,
+      serialNumber: device.serialNumber,
+      deviceName: device.modules?.inventory?.deviceName || device.serialNumber,
+      assetTag: device.modules?.inventory?.assetTag || '',
+      usage: device.modules?.inventory?.usage || 'Unknown',
+      catalog: device.modules?.inventory?.catalog || 'Unknown',
+      room: device.modules?.inventory?.location || 'Unknown',
+      location: device.modules?.inventory?.location || 'Unknown',
+      fleet: device.modules?.inventory?.fleet || 'Unknown',
+      // Platform detection: use device.platform first, then derive from configType (Cimian=Windows, Munki=macOS)
+      platform: device.platform || (isCimian ? 'Windows' : munkiConfig ? 'macOS' : 'Unknown'),
+      lastSeen: device.lastSeen,
+      inventoryState: device.inventoryState ?? null,
+      // Config data - Cimian has config sub-object, Munki has fields at root
+      configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
+      clientIdentifier: cimianConfig?.config?.ClientIdentifier || munkiConfig?.clientIdentifier || 'N/A',
+      softwareRepoUrl: cimianConfig?.config?.SoftwareRepoURL || munkiConfig?.softwareRepoURL || 'N/A',
+      version: config?.version || 'N/A',
+      lastSessionStatus: latestSession?.status || 'N/A',
+      totalPackagesManaged: totalPackages,
+      // Item counts by status
+      installedCount,
+      pendingCount,
+      errorCount,
+      warningCount,
+      removedCount
+    }
+  }).filter(d => d.configType !== 'None')
+}
+
+const cachedFilters = () => peekCached<any>(INSTALLS_FILTERS_URL)
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -151,16 +269,29 @@ const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
   },
 }
 
+const URL_STATUS_FILTERS = ['errors', 'warnings', 'pending', 'success'] as const
+const urlStatusFilter = (value: string | null): ItemStatusFilter =>
+  (URL_STATUS_FILTERS as readonly string[]).includes(value || '') ? (value as ItemStatusFilter) : 'all'
+
 function InstallsPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  // Deep-link state read once for the initial render, so the state->URL sync
+  // below starts in agreement with the URL instead of rewriting it.
+  const initialFilter = urlStatusFilter(searchParams.get('filter'))
+  const initialItem = (searchParams.get('item') || '').trim()
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(false)
-  const [filtersLoading, setFiltersLoading] = useState(true)
+  const [filtersLoading, setFiltersLoading] = useState(() => cachedFilters() === undefined)
+  // A failed background refresh keeps the cached filters and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialFilter !== 'all' ? initialItem : '')
   const [filtersExpanded, setFiltersExpanded] = useState(false) // Collapsed by default since Config Report is default view
-  const [devices, setDevices] = useState<any[]>([])
+  const [devices, setDevices] = useState<any[]>(() => (Array.isArray(cachedFilters()?.devices) ? cachedFilters().devices : []))
   const [, startTransition] = useTransition() // For non-blocking state updates
   const [isConfigReport, setIsConfigReport] = useState(false)
   const [configReportData, setConfigReportData] = useState<any[]>([])
@@ -193,7 +324,16 @@ function InstallsPageContent() {
   }
   
   // Status filter state - items filter (errors, warnings, pending, successes)
-  const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>('all')
+  const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>(initialFilter)
+  // `item=<name>` without a status filter: devices that manage that item.
+  // With a status filter the item is the selected item, i.e. searchQuery.
+  const [itemFilter, setItemFilter] = useState(initialFilter === 'all' ? initialItem : '')
+  // `stale=1`: devices whose install agent has been silent > SILENT_AGENT_DAYS
+  const [staleOnly, setStaleOnly] = useState(searchParams.get('stale') === '1')
+  // `agent=munki|cimian`: every view narrowed to devices on that install agent
+  // (Munki = macOS, Cimian = Windows), combined with filter= and stale=.
+  const [agentFilter, setAgentFilter] = useState<InstallAgent | null>(installAgentFromParam(searchParams.get('agent')))
+  const [staleAgents, setStaleAgents] = useState<any[]>(() => (Array.isArray(cachedFilters()?.staleAgents) ? cachedFilters().staleAgents : []))
   // Device status filter (active, stale, missing)
   const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | DeviceStatusFilterValue>('all')
   // Install status filter (installed, pending, warnings, errors, removed)
@@ -202,7 +342,7 @@ function InstallsPageContent() {
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   // How the errors/warnings drill-down is grouped: one row per device, or one
   // row per distinct message so every message is readable without drilling in
-  const [statusView, setStatusView] = useState<'devices' | 'messages'>('devices')
+  const [statusView, setStatusView] = useState<'devices' | 'messages'>(searchParams.get('view') === 'messages' ? 'messages' : 'devices')
   // Message rows cap their device list; this tracks the ones expanded in place
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
 
@@ -210,15 +350,13 @@ function InstallsPageContent() {
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading && !filtersLoading }
   )
-  const searchParams = useSearchParams()
-  const router = useRouter()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   // Apply global platform filter (?platform=mac or ?platform=win)
   // For installs: mac = only devices with Munki data, win = only devices with Cimian data
   // Declared early to avoid temporal dead zone when referenced in handleConfigReport
   const platformFilteredDevices = useMemo(() => {
-    if (platformFilter === 'all') return devices
+    if (platformFilter === 'all' && !agentFilter) return devices
     return devices.filter((device: any) => {
       let platform = getDevicePlatform(device)
       // Installs-specific fallback: use install manager presence when generic platform detection fails
@@ -226,9 +364,24 @@ function InstallsPageContent() {
         if (device.modules?.installs?.cimian) platform = 'Windows'
         else if (device.modules?.installs?.munki) platform = 'macOS'
       }
-      return isPlatformVisible(platform)
+      if (agentFilter && installAgent({ platform, modules: device.modules }) !== agentFilter) return false
+      return platformFilter === 'all' || isPlatformVisible(platform)
     })
-  }, [devices, platformFilter, isPlatformVisible])
+  }, [devices, platformFilter, isPlatformVisible, agentFilter])
+
+  // Serials of the devices the `item` and `stale` deep links keep
+  const itemFilterSerials = useMemo(() => {
+    if (!itemFilter) return null
+    return new Set(platformFilteredDevices
+      .filter((d: any) => hasManagedItem(getDeviceInstallItems(d), itemFilter))
+      .map((d: any) => d.serialNumber))
+  }, [platformFilteredDevices, itemFilter])
+  const staleSerials = useMemo(() => {
+    if (!staleOnly) return null
+    // Platform comes from the device list; staleAgents[].platform is often empty
+    const visible = new Set(platformFilteredDevices.map((d: any) => d.serialNumber))
+    return new Set(staleAgents.filter(isSilentAgent).map((a: any) => a.serialNumber).filter((sn: string) => visible.has(sn)))
+  }, [staleAgents, staleOnly, platformFilteredDevices])
 
   // Filter state
   const [selectedInstalls, setSelectedInstalls] = useState<string[]>([])
@@ -250,7 +403,7 @@ function InstallsPageContent() {
     platforms: string[]
   }>({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], areas: [], platforms: [] })
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>(() => cachedFilters() ?? {
     managedInstalls: [],
     otherInstalls: [],
     totalManagedInstalls: 0,
@@ -323,14 +476,19 @@ function InstallsPageContent() {
     setSelectedPlatforms([])
     setSearchQuery('')
     setItemsStatusFilter('all')
+    setItemFilter('')
+    setStaleOnly(false)
+    setAgentFilter(null)
     setWidgetsExpanded(true)
   }
 
   // Fetch filter options
   const fetchFilterOptions = useCallback(async () => {
     let progressInterval: NodeJS.Timeout | null = null
+    const hasCache = cachedFilters() !== undefined
     try {
-      setFiltersLoading(true)
+      // With cached filters on screen, refresh in the background, no skeleton.
+      if (!hasCache) setFiltersLoading(true)
       setError(null) // Clear any previous errors
       
       // NOTE: sessionStorage caching DISABLED - was causing 60+ second UI freeze
@@ -372,14 +530,14 @@ function InstallsPageContent() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 120000)
       
-      const response = await fetch('/api/v1/installs/filters', {
+      const response = await trackedFetch(INSTALLS_FILTERS_URL, {
         cache: 'no-store',
         credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache'
         },
         signal: controller.signal
-      })
+      }, { background: hasCache })
       
       clearTimeout(timeoutId)
       
@@ -410,7 +568,10 @@ function InstallsPageContent() {
       // Get the actual device count from the response
       const _actualDeviceCount = data.devicesWithData || 0
       
+      rememberCached(INSTALLS_FILTERS_URL, data)
+      setRefreshError(null)
       setFilterOptions(data)
+      setStaleAgents(Array.isArray(data.staleAgents) ? data.staleAgents : [])
       
       // Extract device data from same response (no second API call needed)
       // Use startTransition to make this non-blocking - allows UI to update while processing
@@ -431,6 +592,11 @@ function InstallsPageContent() {
                 return
       }
       console.error('[INSTALLS PAGE] Error fetching filter options:', error)
+      // Keep the cached filters on screen when a background refresh fails.
+      if (hasCache) {
+        setRefreshError(error instanceof Error ? error.message : String(error))
+        return
+      }
       setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
       setLoadingProgress({ current: 0, total: 0 })
     } finally {
@@ -438,6 +604,7 @@ function InstallsPageContent() {
         clearInterval(progressInterval)
       }
       setFiltersLoading(false)
+      setRetrying(false)
     }
   }, [])
 
@@ -575,32 +742,6 @@ function InstallsPageContent() {
            !arraysEqual(selectedPlatforms, lastAppliedFilters.platforms)
   }, [selectedInstalls, selectedUsages, selectedCatalogs, selectedRooms, selectedFleets, selectedAreas, selectedPlatforms, lastAppliedFilters, installs.length])
   
-  // Helper function to classify item status
-  const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
-    const status = (item.currentStatus || item.status || '').toLowerCase()
-    
-    // Check for errors first
-    if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
-      return 'error'
-    }
-    // Check for warnings
-    if (status.includes('warning') || status === 'needs-attention') {
-      return 'warning'
-    }
-    // Check for pending removals (separate from other pending)
-    if (status.includes('will-be-removed') || status.includes('removal-requested')) {
-      return 'removed'
-    }
-    // Check for other pending statuses
-    if (status.includes('will-be-installed') || status.includes('update-available') || 
-        status.includes('update_available') || status.includes('pending') || status.includes('scheduled') || 
-        status === 'managed-update-available') {
-      return 'pending'
-    }
-    // Everything else is installed
-    return 'installed'
-  }
-
   // Config Report handler - now the default view
   const handleConfigReport = useCallback(async () => {
     if (platformFilteredDevices.length === 0) return // Guard against empty devices
@@ -611,81 +752,7 @@ function InstallsPageContent() {
       setFiltersExpanded(false)
       setSearchQuery('')
       
-      // Process devices to extract config data with item counts
-      const configData = platformFilteredDevices.map(device => {
-        const cimianConfig = device.modules?.installs?.cimian
-        const munkiConfig = device.modules?.installs?.munki
-        
-        // Prefer Cimian over Munki
-        const config = cimianConfig || munkiConfig
-        const isCimian = !!cimianConfig
-        
-        // Use pre-computed item counts from API (falls back to counting items if available)
-        const counts = config?.itemCounts
-        let installedCount = 0
-        let pendingCount = 0
-        let errorCount = 0
-        let warningCount = 0
-        let removedCount = 0
-        let totalPackages = 0
-        
-        if (counts) {
-          // Use server-side pre-computed counts
-          installedCount = counts.installed || 0
-          pendingCount = counts.pending || 0
-          errorCount = counts.error || 0
-          warningCount = counts.warning || 0
-          removedCount = counts.removed || 0
-          totalPackages = counts.total || 0
-        } else if (config?.items) {
-          // Fallback: count from items array (legacy responses)
-          const items = config.items || []
-          totalPackages = items.length
-          items.forEach((item: any) => {
-            const classification = classifyItemStatus(item)
-            switch (classification) {
-              case 'installed': installedCount++; break
-              case 'pending': pendingCount++; break
-              case 'error': errorCount++; break
-              case 'warning': warningCount++; break
-              case 'removed': removedCount++; break
-            }
-          })
-        }
-        
-        // Get most recent session
-        const sessions = config?.sessions || []
-        const latestSession = sessions.length > 0 ? sessions[0] : null
-        
-        return {
-          deviceId: device.deviceId,
-          serialNumber: device.serialNumber,
-          deviceName: device.modules?.inventory?.deviceName || device.serialNumber,
-          assetTag: device.modules?.inventory?.assetTag || '',
-          usage: device.modules?.inventory?.usage || 'Unknown',
-          catalog: device.modules?.inventory?.catalog || 'Unknown',
-          room: device.modules?.inventory?.location || 'Unknown',
-          location: device.modules?.inventory?.location || 'Unknown',
-          fleet: device.modules?.inventory?.fleet || 'Unknown',
-          // Platform detection: use device.platform first, then derive from configType (Cimian=Windows, Munki=macOS)
-          platform: device.platform || (isCimian ? 'Windows' : munkiConfig ? 'macOS' : 'Unknown'),
-          lastSeen: device.lastSeen,
-          inventoryState: device.inventoryState ?? null,
-          // Config data - Cimian has config sub-object, Munki has fields at root
-          configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
-          clientIdentifier: cimianConfig?.config?.ClientIdentifier || munkiConfig?.clientIdentifier || 'N/A',
-          softwareRepoUrl: cimianConfig?.config?.SoftwareRepoURL || munkiConfig?.softwareRepoURL || 'N/A',
-          version: config?.version || 'N/A',
-          lastSessionStatus: latestSession?.status || 'N/A',
-          totalPackagesManaged: totalPackages,
-          // Item counts by status
-          installedCount,
-          pendingCount,
-          errorCount,
-          warningCount,
-          removedCount
-        }
-      }).filter(d => d.configType !== 'None')
+      const configData = buildConfigReport(platformFilteredDevices)
       
       setConfigReportData(configData)
       setIsConfigReport(true)
@@ -711,6 +778,8 @@ function InstallsPageContent() {
     setLastAppliedFilters({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], areas: [], platforms: [] })
     setSearchQuery('')
     setItemsStatusFilter('all')
+    setItemFilter('')
+    setStaleOnly(false)
     setDeviceStatusFilter('all')
     setInstallStatusFilter('all')
     // Clear selected filters
@@ -741,6 +810,10 @@ function InstallsPageContent() {
   // Filter and sort config report data
   const filteredConfigData = useMemo(() => {
     let filtered = [...configReportData]
+
+    // Deep-link filters: managed item, silent install agent
+    if (itemFilterSerials) filtered = filtered.filter(device => itemFilterSerials.has(device.serialNumber))
+    if (staleSerials) filtered = filtered.filter(device => staleSerials.has(device.serialNumber))
     
     // Apply device status filter (Active/Stale/Missing based on lastSeen)
     if (deviceStatusFilter !== 'all') {
@@ -851,11 +924,16 @@ function InstallsPageContent() {
     })
     
     return filtered
-  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
+  }, [configReportData, itemFilterSerials, staleSerials, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
   
   // Filter installs based on search query AND inventory filters AND device status AND install status
   const filteredInstalls = useMemo(() => {
     let filtered = installs
+
+    // agent= narrows the generated report too (Munki rows are macOS, Cimian Windows)
+    if (agentFilter) {
+      filtered = filtered.filter(install => installAgent({ platform: install.platform }) === agentFilter)
+    }
     
     // Apply device status filter (Active/Stale/Missing based on lastSeen)
     if (deviceStatusFilter !== 'all') {
@@ -972,7 +1050,7 @@ function InstallsPageContent() {
     })
 
     return sorted
-  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection])
+  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection, agentFilter])
 
   useEffect(() => {
     fetchFilterOptions()
@@ -990,6 +1068,14 @@ function InstallsPageContent() {
     }
   }, [platformFilteredDevices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter, handleConfigReport])
 
+  // A background refresh of the devices rebuilds the Config Report in place,
+  // without the reset handleConfigReport does (search, filters, loading state).
+  useEffect(() => {
+    if (!isConfigReport || platformFilteredDevices.length === 0) return
+    setConfigReportData(buildConfigReport(platformFilteredDevices))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformFilteredDevices])
+
   // Re-generate config report when platform filter changes
   useEffect(() => {
     if (platformFilteredDevices.length > 0 && isConfigReport) {
@@ -998,18 +1084,62 @@ function InstallsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platformFilter])
 
-  // Handle URL filter parameter (from dashboard click-through)
+  // URL is canonical for the drill-down (`filter`, `view`, `item`, `stale`);
+  // defaults are omitted and unrelated params (platform, from) are kept.
+  // Query strings this page wrote itself, so the URL->state effect does not
+  // feed an older write back over newer state (e.g. while typing a search).
+  const ownUrlWritesRef = useRef<Set<string>>(new Set())
+  const currentQuery = searchParams.toString()
+
+  // URL -> state: applies a URL that changed from outside (dashboard
+  // click-through, back/forward). The first render already read it.
+  const lastAppliedQueryRef = useRef(currentQuery)
   useEffect(() => {
-    const filterParam = searchParams.get('filter')
-    if (filterParam === 'errors' || filterParam === 'warnings' || filterParam === 'pending' || filterParam === 'success') {
-      setItemsStatusFilter(filterParam)
-      // Collapse regular filters when viewing status-filtered view
-      setFiltersExpanded(false)
-    } else {
-      setItemsStatusFilter('all')
-    }
+    if (lastAppliedQueryRef.current === currentQuery) return
+    lastAppliedQueryRef.current = currentQuery
+    if (ownUrlWritesRef.current.delete(currentQuery)) return
+    const filterParam = urlStatusFilter(searchParams.get('filter'))
+    const itemParam = (searchParams.get('item') || '').trim()
+    setItemsStatusFilter(filterParam)
+    // Collapse regular filters when viewing status-filtered view
+    if (filterParam !== 'all') setFiltersExpanded(false)
     setStatusView(searchParams.get('view') === 'messages' ? 'messages' : 'devices')
-  }, [searchParams])
+    if (filterParam !== 'all') {
+      setSearchQuery(itemParam)
+      setItemFilter('')
+    } else {
+      setItemFilter(itemParam)
+    }
+    setStaleOnly(searchParams.get('stale') === '1')
+    setAgentFilter(installAgentFromParam(searchParams.get('agent')))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQuery])
+
+  // Collapse the regular filters when the page opens on a status view
+  useEffect(() => {
+    if (initialFilter !== 'all') setFiltersExpanded(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // state -> URL
+  const urlItem = itemsStatusFilter !== 'all' ? searchQuery.trim() : itemFilter
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const set = (key: string, value: string | null) => {
+      if (value) params.set(key, value)
+      else params.delete(key)
+    }
+    set('filter', itemsStatusFilter !== 'all' ? itemsStatusFilter : null)
+    set('view', statusView === 'messages' ? 'messages' : null)
+    set('item', urlItem || null)
+    set('stale', staleOnly ? '1' : null)
+    set('agent', agentFilter)
+    const next = params.toString()
+    if (next === searchParams.toString()) return
+    ownUrlWritesRef.current.add(next)
+    router.replace(next ? `/installs?${next}` : '/installs', { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsStatusFilter, statusView, urlItem, staleOnly, agentFilter])
 
   const toggleExpandedMessage = useCallback((key: string) => {
     setExpandedMessages(prev => {
@@ -1020,29 +1150,16 @@ function InstallsPageContent() {
     })
   }, [])
 
-  // URL is canonical for the drill-down; defaults are omitted
-  const replaceInstallsUrl = useCallback((mutate: (params: URLSearchParams) => void) => {
-    const params = new URLSearchParams(searchParams.toString())
-    mutate(params)
-    const query = params.toString()
-    router.replace(query ? `/installs?${query}` : '/installs', { scroll: false })
-  }, [router, searchParams])
-
+  // The state -> URL effect above writes `view` and `filter`
   const selectStatusView = useCallback((view: 'devices' | 'messages') => {
     setStatusView(view)
-    replaceInstallsUrl(params => {
-      if (view === 'messages') params.set('view', 'messages')
-      else params.delete('view')
-    })
-  }, [replaceInstallsUrl])
+  }, [])
 
   const selectStatusFilter = useCallback((status: ItemStatusFilter) => {
     setItemsStatusFilter(status)
-    replaceInstallsUrl(params => {
-      if (status === 'all') params.delete('filter')
-      else params.set('filter', status)
-    })
-  }, [replaceInstallsUrl])
+    // A status view selects its item through the search box instead
+    if (status !== 'all') setItemFilter('')
+  }, [])
 
   // Categorize devices by install status (for filtered views)
   const { devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess } = useMemo(() => {
@@ -1506,6 +1623,8 @@ function InstallsPageContent() {
     else if (itemsStatusFilter === 'warnings') filtered = devicesWithWarnings
     else if (itemsStatusFilter === 'pending') filtered = devicesWithPending
     else if (itemsStatusFilter === 'success') filtered = devicesWithSuccess
+
+    if (staleSerials) filtered = filtered.filter((device: any) => staleSerials.has(device.serialNumber))
     
     // Filter by device status (active/stale/missing)
     if (deviceStatusFilter !== 'all') {
@@ -1596,7 +1715,7 @@ function InstallsPageContent() {
     }
     
     return filtered
-  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
+  }, [itemsStatusFilter, staleSerials, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
 
   // Distinct error/warning messages across the drill-down's devices, for the
   // "By message" grouping. Pending items carry no message, so the grouping is
@@ -1810,7 +1929,7 @@ function InstallsPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-2 sm:pt-4 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-2 sm:pt-4 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
           
 
@@ -1851,6 +1970,13 @@ function InstallsPageContent() {
                         : 'Filtered install records across selected devices and criteria'
                   }
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(INSTALLS_FILTERS_URL)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); fetchFilterOptions() }}
+                  className="mt-2 w-fit"
+                />
               </div>
               
               {/* Loading Progress - Inline with title */}
@@ -1963,7 +2089,7 @@ function InstallsPageContent() {
                           device.warningCount,
                           device.removedCount,
                           device.lastSeen
-                        ].map(field => `\"${String(field).replace(/\"/g, '\"\"')}\"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -1987,7 +2113,7 @@ function InstallsPageContent() {
                           install.fleet || '',
                           install.platform || '',
                           install.lastSeen
-                        ].map(field => `\"${String(field).replace(/\"/g, '\"\"')}\"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2080,6 +2206,7 @@ function InstallsPageContent() {
 
             {/* Skeleton Loading State - Shows full page structure while loading */}
             {filtersLoading && (
+              <SkeletonTimeout onRetry={() => { void fetchFilterOptions() }}>
               <div className="animate-pulse">
                 {/* Skeleton Widgets Accordion Header */}
                 <div className="border-b border-gray-200 dark:border-gray-700">
@@ -2375,6 +2502,7 @@ function InstallsPageContent() {
                   </table>
                 </div>
               </div>
+              </SkeletonTimeout>
             )}
 
             {/* Widgets Accordion - Collapsible section for Items with Errors/Warnings/Pending and Config Widgets */}
@@ -3497,6 +3625,48 @@ function InstallsPageContent() {
             </div>
           </CollapsibleSection>
           </div>
+          )}
+
+          {/* Deep-link filters (dashboard Install Health card): clearable */}
+          {!filtersLoading && !isGeneratingReport && ((itemFilter && itemsStatusFilter === 'all') || staleOnly || agentFilter) && (
+            <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="font-medium">Filters Active</span>
+                {itemFilter && itemsStatusFilter === 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    Item: {itemFilter} ({itemFilterSerials?.size ?? 0})
+                    <button onClick={() => setItemFilter('')} className="hover:text-yellow-950 dark:hover:text-white" title="Clear item filter" aria-label="Clear item filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+                {agentFilter && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    Agent: {INSTALL_AGENT_LABELS[agentFilter]} ({platformFilteredDevices.length})
+                    <button onClick={() => setAgentFilter(null)} className="hover:text-yellow-950 dark:hover:text-white" title="Clear agent filter" aria-label="Clear agent filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+                {staleOnly && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    Install agent silent &gt; {SILENT_AGENT_DAYS} days ({staleSerials?.size ?? 0})
+                    <button onClick={() => setStaleOnly(false)} className="hover:text-yellow-950 dark:hover:text-white" title="Clear silent-agent filter" aria-label="Clear silent-agent filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => { setItemFilter(''); setStaleOnly(false); setAgentFilter(null) }}
+                className="px-3 py-1 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Clear Filters
+              </button>
+            </div>
           )}
 
           {/* Search Input - Below Filters, connected to the table */}

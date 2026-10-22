@@ -5,6 +5,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Page width. A laptop screen keeps the 80rem column; a desktop screen
+   (>= 1680px, the `desktop` breakpoint) widens it so pages can add columns. */
+@layer components {
+  .page-container {
+    @apply mx-auto w-full max-w-7xl;
+  }
+  @media (min-width: 1680px) {
+    .page-container {
+      max-width: min(96vw, 2400px);
+    }
+  }
+}
+
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -298,4 +311,44 @@ body {
 .tab-button:hover .tab-label-transition,
 .tab-button.active .tab-label-transition {
   transition-delay: 0.1s; /* Slight delay for smoother feel */
+}
+
+/* Skeletons: keep Tailwind's animate-pulse and add a visible light sweep
+   across every skeleton block, so a loading page reads as moving. */
+@keyframes rm-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-pulse .bg-gray-200:not(.absolute):not(.fixed),
+.animate-pulse .bg-gray-100:not(.absolute):not(.fixed),
+.animate-pulse.bg-gray-200:not(.absolute):not(.fixed) {
+  position: relative;
+  overflow: hidden;
+}
+.animate-pulse .bg-gray-200::after,
+.animate-pulse .bg-gray-100::after,
+.animate-pulse.bg-gray-200::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.55) 50%, transparent 100%);
+  animation: rm-shimmer 1.4s ease-in-out infinite;
+}
+.dark .animate-pulse .bg-gray-200::after,
+.dark .animate-pulse .bg-gray-100::after,
+.dark .animate-pulse.bg-gray-200::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.12) 50%, transparent 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse .bg-gray-200::after,
+  .animate-pulse .bg-gray-100::after,
+  .animate-pulse.bg-gray-200::after { animation: none; }
+}
+
+/* Indeterminate sweep for the top progress bar */
+@keyframes rm-progress-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
 }

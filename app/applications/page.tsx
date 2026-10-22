@@ -12,6 +12,15 @@ import { usePlatformFilterSafe } from '@/src/providers/PlatformFilterProvider'
 import { CollapsibleSection } from '@/src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '@/src/hooks/useScrollCollapse'
 import DeviceFilters, { FilterOptions as SharedFilterOptions } from '@/src/components/shared/DeviceFilters'
+import { peekCached, rememberCached, trackedFetch } from '@/src/lib/data-cache'
+import { csvCell } from "@/src/lib/csv"
+import { normalizeAppNameForReport } from "@/src/lib/applications/appNames"
+
+/** The filters payload, kept for the tab so a return to this page renders at once. */
+const APPLICATIONS_FILTERS_URL = '/api/v1/applications/filters'
+/** Cache key for one generated report: its type plus every input that shapes it. */
+const reportCacheKey = (type: 'usage' | 'versions', inputs: Record<string, unknown>) =>
+  `applications:${type}:${JSON.stringify(inputs)}`
 
 interface ApplicationItem {
   id: string
@@ -211,173 +220,7 @@ function formatDuration(totalSeconds: number): string {
 }
 
 // Ultra-robust application name normalization based on real-world data patterns
-function normalizeAppName(appName: string): string {
-  if (!appName || typeof appName !== 'string') return ''
-  
-  let normalized = appName.trim()
-  if (!normalized) return ''
-  
-  // Step 1: Remove placeholder/junk entries
-  if (normalized.includes('${{') || normalized.includes('}}')) return ''
-  if (normalized === 'Unknown' || normalized === 'N/A') return ''
-  
-  // Step 2: Handle specific product lines first (before generic patterns)
-  
-  // Microsoft Visual C++ Redistributables - consolidate all versions
-  if (normalized.match(/Microsoft Visual C\+\+ \d{4}/i)) {
-    return 'Microsoft Visual C++ Redistributable'
-  }
-  
-  // Microsoft .NET components - aggressive consolidation
-  if (normalized.startsWith('Microsoft.NET') || normalized.includes('Microsoft ASP.NET Core')) {
-    if (normalized.includes('Workload')) return 'Microsoft .NET Workload'
-    if (normalized.includes('Sdk') || normalized.includes('SDK')) return 'Microsoft .NET SDK'
-    if (normalized.includes('ASP.NET Core')) return 'Microsoft ASP.NET Core'
-    if (normalized.includes('Runtime') || normalized.includes('AppHost') || 
-        normalized.includes('Targeting Pack') || normalized.includes('Host FX Resolver')) {
-      return 'Microsoft .NET Runtime'
-    }
-    return 'Microsoft .NET'
-  }
-  
-  // Microsoft Visual Studio Tools
-  if (normalized.includes('Microsoft Visual Studio Tools')) {
-    return 'Microsoft Visual Studio Tools'
-  }
-  
-  // Office 365 / Microsoft 365
-  if (normalized.match(/Microsoft (365|Office 365)/i)) {
-    return 'Microsoft 365'
-  }
-  
-  // Kinect Language Packs - consolidate all language variants
-  if (normalized.match(/Kinect for Windows Speech Recognition Language Pack/i)) {
-    return 'Kinect for Windows Speech Recognition Language Pack'
-  }
-  
-  // Microsoft Language Packs (general pattern)
-  if (normalized.match(/Microsoft.*Language Pack/i)) {
-    return 'Microsoft Language Pack'
-  }
-  
-  // Kits Configuration Installer
-  if (normalized.match(/Kits Configuration Installer/i)) {
-    return 'Kits Configuration Installer'
-  }
-  
-  // VRS/VR related software
-  if (normalized.match(/Kofax VRS/i)) {
-    return 'Kofax VRS'
-  }
-  
-  // Adobe products - normalize across versions
-  if (normalized.startsWith('Adobe ')) {
-    const product = normalized.match(/Adobe ([A-Za-z\s]+)/)?.[1]?.split(/\s+/)[0]
-    if (product && product !== 'AIR') return `Adobe ${product}`
-  }
-  
-  // 7-Zip versions - consolidate all versions
-  if (normalized.match(/^7-Zip/i)) {
-    return '7-Zip'
-  }
-  
-  // Chrome versions
-  if (normalized.match(/Google Chrome|Chrome/i)) {
-    return 'Google Chrome'
-  }
-  
-  // Firefox versions
-  if (normalized.match(/Mozilla Firefox|Firefox/i)) {
-    return 'Mozilla Firefox'
-  }
-  
-  // AMD components
-  if (normalized.startsWith('AMD ') && (normalized.includes('Driver') || normalized.includes('Chipset'))) {
-    if (normalized.includes('Chipset')) return 'AMD Chipset Software'
-    return 'AMD Drivers'
-  }
-  
-  // SOLIDWORKS components
-  if (normalized.includes('SOLIDWORKS')) {
-    if (normalized.includes('3DEXPERIENCE')) return '3DEXPERIENCE for SOLIDWORKS'
-    return 'SOLIDWORKS'
-  }
-  
-  // HP components
-  if (normalized.startsWith('HP ') || normalized.includes('HP ')) {
-    return 'HP Software'
-  }
-  
-  // Step 3: Generic version number removal (more aggressive)
-  
-  // Remove version numbers at the end
-  normalized = normalized
-    // Version patterns: 1.2.3, v1.2, 2024, 2024.1, 20.5.278, etc.
-    .replace(/\s+v?\d+(\.\d+)*(\.\d+)*(\.\d+)*$/i, '')
-    .replace(/\s+\d{4}(\.\d+)*$/i, '') // Year versions
-    .replace(/\s+-\s+\d+(\.\d+)*$/i, '') // Dash versions
-    .replace(/\s+\(\d+(\.\d+)*(\.\d+)*\)$/i, '') // Parentheses versions
-    .replace(/\s+build\s+\d+/i, '') // Build numbers
-    .replace(/\s+\d+(\.\d+)*(\.\d+)*(\.\d+)*$/i, '') // Direct versions
-    
-  // Remove version patterns in the middle (more aggressive)
-  normalized = normalized
-    .replace(/\s+\d{4}\.\d{2}-\d+/i, '') // Anaconda-style versions: 2025.06-0
-    .replace(/\s+\d{1,2}\.\d+\.\d+/i, '') // Standard versions: 10.3.1.3
-    .replace(/\s+\d{4}/i, '') // Year versions in middle
-    .replace(/\s+v\d+(\.\d+)*/i, '') // v-prefixed versions
-  
-  // Step 4: Remove architecture and platform info (more aggressive)
-  normalized = normalized
-    .replace(/\s+(x64|x86|64-bit|32-bit|amd64|i386)$/i, '')
-    .replace(/\s+\((x64|x86|64-bit|32-bit|amd64|i386)\)$/i, '')
-    .replace(/\s+\(Python\s+[\d\.]+\s+(64-bit|32-bit)\)$/i, '')
-    .replace(/\s+\(git\s+[a-f0-9]+\)$/i, '') // Git commit hashes
-    .replace(/\s+\([^)]*bit[^)]*\)/i, '') // Any parentheses with "bit"
-    .replace(/\s+\([^)]*\d+\.\d+\.\d+[^)]*\)/i, '') // Any parentheses with version numbers
-  
-  // Step 5: Remove Microsoft-specific runtime suffixes
-  normalized = normalized
-    .replace(/\s+(Additional Runtime|Minimum Runtime|Redistributable|Shared Framework|Targeting Pack|AppHost Pack|Host FX Resolver|Hosting Support)$/i, '')
-    .replace(/\s+-\s+(en-us|x64|x86|\d+(\.\d+)*)$/i, '') // Language codes and versions with dashes
-  
-  // Step 6: Remove common application suffixes
-  normalized = normalized
-    .replace(/\s+(Desktop|App|Application|Software|Program|Tool|Suite|Client|Server)$/i, '')
-    .replace(/\s+(Pro|Professional|Standard|Basic|Free|Premium|Enterprise|Business|Personal|Home|Student|Education)$/i, '')
-    .replace(/\s+(Trial|Beta|Alpha|RC|Release|Final|Portable|Standalone)$/i, '')
-  
-  // Step 7: Remove update/version info in the middle
-  normalized = normalized
-    .replace(/\s+Update\s+\d+/i, '') // "Update 1", "Update 2024", etc.
-    .replace(/\s+SP\d+/i, '') // Service packs
-    .replace(/\s+Patch\s+\d+/i, '') // Patches
-  
-  // Step 8: Handle specific patterns
-  
-  // Remove language indicators
-  normalized = normalized.replace(/\s+-\s+en-us$/i, '')
-  
-  // Clean up common words that add no value
-  normalized = normalized
-    .replace(/\s+for\s+Windows$/i, '')
-    .replace(/\s+for\s+Microsoft\s+Windows$/i, '')
-    .replace(/\s+Windows\s+Edition$/i, '')
-  
-  // Step 9: Final cleanup
-  normalized = normalized
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .replace(/\s*-\s*$/, '') // Remove trailing dashes
-    .replace(/^\s*-\s*/, '') // Remove leading dashes
-    .trim()
-    .replace(/\s+$/, '') // Remove trailing space
-    .replace(/^\s+/, '') // Remove leading space
-  
-  // Step 10: Handle empty results
-  if (!normalized || normalized.length < 2) return ''
-  
-  return normalized
-}
+
 
 // Filter function to exclude junk/system applications (more aggressive)
 function shouldIncludeApplication(appName: string): boolean {
@@ -547,7 +390,7 @@ function ApplicationsPageContent() {
     devicesWithData: 0
   })
   const [loading, setLoading] = useState(false)
-  const [filtersLoading, setFiltersLoading] = useState(true)
+  const [filtersLoading, setFiltersLoading] = useState(() => peekCached(APPLICATIONS_FILTERS_URL) === undefined)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
@@ -808,48 +651,48 @@ function ApplicationsPageContent() {
     selectedLocations, selectedRooms, selectedFleets, selectedAreas, selectedVersions,
   ])
 
+  // Filter options and the device list for the missing report, from one filters payload
+  const applyFiltersPayload = (data: any) => {
+    setFilterOptions({
+      applicationNames: data.applicationNames || [],
+      windowsApplicationNames: data.windowsApplicationNames,
+      macApplicationNames: data.macApplicationNames,
+      usages: data.usages || [],
+      catalogs: data.catalogs || [],
+      locations: data.locations || [],
+      rooms: data.rooms || [],
+      fleets: data.fleets || [],
+      areas: data.areas || [],
+      devicesWithData: data.devices?.length || 0
+    })
+    if (data.devices && Array.isArray(data.devices)) {
+      setAllDevices(data.devices.map((d: any) => ({
+        serialNumber: d.serialNumber,
+        name: d.name || d.serialNumber,
+        usage: d.usage,
+        catalog: d.catalog,
+        location: d.location,
+        room: d.room || d.location
+      })))
+    }
+  }
+
   // Load ALL applications data on mount with progressive loading
   useEffect(() => {
     const fetchAllData = async () => {
       let progressInterval: NodeJS.Timeout | null = null
       try {
-        setFiltersLoading(true)
-        setLoading(true)
-        setError(null)
-        
-        // Check if we have cached data in sessionStorage
-        const cachedData = sessionStorage.getItem('applications-all-data')
-        const cachedTimestamp = sessionStorage.getItem('applications-all-timestamp')
-        const cacheExpiry = 5 * 60 * 1000 // 5 minutes
-        
-        if (cachedData && cachedTimestamp) {
-          const age = Date.now() - parseInt(cachedTimestamp)
-          if (age < cacheExpiry) {
-                        const data = JSON.parse(cachedData)
-            
-            setFilterOptions({
-              applicationNames: data.applicationNames || [],
-              windowsApplicationNames: data.windowsApplicationNames,
-              macApplicationNames: data.macApplicationNames,
-              usages: data.usages || [],
-              catalogs: data.catalogs || [],
-              locations: data.locations || [],
-              rooms: data.rooms || [],
-              fleets: data.fleets || [],
-              areas: data.areas || [],
-              devicesWithData: data.devices?.length || 0
-            })
-            
-            // Don't auto-load applications from cache - let user filter first
-                        
-            setLoadingMessage('Loaded from cache')
-            setLoadingProgress({ current: data.devices?.length || 0, total: data.devices?.length || 0 })
-            setFiltersLoading(false)
-            setLoading(false)
-            return
-          } else {
-                      }
+        // A return visit renders the last filters payload at once and
+        // refreshes it in the background; only a first load shows progress.
+        const cachedFilters = peekCached<any>(APPLICATIONS_FILTERS_URL)
+        if (cachedFilters) {
+          applyFiltersPayload(cachedFilters)
+          setFiltersLoading(false)
+        } else {
+          setFiltersLoading(true)
+          setLoading(true)
         }
+        setError(null)
         
         // Show loading state without specific numbers initially
         setLoadingProgress({ current: 0, total: 0 })
@@ -872,14 +715,14 @@ function ApplicationsPageContent() {
           setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
         }, 200)
         
-        const response = await fetch('/api/v1/applications/filters', {
+        const response = await trackedFetch(APPLICATIONS_FILTERS_URL, {
           cache: 'no-store',
           credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
-        })
+        }, { background: cachedFilters !== undefined })
         
         if (!response.ok) {
           console.error('[APPLICATIONS PAGE] Filters API failed:', response.status, response.statusText)
@@ -898,42 +741,9 @@ function ApplicationsPageContent() {
           progressInterval = null
         }
         
-        // Get the actual device count from the response
+        rememberCached(APPLICATIONS_FILTERS_URL, data)
+        applyFiltersPayload(data)
         const actualDeviceCount = data.devices?.length || 0
-        
-        // Use inventory filters directly from API response (already extracted from applications data)
-        const usages = data.usages || []
-        const catalogs = data.catalogs || []
-        const locations = data.locations || []
-        const rooms = data.rooms || []
-        const fleets = data.fleets || []
-        const areas = data.areas || []
-
-
-        setFilterOptions({
-          applicationNames: data.applicationNames || [],
-          windowsApplicationNames: data.windowsApplicationNames,
-          macApplicationNames: data.macApplicationNames,
-          usages,
-          catalogs,
-          locations,
-          rooms,
-          fleets,
-          areas,
-          devicesWithData: actualDeviceCount
-        })
-        
-        // Store all devices for computing missing report
-        if (data.devices && Array.isArray(data.devices)) {
-          setAllDevices(data.devices.map((d: any) => ({
-            serialNumber: d.serialNumber,
-            name: d.name || d.serialNumber,
-            usage: d.usage,
-            catalog: d.catalog,
-            location: d.location,
-            room: d.room || d.location
-          })))
-        }
         
         // Set progress to complete and show UI immediately
         setLoadingMessage('Complete!')
@@ -944,7 +754,10 @@ function ApplicationsPageContent() {
                         
       } catch (error) {
         console.error('[APPLICATIONS PAGE] Error fetching filter options:', error)
-        setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
+        // Filters already on screen from the cache stay; the error is for a first load
+        if (peekCached(APPLICATIONS_FILTERS_URL) === undefined) {
+          setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
+        }
         setLoadingProgress({ current: 0, total: 0 })
       } finally {
         if (progressInterval) {
@@ -1064,8 +877,26 @@ function ApplicationsPageContent() {
     // actually queried, not whatever platform the user may have flipped to
     // mid-flight.
     const fetchPlatform = platformFilter
+    // The same report generated before in this tab shows at once; the fetch
+    // below refreshes it in the background without the loading view.
+    const usageKey = reportCacheKey('usage', {
+      days: effectiveDays, apps: selectedApplications, usages: selectedUsages, catalogs: selectedCatalogs,
+      locations: selectedLocations, areas: selectedAreas, fleets: selectedFleets, rooms: selectedRooms,
+      platform: fetchPlatform,
+    })
+    const cachedUsage = peekCached<{ utilization: UtilizationData; inventory: ApplicationItem[] | null }>(usageKey)
     try {
-      setLoading(true)
+      if (cachedUsage) {
+        reportPlatformRef.current = fetchPlatform
+        if (cachedUsage.inventory) setApplications(cachedUsage.inventory)
+        setUtilizationData(cachedUsage.utilization)
+        setReportType('usage')
+        setWidgetsExpanded(true)
+        setSelectionsExpanded(false)
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
       setError(null)
       
       // Clear search field when generating report
@@ -1081,6 +912,7 @@ function ApplicationsPageContent() {
         : ''
       
       // Load inventory data first (for version analysis) - 0-30%
+      let inventoryForCache: ApplicationItem[] | null = null
       if (selectedApplications.length > 0) {
         setLoadingMessage('Loading inventory data for version analysis...')
         setLoadingProgress({ current: 10, total: 100 })
@@ -1090,10 +922,10 @@ function ApplicationsPageContent() {
         const inventoryUrl = `/api/v1/applications?${inventoryParams.toString()}`
                 
         try {
-          const inventoryResponse = await fetch(inventoryUrl, {
+          const inventoryResponse = await trackedFetch(inventoryUrl, {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache' }
-          })
+          }, { background: !!cachedUsage })
           
           setLoadingProgress({ current: 25, total: 100 })
           
@@ -1101,7 +933,8 @@ function ApplicationsPageContent() {
             const inventoryData = await inventoryResponse.json()
             if (Array.isArray(inventoryData)) {
               setApplications(inventoryData)
-                          }
+              inventoryForCache = inventoryData
+            }
           }
         } catch (invError) {
           console.warn('Failed to load inventory data:', invError)
@@ -1145,13 +978,13 @@ function ApplicationsPageContent() {
             
       setLoadingProgress({ current: 40, total: 100 })
       
-      const response = await fetch(url, {
+      const response = await trackedFetch(url, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }
-      })
+      }, { background: !!cachedUsage })
       
       setLoadingProgress({ current: 80, total: 100 })
       
@@ -1172,6 +1005,7 @@ function ApplicationsPageContent() {
         // load completes. Use the captured fetchPlatform (not current
         // platformFilter) in case the user flipped while the fetch was in flight.
         reportPlatformRef.current = fetchPlatform
+        rememberCached(usageKey, { utilization: data, inventory: inventoryForCache ?? cachedUsage?.inventory ?? null })
         setUtilizationData(data)
         setReportType('usage')
         setWidgetsExpanded(true)
@@ -1196,7 +1030,8 @@ function ApplicationsPageContent() {
     } catch (error) {
       console.error('Failed to load utilization data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      setError(errorMessage)
+      // A cached report stays on screen when its refresh fails
+      if (!cachedUsage) setError(errorMessage)
     } finally {
       setLoading(false)
       setFiltersExpanded(false) // Collapse accordion after report loads
@@ -1208,8 +1043,23 @@ function ApplicationsPageContent() {
   // Load versions-only report (inventory data with version distribution, no usage analytics)
   const handleLoadVersionsReport = async () => {
     const fetchPlatform = platformFilter
+    const versionsKey = reportCacheKey('versions', {
+      apps: selectedApplications, usages: selectedUsages, catalogs: selectedCatalogs, locations: selectedLocations,
+      areas: selectedAreas, fleets: selectedFleets, rooms: selectedRooms, platform: fetchPlatform,
+    })
+    const cachedVersions = peekCached<{ inventory: ApplicationItem[]; distribution: typeof versionDistributionServer }>(versionsKey)
     try {
-      setLoading(true)
+      if (cachedVersions) {
+        reportPlatformRef.current = fetchPlatform
+        setApplications(cachedVersions.inventory)
+        setVersionDistributionServer(cachedVersions.distribution)
+        setReportType('versions')
+        setSelectionsExpanded(false)
+        setUtilizationData(null)
+        setLoading(false)
+      } else {
+        setLoading(true)
+      }
       setError(null)
       setSearchQuery('')
       
@@ -1259,9 +1109,9 @@ function ApplicationsPageContent() {
         : null
 
       const [inventoryResponse, distributionResponse] = await Promise.all([
-        fetch(inventoryUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }),
+        trackedFetch(inventoryUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }, { background: !!cachedVersions }),
         distributionUrl
-          ? fetch(distributionUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } })
+          ? trackedFetch(distributionUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }, { background: !!cachedVersions })
           : Promise.resolve(null),
       ])
 
@@ -1315,6 +1165,7 @@ function ApplicationsPageContent() {
         // Pin the platform the data was fetched for so the refetch-on-platform
         // effect doesn't fire immediately after this load completes.
         reportPlatformRef.current = fetchPlatform
+        rememberCached(versionsKey, { inventory: inventoryData, distribution: distributionData })
         setApplications(inventoryData)
         setVersionDistributionServer(distributionData)
         setReportType('versions')
@@ -1338,6 +1189,7 @@ function ApplicationsPageContent() {
     } catch (error) {
       console.error('Failed to load versions data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      if (cachedVersions) return
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -1514,7 +1366,7 @@ function ApplicationsPageContent() {
           const [filterAppName, filterVersion] = versionFilter.split(':')
           if (filterVersion === 'Unknown') return false
           // Compare using NORMALIZED app name (since versionAnalysis uses normalized names)
-          const normalizedAppName = normalizeAppName(app.name)
+          const normalizedAppName = normalizeAppNameForReport(app.name)
           return normalizedAppName === filterAppName && app.version === filterVersion
         } else {
           if (versionFilter === 'Unknown') return false
@@ -1755,12 +1607,12 @@ function ApplicationsPageContent() {
       // app like "Houdini Launcher" returned by the server would render under
       // its raw name on the chart, but `selectedVersions` would store
       // `"Houdini Launcher:21.0.440"` and the table-filter compare against
-      // `normalizeAppName(app.name)` (which yields "Houdini") would never
+      // `normalizeAppNameForReport(app.name)` (which yields "Houdini") would never
       // match. Collisions sum per-version so two raw apps that normalize to
       // the same name behave identically to the client fold.
       const analysis: VersionAnalysis = {}
       for (const [appName, bucket] of Object.entries(versionDistributionServer)) {
-        const key = normalizeAppName(appName) || appName
+        const key = normalizeAppNameForReport(appName) || appName
         const target = analysis[key] || (analysis[key] = {})
         for (const [version, count] of Object.entries(bucket.versions)) {
           target[version] = (target[version] || 0) + count
@@ -1772,7 +1624,7 @@ function ApplicationsPageContent() {
     const analysis: VersionAnalysis = {}
     baseFilteredApplications.forEach(app => {
       // Use normalized name as the key (same as what's in filterOptions.applicationNames)
-      const normalizedName = normalizeAppName(app.name)
+      const normalizedName = normalizeAppNameForReport(app.name)
       if (!normalizedName) return // Skip if normalization results in empty string
 
       if (!analysis[normalizedName]) {
@@ -1871,7 +1723,7 @@ function ApplicationsPageContent() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4 min-w-0 flex-1">
                 <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
@@ -1936,7 +1788,7 @@ function ApplicationsPageContent() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
 
           {/* Header Section */}
@@ -2214,7 +2066,7 @@ function ApplicationsPageContent() {
                         app.userCount,
                         app.lastUsed || '',
                         app.isSingleUser ? 'Yes' : 'No'
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      ].map(csvCell).join(','))
                     ].join('\n')
                     
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2247,7 +2099,7 @@ function ApplicationsPageContent() {
                           device.location || '',
                           device.catalog || '',
                           appNames
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -2269,7 +2121,7 @@ function ApplicationsPageContent() {
                           app.location || '',
                           app.deviceName || app.serialNumber,
                           app.serialNumber,
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                        ].map(csvCell).join(','))
                       ].join('\n')
                       
                       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -3262,7 +3114,7 @@ function ApplicationsPageContent() {
                           <td className="px-4 lg:px-6 py-4">
                             {/* Show versions from versionAnalysis - use normalized name for lookup */}
                             {(() => {
-                              const normalizedAppName = normalizeAppName(app.name)
+                              const normalizedAppName = normalizeAppNameForReport(app.name)
                               const versions = versionAnalysis[normalizedAppName] || versionAnalysis[app.name]
                               if (!versions || Object.keys(versions).length === 0) {
                                 return <span className="text-xs text-gray-400">-</span>
@@ -4008,7 +3860,7 @@ export default function ApplicationsPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
           <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+            <div className="page-container px-4 sm:px-6 lg:px-8 h-16 flex items-center">
               <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
             </div>
           </header>

@@ -2,23 +2,28 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useMemo, useRef, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { OSVersionPieChart } from "@/src/lib/modules/graphs/OSVersionPieChart"
 import { EditionDonutChart } from "@/src/lib/modules/graphs/EditionDonutChart"
 import { ActivationComplianceChart } from "@/src/lib/modules/graphs/ActivationComplianceChart"
-import { UptimeDistributionChart, getUptimeBucketKey } from "@/src/lib/modules/graphs/UptimeDistributionChart"
-import { PendingUpdatesChart, getPendingUpdatesBucketKey } from "@/src/lib/modules/graphs/PendingUpdatesChart"
+import { UptimeDistributionChart } from "@/src/lib/modules/graphs/UptimeDistributionChart"
+import { PendingUpdatesChart } from "@/src/lib/modules/graphs/PendingUpdatesChart"
 import { LicenseSourceChart } from "@/src/lib/modules/graphs/LicenseSourceChart"
 import { useDeviceData } from "@/src/hooks/useDeviceData"
+import { cachedAt, peekCached } from "@/src/lib/data-cache"
+import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { InstalledUpdate, matchesSystemSearch, updatesToDisplay } from "@/src/lib/system/installedUpdates"
+import { osCurrency, paramList, uptimeBucketKey, pendingBucketKey, hasDeferredUpdates, UPTIME_KEYS, PENDING_KEYS } from "@/src/lib/dashboard/reportRules"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { csvCell } from "@/src/lib/csv"
 
 interface SystemDevice {
   id: string
@@ -66,7 +71,7 @@ interface SystemDevice {
 function LoadingSkeleton() {
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden animate-pulse">
           {/* Title Section Skeleton */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -237,11 +242,19 @@ function getOSDisplayName(sys: SystemDevice): string {
 function SystemPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
-  const [loading, setLoading] = useState(true)
-  const [systems, setSystems] = useState<SystemDevice[]>([])
+  // useDeviceData caches /api/v1/system; with it cached, skip the skeleton.
+  const [loading, setLoading] = useState(() => peekCached('/api/v1/system') === undefined)
+  const [systems, setSystems] = useState<SystemDevice[]>(() => peekCached<SystemDevice[]>('/api/v1/system') ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const osVersionFilter = searchParams.get('osVersion') // Get OS version filter from URL
+  // OS version filter, set from ?osVersion= or by clicking a version in the charts
+  const [osVersionFilter, setOsVersionFilter] = useState<string | null>(searchParams.get('osVersion'))
+  // Dashboard deep-link filters with no widget of their own: ?deferred=1,
+  // ?os=unsupported|windows10 and ?patch=behind. Shown as removable pills by the search box.
+  const [deferredOnly, setDeferredOnly] = useState(false)
+  const [osCurrencyFilters, setOsCurrencyFilters] = useState<string[]>([])
+  const [patchFilters, setPatchFilters] = useState<string[]>([])
 
   const [activationFilter, setActivationFilter] = useState('all')
   const [firmwareLicenseFilter, setFirmwareLicenseFilter] = useState('all')
@@ -388,23 +401,73 @@ function SystemPageContent() {
     setActivationFilter('all')
     setFirmwareLicenseFilter('all')
     setSearchQuery('')
+    setOsVersionFilter(null)
+    setDeferredOnly(false)
+    setOsCurrencyFilters([])
+    setPatchFilters([])
     setWidgetsExpanded(true)
-    if (osVersionFilter) router.push('/system')
   }
+
+  // URL → state: on mount and when the URL changes from outside (a dashboard
+  // deep link, Back). The page's own writes are recognised and skipped.
+  const lastWrittenQuery = useRef<string | null>(null)
+  const urlHydrated = useRef(false)
+  const skipNextUrlWrite = useRef(false)
+  useEffect(() => {
+    if (urlHydrated.current && searchParams.toString() === lastWrittenQuery.current) return
+    const known = (key: string, allowed: readonly string[]) =>
+      paramList(searchParams.get(key)).filter(v => allowed.includes(v))
+    setSearchQuery(searchParams.get('search') || '')
+    setOsVersionFilter(searchParams.get('osVersion'))
+    setSelectedUptimeBuckets(known('uptime', UPTIME_KEYS))
+    setSelectedPendingBuckets(known('pending', PENDING_KEYS))
+    setSelectedEditions(paramList(searchParams.get('edition')))
+    setDeferredOnly(searchParams.get('deferred') === '1')
+    setOsCurrencyFilters(known('os', ['unsupported', 'windows10']))
+    setPatchFilters(known('patch', ['behind']))
+    urlHydrated.current = true
+    skipNextUrlWrite.current = true
+  }, [searchParams])
+
+  // State → URL: defaults omitted, other parameters (platform, from) kept,
+  // replace rather than push so filter changes stay out of history.
+  useEffect(() => {
+    if (!urlHydrated.current) return
+    if (skipNextUrlWrite.current) { skipNextUrlWrite.current = false; return }
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      const put = (key: string, value: string | null) => (value ? params.set(key, value) : params.delete(key))
+      put('search', searchQuery.trim())
+      put('osVersion', osVersionFilter)
+      put('uptime', selectedUptimeBuckets.join(','))
+      put('pending', selectedPendingBuckets.join(','))
+      put('edition', selectedEditions.join(','))
+      put('deferred', deferredOnly ? '1' : null)
+      put('os', osCurrencyFilters.join(','))
+      put('patch', patchFilters.join(','))
+      const next = params.toString().replace(/%2C/gi, ',')
+      if (next === window.location.search.replace(/^\?/, '')) return
+      lastWrittenQuery.current = next
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery, osVersionFilter, selectedUptimeBuckets, selectedPendingBuckets, selectedEditions,
+      deferredOnly, osCurrencyFilters, patchFilters, pathname, router])
   
   const totalActiveFilters = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length +
     selectedLocations.length + selectedAreas.length + selectedFleets.length +
     selectedEditions.length + selectedActivationStatus.length + selectedLicenseType.length +
     selectedArchitectures.length + selectedTimeZones.length + selectedUptimeBuckets.length + selectedLicenseSources.length +
-    selectedPendingBuckets.length +
+    selectedPendingBuckets.length + (deferredOnly ? 1 : 0) + osCurrencyFilters.length + patchFilters.length +
     (activationFilter !== 'all' ? 1 : 0) + (firmwareLicenseFilter !== 'all' ? 1 : 0) +
     (osVersionFilter ? 1 : 0)
 
   // Use the new hook to get both devices data (with inventory) and system module data
-  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error } = useDeviceData({
+  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error, refreshError, refetch } = useDeviceData({
     includeModuleData: true,
     moduleType: 'system'
   })
+  const [retrying, setRetrying] = useState(false)
 
   useEffect(() => {
     console.log('[SystemPage] Hook data:', {
@@ -517,6 +580,10 @@ function SystemPageContent() {
     return acc
   }, {} as Record<string, number>)
 
+  // OS currency is relative to the whole fleet, so it is computed over every
+  // system row, before any filter, exactly as the dashboard card computes it.
+  const currency = useMemo(() => osCurrency(systems), [systems])
+
   // Filter systems
   const filteredSystems = systems.filter(s => {
     // Find the corresponding device from the main devices API to get inventory data
@@ -567,7 +634,7 @@ function SystemPageContent() {
     
     // Filter by uptime bucket
     if (selectedUptimeBuckets.length > 0) {
-      const bucket = getUptimeBucketKey(s.uptime)
+      const bucket = uptimeBucketKey(s)
       if (!bucket || !selectedUptimeBuckets.includes(bucket)) return false
     }
     
@@ -578,9 +645,19 @@ function SystemPageContent() {
     
     // Filter by pending updates bucket
     if (selectedPendingBuckets.length > 0) {
-      const bucket = getPendingUpdatesBucketKey(s.pendingUpdatesCount)
+      const bucket = pendingBucketKey(s)
       if (!bucket || !selectedPendingBuckets.includes(bucket)) return false
     }
+
+    // Dashboard deep-link filters (?deferred=1, ?os=, ?patch=behind)
+    if (deferredOnly && !hasDeferredUpdates(s)) return false
+    if (osCurrencyFilters.length > 0) {
+      const matchesOs =
+        (osCurrencyFilters.includes('unsupported') && currency.isUnsupportedMac(s)) ||
+        (osCurrencyFilters.includes('windows10') && currency.isWindows10(s))
+      if (!matchesOs) return false
+    }
+    if (patchFilters.includes('behind') && !currency.isBehind(s)) return false
     
     // URL-based OS Version filter
     if (osVersionFilter) {
@@ -816,14 +893,37 @@ function SystemPageContent() {
     return 0
   })
 
+  // Removable pills for the active filters that have no widget showing them
+  const deepLinkPills: { key: string; label: string; clear: () => void }[] = [
+    ...osCurrencyFilters.map(v => ({
+      key: `os-${v}`,
+      label: v === 'unsupported' ? 'Unsupported macOS' : 'Windows 10',
+      clear: () => setOsCurrencyFilters(prev => prev.filter(x => x !== v)),
+    })),
+    ...patchFilters.map(v => ({
+      key: `patch-${v}`,
+      label: 'Behind on patches',
+      clear: () => setPatchFilters(prev => prev.filter(x => x !== v)),
+    })),
+    ...(deferredOnly ? [{ key: 'deferred', label: 'Deferred updates', clear: () => setDeferredOnly(false) }] : []),
+    // The edition chart is only drawn when the platform filter is Windows
+    ...(globalPlatformFilter !== 'Windows'
+      ? selectedEditions.map(v => ({
+          key: `edition-${v}`,
+          label: `Edition: ${v}`,
+          clear: () => setSelectedEditions(prev => prev.filter(x => x !== v)),
+        }))
+      : []),
+  ]
+
   if (loading) {
-    return <LoadingSkeleton />
+    return <SkeletonTimeout page><LoadingSkeleton /></SkeletonTimeout>
   }
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+      <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -832,6 +932,13 @@ function SystemPageContent() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   OS versions, activation status, and system uptime {searchFilteredSystems.length} devices
                 </p>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt('/api/v1/system')}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); refetch().finally(() => setRetrying(false)) }}
+                  className="mt-2 w-fit"
+                />
               </div>
               <div className="flex items-center gap-4">
                 {/* Export to CSV Button */}
@@ -857,7 +964,7 @@ function SystemPageContent() {
                         uptimeStr,
                         s.bootTime || '',
                         s.lastSeen || ''
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                      ].map(csvCell).join(',')
                     })
                     
                     const csv = [headers.join(','), ...rows].join('\n')
@@ -952,9 +1059,9 @@ function SystemPageContent() {
                       osType="Windows"
                       activeVersion={osVersionFilter || undefined}
                       onFilterApplied={() => setWidgetsExpanded(false)}
-                      onVersionSelect={(version) => router.push(`/system?osVersion=${encodeURIComponent(version)}`)}
+                      onVersionSelect={(version) => setOsVersionFilter(version)}
                       onUpdateSelect={setSearchQuery}
-                      onClearFilter={() => router.push('/system')}
+                      onClearFilter={() => setOsVersionFilter(null)}
                     />
                   </div>
                 </div>
@@ -980,8 +1087,8 @@ function SystemPageContent() {
                       osType="macOS"
                       activeVersion={osVersionFilter || undefined}
                       onFilterApplied={() => setWidgetsExpanded(false)}
-                      onVersionSelect={(version) => router.push(`/system?osVersion=${encodeURIComponent(version)}`)}
-                      onClearFilter={() => router.push('/system')}
+                      onVersionSelect={(version) => setOsVersionFilter(version)}
+                      onClearFilter={() => setOsVersionFilter(null)}
                     />
                   </div>
                 </div>
@@ -1134,6 +1241,28 @@ function SystemPageContent() {
                 </button>
               )}
             </div>
+            {deepLinkPills.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {deepLinkPills.map(pill => (
+                  <span
+                    key={pill.key}
+                    className="inline-flex items-center gap-1 pl-3 pr-1 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800"
+                  >
+                    {pill.label}
+                    <button
+                      type="button"
+                      onClick={pill.clear}
+                      aria-label={`Remove filter: ${pill.label}`}
+                      className="rounded-full p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800"
+                    >
+                      <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">

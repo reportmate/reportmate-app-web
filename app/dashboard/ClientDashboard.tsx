@@ -2,15 +2,28 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
-import { WarningStatsWidget, ErrorStatsWidget, InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
+import type { InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
+import { AppUsageCard, CheckinGaps, InsightCardById, InstallHealthHero, ManagementToolLogs, useDashboardInsights, useInsightLayout, type InsightContext } from "../../src/lib/modules/widgets/InsightWidgets"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import type { InsightCardKey } from "../../src/lib/dashboard/insights"
+import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+
+/** The dashboard's own data, kept across navigation so a return renders instantly. */
+const DASHBOARD_CACHE_KEY = "dashboard:view"
+interface DashboardView {
+  devices: Device[]
+  events: FleetEvent[]
+  installStats: InstallStatsData | null
+}
 
 // WebPubSub message types for JSON subprotocol
 interface WebPubSubMessage {
@@ -94,15 +107,25 @@ interface Device {
   inventoryState?: InventoryState
 }
 
+/** Columns 2 and 3 (revisions 5 and 6). Narrower layouts keep this order. */
+const COLUMN_2 = ["directoryServices", "userAccounts", "connectivityProblems", "protectionGaps", "expiringCertificates"] as const
+const COLUMN_3_BEFORE_APP_USAGE = ["updateDebt", "storage"] as const
+const COLUMN_3_AFTER_APP_USAGE = ["softwareRisk", "rebootDebt"] as const
+
 export default function ClientDashboard() {
   // All data comes from consolidated /api/dashboard call
   // Eliminates separate events API call for faster load
-  const [events, setEvents] = useState<FleetEvent[]>([])
-  const [devices, setDevices] = useState<Device[]>([])
-  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [cachedView] = useState(() => peekCached<DashboardView>(DASHBOARD_CACHE_KEY))
+  // A failed background refresh keeps the data on screen and shows a banner
+  const [dashboardRefreshError, setDashboardRefreshError] = useState<string | null>(null)
+  const [dashboardRetrying, setDashboardRetrying] = useState(false)
+  const refreshDashboardRef = useRef<() => Promise<void>>(async () => {})
+  const [events, setEvents] = useState<FleetEvent[]>(() => cachedView?.events ?? [])
+  const [devices, setDevices] = useState<Device[]>(() => cachedView?.devices ?? [])
+  const [devicesLoading, setDevicesLoading] = useState(!cachedView)
   const [, setTimeUpdateCounter] = useState(0)
-  const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
-  const [installStatsLoading, setInstallStatsLoading] = useState(true)
+  const [installStats, setInstallStats] = useState<InstallStatsData | null>(() => cachedView?.installStats ?? null)
+  const [, setInstallStatsLoading] = useState(!cachedView)
   const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -113,6 +136,8 @@ export default function ClientDashboard() {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
+  const insights = useDashboardInsights(platformFilter)
+  const layout = useInsightLayout()
   
   // Filter devices by platform
   const filteredDevices = useMemo(() => {
@@ -126,6 +151,14 @@ export default function ClientDashboard() {
     return events.filter(event => isPlatformVisible(event.platform || 'Unknown'))
   }, [events, platformFilter, isPlatformVisible])
   
+  const insightCtx: InsightContext = useMemo(() => ({ insights, platformFilter }), [insights, platformFilter])
+
+  // Keep the latest view for the next visit
+  useEffect(() => {
+    if (devicesLoading || devices.length === 0) return
+    rememberCached<DashboardView>(DASHBOARD_CACHE_KEY, { devices, events, installStats })
+  }, [devices, events, installStats, devicesLoading])
+
   // Mark as mounted
   useEffect(() => {
     setMounted(true)
@@ -159,17 +192,20 @@ export default function ClientDashboard() {
 
     const fetchDashboardData = async (isInitialLoad = false) => {
       try {
-        if (isInitialLoad) {
+        // A return visit already shows the cached view; this is a background refresh
+        const hasCache = peekCached(DASHBOARD_CACHE_KEY) !== undefined
+        if (isInitialLoad && !hasCache) {
           setDevicesLoading(true)
           setInstallStatsLoading(true)
         }
         
         // Single consolidated API call
-        const response = await fetch('/api/dashboard', { cache: 'no-store' })
+        const response = await trackedFetch('/api/dashboard', { cache: 'no-store' }, { background: !isInitialLoad || hasCache })
 
         if (!response.ok) {
           throw new Error(`Failed to load dashboard data: ${response.status}`)
         }
+        setDashboardRefreshError(null)
 
         const data = await response.json()
         
@@ -306,10 +342,12 @@ export default function ClientDashboard() {
       } catch (error) {
         if (!aborted) {
           console.error('[DASHBOARD] Dashboard data fetch failed:', error)
-          if (isInitialLoad) {
+          if (isInitialLoad && peekCached(DASHBOARD_CACHE_KEY) === undefined) {
             setDevices([])
             setInstallStats(null)
             setConnectionStatus('error')
+          } else {
+            setDashboardRefreshError(error instanceof Error ? error.message : 'Refresh failed')
           }
           // Non-initial refresh failures are transient — don't change
           // connectionStatus since we still have valid data displaying
@@ -321,6 +359,8 @@ export default function ClientDashboard() {
         }
       }
     }
+
+    refreshDashboardRef.current = () => fetchDashboardData(false)
 
     // Initial load
     fetchDashboardData(true)
@@ -480,80 +520,172 @@ export default function ClientDashboard() {
 
   // Show skeleton while data is loading
   if (devicesLoading) {
-    return <DashboardSkeleton />
+    return <SkeletonTimeout page><DashboardSkeleton /></SkeletonTimeout>
   }
+
+  const appUsage = (
+    <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading app usage</div>}>
+      <AppUsageCard platformFilter={platformFilter} />
+    </ErrorBoundary>
+  )
+  /** Column 3's cards in order; App Usage spans `appUsageSpan` in a grid. */
+  const column3Cards = (appUsageSpan = "") => (
+    <>
+      {COLUMN_3_BEFORE_APP_USAGE.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
+      <div className={appUsageSpan}>{appUsage}</div>
+      {COLUMN_3_AFTER_APP_USAGE.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)}
+    </>
+  )
+  const newClients = (
+    <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
+      <NewClientsWidget devices={filteredDevices as any} loading={devicesLoading} />
+    </ErrorBoundary>
+  )
+
+  const cards = (ids: readonly InsightCardKey[]) => ids.map(id => <InsightCardById key={id} id={id} ctx={insightCtx} />)
+  const column1 = (
+    <>
+      {/* Device Status Widget */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
+        <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
+      </ErrorBoundary>
+
+      {/* Install Health replaces the Errors and Warnings tiles */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading install health</div>}>
+        <InstallHealthHero ctx={insightCtx} />
+      </ErrorBoundary>
+
+      {/* Management Tools Logs, then Check-in Gaps at the foot of column 1 */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading management tools logs</div>}>
+        <ManagementToolLogs ctx={insightCtx} />
+      </ErrorBoundary>
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading check-in gaps</div>}>
+        <CheckinGaps ctx={insightCtx} />
+      </ErrorBoundary>
+    </>
+  )
+  const column2Cards = (
+    <>
+      {newClients}
+      {cards(COLUMN_2)}
+    </>
+  )
+  const eventsColumn = (
+    <>
+      {/* Recent Events Table */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
+        <RecentEventsTable
+          events={filteredEvents}
+          connectionStatus={connectionStatus}
+          lastUpdateTime={lastUpdateTime}
+          mounted={mounted}
+          deviceNameMap={deviceNameMap}
+          isLoading={connectionStatus === 'connecting' && events.length === 0}
+          loadingProgress={loadingProgress}
+          loadingMessage={loadingMessage}
+        />
+      </ErrorBoundary>
+
+      {/* Platform Distribution - Full Width */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
+        <PlatformDistributionWidget devices={filteredDevices as any} loading={devicesLoading} />
+      </ErrorBoundary>
+
+      {/* OS Version Tracking - Conditional display based on platform filter */}
+      <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
+        {(() => {
+          const showMac = platformFilter === 'all' || platformFilter === 'macOS'
+          const showWin = platformFilter === 'all' || platformFilter === 'Windows'
+          const gridCols = showMac && showWin ? 'lg:grid-cols-2 desktop:grid-cols-1 wide:grid-cols-2' : 'lg:grid-cols-1'
+          
+          return (
+            <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
+              {/* macOS Versions - only show when filtering macOS or all */}
+              {showMac && (
+                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
+              )}
+              
+              {/* Windows Versions - only show when filtering Windows or all */}
+              {showWin && (
+                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
+              )}
+            </div>
+          )
+        })()}
+      </ErrorBoundary>
+    </>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Two-column layout: Column A (30%) + Column B (70%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
-          {/* Column A (30% width) - Status Widget + Error/Warning Stats + New Clients Table */}
-          <div className="lg:col-span-3 space-y-8">
-            {/* Device Status Widget */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
-              <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
-            </ErrorBoundary>
-
-            {/* Error and Warning Stats Cards - Side by Side */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-              <div className="grid grid-cols-2 gap-4">
-                <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} platformFilter={platformFilter} />
-                <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} platformFilter={platformFilter} />
-              </div>
-            </ErrorBoundary>
-
-            {/* New Clients Table */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
-              <NewClientsWidget devices={filteredDevices as any} loading={devicesLoading} />
-            </ErrorBoundary>
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
+        {(() => {
+          // Keep the last good data on screen; say a refresh failed and when the data is from
+          const insightsFailed = !!insights.data && !!insights.error
+          const error = dashboardRefreshError || (insightsFailed ? insights.error : null)
+          if (!error) return null
+          const updatedAt = dashboardRefreshError
+            ? (lastUpdateTime ?? cachedAt(DASHBOARD_CACHE_KEY))
+            : insights.data?.generatedAt ? Date.parse(insights.data.generatedAt) : null
+          return (
+            <RefreshErrorBanner
+              className="mb-6 w-fit"
+              error={error}
+              updatedAt={updatedAt}
+              retrying={dashboardRetrying || insights.loading}
+              onRetry={async () => {
+                setDashboardRetrying(true)
+                insights.refresh()
+                try { await refreshDashboardRef.current() } finally { setDashboardRetrying(false) }
+              }}
+            />
+          )
+        })()}
+        {/* Layout per docs/DASHBOARD-WIDGETS.md: independent column stacks at
+            every width, never a grid row under the columns.
+            Wide (>= 2200px): column 1 | column 2 | column 3 | events.
+            Desktop (>= 1680px): column 1 + Uptime Overview | column 2 + App
+            Usage | events + Update Debt, Storage, Software Risk.
+            Laptop: column 1 + column 3 without App Usage | events + App Usage
+            + column 2 (2fr / 3fr), one stack after the other below the lg
+            breakpoint. Balanced by measured card heights. */}
+        {layout === "wide" && (
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start">
+            <div className="space-y-8">{column1}</div>
+            <div className="space-y-8">{column2Cards}</div>
+            <div className="space-y-8">{column3Cards()}</div>
+            <div className="space-y-8">{eventsColumn}</div>
           </div>
-
-          {/* Column B (70% width) - Recent Events + OS Version Charts */}
-          <div className="lg:col-span-7 space-y-8">
-            {/* Recent Events Table */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
-              <RecentEventsTable
-                events={filteredEvents}
-                connectionStatus={connectionStatus}
-                lastUpdateTime={lastUpdateTime}
-                mounted={mounted}
-                deviceNameMap={deviceNameMap}
-                isLoading={connectionStatus === 'connecting' && events.length === 0}
-                loadingProgress={loadingProgress}
-                loadingMessage={loadingMessage}
-              />
-            </ErrorBoundary>
-
-            {/* Platform Distribution - Full Width */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
-              <PlatformDistributionWidget devices={filteredDevices as any} loading={devicesLoading} />
-            </ErrorBoundary>
-
-            {/* OS Version Tracking - Conditional display based on platform filter */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
-              {(() => {
-                const showMac = platformFilter === 'all' || platformFilter === 'macOS'
-                const showWin = platformFilter === 'all' || platformFilter === 'Windows'
-                const gridCols = showMac && showWin ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
-                
-                return (
-                  <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
-                    {/* macOS Versions - only show when filtering macOS or all */}
-                    {showMac && (
-                      <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
-                    )}
-                    
-                    {/* Windows Versions - only show when filtering Windows or all */}
-                    {showWin && (
-                      <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
-                    )}
-                  </div>
-                )
-              })()}
-            </ErrorBoundary>
+        )}
+        {layout === "desktop" && (
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)] gap-8 items-start">
+            <div className="space-y-8">
+              {column1}
+              {cards(["rebootDebt"])}
+            </div>
+            <div className="space-y-8">
+              {column2Cards}
+              {appUsage}
+            </div>
+            <div className="space-y-8">
+              {eventsColumn}
+              {cards(["updateDebt", "storage", "softwareRisk"])}
+            </div>
           </div>
-        </div>
+        )}
+        {layout === "narrow" && (
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-8 items-start">
+            <div className="space-y-8">
+              {column1}
+              {cards(["updateDebt", "storage", "softwareRisk", "rebootDebt"])}
+            </div>
+            <div className="space-y-8">
+              {eventsColumn}
+              {appUsage}
+              {column2Cards}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Performance monitors disabled for memory optimization */}

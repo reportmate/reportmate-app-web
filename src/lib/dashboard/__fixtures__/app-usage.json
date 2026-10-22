@@ -1,0 +1,176 @@
+{
+  "card": "appUsage",
+  "platform": "all",
+  "includeArchived": false,
+  "generatedAt": "2026-10-22T15:00:00+00:00",
+  "data": {
+    "generatedAt": "2026-10-22T15:00:00+00:00",
+    "platform": "all",
+    "days": 30,
+    "filters": {
+      "usages": [],
+      "catalogs": []
+    },
+    "available": {
+      "usages": [
+        {
+          "value": "Assigned",
+          "devices": 400
+        },
+        {
+          "value": "Shared",
+          "devices": 500
+        }
+      ],
+      "catalogs": [
+        {
+          "value": "Staff",
+          "devices": 300
+        },
+        {
+          "value": "Curriculum",
+          "devices": 600
+        }
+      ]
+    },
+    "link": {
+      "path": "/applications",
+      "params": {
+        "type": "usage",
+        "period": "30"
+      }
+    },
+    "apps": [
+      {
+        "name": "SampleApp 0",
+        "totalHours": 1200.0,
+        "activeHours": 120.0,
+        "devices": 40,
+        "activeDevices": 20,
+        "link": {
+          "path": "/applications/usage/SampleApp%200",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 1",
+        "totalHours": 1100.0,
+        "activeHours": 110.0,
+        "devices": 39,
+        "activeDevices": 19,
+        "link": {
+          "path": "/applications/usage/SampleApp%201",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 2",
+        "totalHours": 1000.0,
+        "activeHours": 100.0,
+        "devices": 38,
+        "activeDevices": 18,
+        "link": {
+          "path": "/applications/usage/SampleApp%202",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 3",
+        "totalHours": 900.0,
+        "activeHours": 90.0,
+        "devices": 37,
+        "activeDevices": 17,
+        "link": {
+          "path": "/applications/usage/SampleApp%203",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 4",
+        "totalHours": 800.0,
+        "activeHours": 80.0,
+        "devices": 36,
+        "activeDevices": 16,
+        "link": {
+          "path": "/applications/usage/SampleApp%204",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 5",
+        "totalHours": 700.0,
+        "activeHours": 70.0,
+        "devices": 35,
+        "activeDevices": 15,
+        "link": {
+          "path": "/applications/usage/SampleApp%205",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 6",
+        "totalHours": 600.0,
+        "activeHours": 60.0,
+        "devices": 34,
+        "activeDevices": 14,
+        "link": {
+          "path": "/applications/usage/SampleApp%206",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 7",
+        "totalHours": 500.0,
+        "activeHours": 50.0,
+        "devices": 33,
+        "activeDevices": 13,
+        "link": {
+          "path": "/applications/usage/SampleApp%207",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 8",
+        "totalHours": 400.0,
+        "activeHours": 40.0,
+        "devices": 32,
+        "activeDevices": 12,
+        "link": {
+          "path": "/applications/usage/SampleApp%208",
+          "params": {
+            "days": "30"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 9",
+        "totalHours": 300.0,
+        "activeHours": 30.0,
+        "devices": 31,
+        "activeDevices": 11,
+        "link": {
+          "path": "/applications/usage/SampleApp%209",
+          "params": {
+            "days": "30"
+          }
+        }
+      }
+    ]
+  }
+}

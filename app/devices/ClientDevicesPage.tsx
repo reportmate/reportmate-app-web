@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState, useMemo, Suspense } from "react"
+import { useEffect, useState, useMemo, useRef, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 import { calculateDeviceStatus, isStored } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
@@ -11,6 +11,10 @@ import { PlatformBadge } from "../../src/components/ui/PlatformBadge"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 import DeviceFilters, { FilterOptions } from "../../src/components/shared/DeviceFilters"
 import { useScrollCollapse } from "../../src/hooks/useScrollCollapse"
+import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../src/lib/data-cache"
+import { RefreshErrorBanner } from "../../src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { toolRootFromParam, toolLevelFromParam, toolProductLabel, TOOL_WINDOW_HOURS, type ManagementToolRoot, type ToolLevel } from "@/src/lib/dashboard/reportRules"
 
 interface InventoryItem {
   id: string
@@ -46,9 +50,17 @@ interface InventoryItem {
 const includesCI = (list: string[], value?: string | null) =>
   list.some(v => v.toLowerCase() === (value || '').toLowerCase())
 
+// Transformed rows, keyed apart from the raw /api/v1/devices JSON that
+// useDeviceData caches, so the two shapes never collide.
+const DEVICES_CACHE_KEY = '/api/v1/devices#inventory'
+
 function DevicesPageContent() {
-  const [inventory, setInventory] = useState<InventoryItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => peekCached<InventoryItem[]>(DEVICES_CACHE_KEY) ?? [])
+  const [loading, setLoading] = useState(() => peekCached(DEVICES_CACHE_KEY) === undefined)
+  // A failed background refresh keeps the cached rows and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
@@ -57,10 +69,21 @@ function DevicesPageContent() {
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  // `tool=<root>&level=error|warning` from the Management Tools card. The
+  // device list carries no management log data, so this shows as a pill and
+  // does not narrow the rows yet.
+  const [toolFilter, setToolFilter] = useState<{ tool: ManagementToolRoot; level: ToolLevel } | null>(null)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [sortColumn, setSortColumn] = useState<string>('deviceName')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // The query string this page last wrote, so the URL→state effect can tell
+  // its own router.replace apart from an outside navigation.
+  const lastWrittenQuery = useRef<string | null>(null)
+  const hydrated = useRef(false)
+  const skipNextWrite = useRef(false)
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   const { tableContainerRef, effectiveFiltersExpanded } = useScrollCollapse(
@@ -81,43 +104,68 @@ function DevicesPageContent() {
   const clearAllSelections = () => {
     setSelectedStatuses([]); setSelectedUsages([]); setSelectedCatalogs([])
     setSelectedAreas([]); setSelectedLocations([]); setSelectedFleets([])
+    setToolFilter(null)
   }
 
-  // Initialize search query and selections from URL parameters. Each dimension
-  // accepts a comma-separated list so deep links can preselect more than one pill.
+  // URL → state. Runs on mount and whenever the URL changes from outside (a
+  // dashboard deep link, Back). Each dimension accepts a comma-separated list
+  // so deep links can preselect more than one pill; an absent parameter
+  // clears its selection so the page always matches the URL.
   useEffect(() => {
     try {
-      const urlSearch = searchParams.get('search')
-      if (urlSearch) {
-        setSearchQuery(urlSearch)
-      }
-
+      if (hydrated.current && searchParams.toString() === lastWrittenQuery.current) return
       const list = (key: string) =>
         (searchParams.get(key) || '').split(',').map(v => v.trim()).filter(Boolean)
 
-      const status = list('status')
-      if (status.length) setSelectedStatuses(status)
-      const usage = list('usage')
-      if (usage.length) setSelectedUsages(usage)
-      const catalog = list('catalog')
-      if (catalog.length) setSelectedCatalogs(catalog)
-      const area = list('area')
-      if (area.length) setSelectedAreas(area)
-      const location = list('location')
-      if (location.length) setSelectedLocations(location)
-      const fleet = list('fleet')
-      if (fleet.length) setSelectedFleets(fleet)
+      setSearchQuery(searchParams.get('search') || '')
+      setSelectedStatuses(list('status'))
+      setSelectedUsages(list('usage'))
+      setSelectedCatalogs(list('catalog'))
+      setSelectedAreas(list('area'))
+      setSelectedLocations(list('location'))
+      setSelectedFleets(list('fleet'))
+      const tool = toolRootFromParam(searchParams.get('tool'))
+      setToolFilter(tool ? { tool, level: toolLevelFromParam(searchParams.get('level')) ?? 'error' } : null)
+      hydrated.current = true
+      skipNextWrite.current = true
     } catch (e) {
       console.warn('Failed to get search params:', e)
     }
   }, [searchParams])
 
+  // State → URL. Defaults are omitted, unrelated parameters (platform, from)
+  // are kept, and replace rather than push keeps filter toggles out of history.
+  useEffect(() => {
+    if (!hydrated.current) return
+    if (skipNextWrite.current) { skipNextWrite.current = false; return }
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search)
+      const put = (key: string, value: string) => (value ? params.set(key, value) : params.delete(key))
+      put('search', searchQuery.trim())
+      put('status', selectedStatuses.join(','))
+      put('usage', selectedUsages.join(','))
+      put('catalog', selectedCatalogs.join(','))
+      put('area', selectedAreas.join(','))
+      put('location', selectedLocations.join(','))
+      put('fleet', selectedFleets.join(','))
+      put('tool', toolFilter?.tool ?? '')
+      put('level', toolFilter?.level ?? '')
+      const next = params.toString().replace(/%2C/gi, ',')
+      if (next === window.location.search.replace(/^\?/, '')) return
+      lastWrittenQuery.current = next
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [searchQuery, selectedStatuses, selectedUsages, selectedCatalogs, selectedAreas,
+      selectedLocations, selectedFleets, toolFilter, pathname, router])
+
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const response = await fetch('/api/v1/devices', {
+        const response = await trackedFetch('/api/v1/devices', {
           credentials: 'include'
-        })
+        }, { background: peekCached(DEVICES_CACHE_KEY) !== undefined })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const data = await response.json()
         
         // FIXED: API returns {devices: [...], count: N} structure
@@ -182,20 +230,25 @@ function DevicesPageContent() {
             return true
           })
 
-          setInventory(uniqueItems)
+          setInventory(rememberCached(DEVICES_CACHE_KEY, uniqueItems))
+          setRefreshError(null)
         } else {
-                    setInventory([])
+                    setInventory(rememberCached<InventoryItem[]>(DEVICES_CACHE_KEY, []))
+          setRefreshError(null)
         }
       } catch (err) {
         console.error('Error fetching inventory:', err)
-        setError('Failed to fetch inventory data')
+        // Keep the last rows on screen when a background refresh fails.
+        if (peekCached(DEVICES_CACHE_KEY) === undefined) setError('Failed to fetch inventory data')
+        else setRefreshError(err instanceof Error ? err.message : String(err))
       } finally {
         setLoading(false)
+        setRetrying(false)
       }
     }
 
     fetchInventory()
-  }, [])
+  }, [reloadKey])
 
   // Search predicate shared by the table filter and the counter row.
   const matchesSearch = (item: InventoryItem, query: string) => (
@@ -364,10 +417,11 @@ function DevicesPageContent() {
 
   if (loading) {
     return (
+      <SkeletonTimeout page>
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
           {/* Content skeleton */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
               {/* Header section skeleton — title, subtitle, search box */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -451,13 +505,14 @@ function DevicesPageContent() {
           </div>
         </div>
       </div>
+      </SkeletonTimeout>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
         {inventory.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 py-16">
             <div className="text-center">
@@ -486,6 +541,13 @@ function DevicesPageContent() {
                     </span>
                   )}
                 </h2>
+                <RefreshErrorBanner
+                  error={refreshError}
+                  updatedAt={cachedAt(DEVICES_CACHE_KEY)}
+                  retrying={retrying}
+                  onRetry={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+                  className="mt-2 w-fit"
+                />
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   {isFiltered 
                     ? `Showing filtered results from ${baseCounts.all} total devices`
@@ -544,6 +606,32 @@ function DevicesPageContent() {
               onToggle={() => setFiltersExpanded(!filtersExpanded)}
               locationCounts={locationCounts}
             />
+
+            {toolFilter && (
+              <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                  </svg>
+                  <span className="font-medium">Filters Active</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200">
+                    {toolProductLabel(toolFilter.tool, platformFilter === 'all' ? null : platformFilter)} {toolFilter.level === 'error' ? 'errors' : 'warnings'} (last {TOOL_WINDOW_HOURS} h)
+                    <button onClick={() => setToolFilter(null)} className="hover:text-yellow-950 dark:hover:text-white" title="Clear tool filter" aria-label="Clear tool filter">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </span>
+                  <span className="text-yellow-700 dark:text-yellow-300">
+                    The device list has no management log data yet, so every device is shown.
+                  </span>
+                </div>
+                <button
+                  onClick={() => setToolFilter(null)}
+                  className="px-3 py-1 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
 
             <div ref={tableContainerRef} className="overflow-auto max-h-[calc(100vh-16rem)] table-scrollbar">
               <table className="w-full relative">
@@ -830,7 +918,7 @@ export default function ClientDevicesPage() {
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+          <div className="page-container px-4 sm:px-6 lg:px-8 pt-8">
             <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
           </div>
         </div>

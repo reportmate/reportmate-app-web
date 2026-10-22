@@ -2,10 +2,14 @@
 
 export const dynamic = 'force-dynamic'
 
-import React, { useCallback, useEffect, useMemo, useState } from "react"
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { Search, X } from 'lucide-react'
+import { cachedAt, findNearestCached, peekCached, rememberCached, trackedFetch } from "../../../src/lib/data-cache"
+import { RefreshErrorBanner } from "../../../src/components/ui/RefreshErrorBanner"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 interface IngestFailure {
   id: number
@@ -111,49 +115,170 @@ function reasonBadgeClass(failureType: string, outcome: string): string {
     : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
 }
 
+const DEFAULT_HOURS = 168
+const DEFAULT_OUTCOME: Outcome = 'rejected'
+const OUTCOMES: Outcome[] = ['rejected', 'retried', 'accepted']
+
+function parseHours(value: string | null): number {
+  const n = value ? parseInt(value, 10) : NaN
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_HOURS
+}
+
+function parseOutcome(value: string | null): Outcome {
+  return OUTCOMES.includes(value as Outcome) ? (value as Outcome) : DEFAULT_OUTCOME
+}
+
+// The request URL doubles as the cache key, so each filter combination keeps
+// its own last answer.
+function failuresUrl(hours: number, outcome: Outcome, reason: string | null): string {
+  const params = new URLSearchParams({ limit: '500', hours: String(hours), outcome })
+  if (reason) params.append('reason', reason)
+  return `/api/events/failures?${params.toString()}`
+}
+
+/**
+ * The cached answer closest to a filter combination: the exact one; else the
+ * same window and outcome without a reason, narrowed to that reason here;
+ * else whatever this page loaded most recently. Shown while the exact answer
+ * loads, so changing a filter never drops back to a skeleton.
+ */
+function nearestFailures(hours: number, outcome: Outcome, reason: string | null): FailuresPayload | undefined {
+  const exact = peekCached<FailuresPayload>(failuresUrl(hours, outcome, reason))
+  if (exact) return exact
+  if (reason) {
+    const broad = peekCached<FailuresPayload>(failuresUrl(hours, outcome, null))
+    if (broad) {
+      const failures = broad.failures.filter(f => f.reason === reason)
+      return { ...broad, failures, total: failures.length }
+    }
+  }
+  return findNearestCached<FailuresPayload>('/api/events/failures?')?.data
+}
+
+interface FailuresPayload {
+  failures: IngestFailure[]
+  summary: ReasonSummary[]
+  total: number
+  counts: { rejected: number; retried: number; accepted: number }
+}
+
+function parseFailuresPayload(data: any): FailuresPayload {
+  return {
+    failures: Array.isArray(data.failures) ? data.failures : [],
+    summary: Array.isArray(data.summary) ? data.summary : [],
+    total: typeof data.total === 'number' ? data.total : 0,
+    counts: {
+      rejected: typeof data?.counts?.rejected === 'number' ? data.counts.rejected : 0,
+      retried: typeof data?.counts?.retried === 'number' ? data.counts.retried : 0,
+      accepted: typeof data?.counts?.accepted === 'number' ? data.counts.accepted : 0,
+    },
+  }
+}
+
+// `hours`, `outcome` and `reason` live in the URL, so the dashboard's
+// Check-in Gaps card can deep-link to e.g. `?hours=24&reason=<r>`.
 export default function ClientFailuresPage() {
-  const [failures, setFailures] = useState<IngestFailure[]>([])
-  const [summary, setSummary] = useState<ReasonSummary[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
+  return (
+    <Suspense fallback={<div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black" />}>
+      <ClientFailuresPageContent />
+    </Suspense>
+  )
+}
+
+function ClientFailuresPageContent() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [initialCache] = useState(() => nearestFailures(
+    parseHours(searchParams.get('hours')),
+    parseOutcome(searchParams.get('outcome')),
+    searchParams.get('reason') || null,
+  ))
+  const [failures, setFailures] = useState<IngestFailure[]>(initialCache?.failures ?? [])
+  const [summary, setSummary] = useState<ReasonSummary[]>(initialCache?.summary ?? [])
+  const [total, setTotal] = useState(initialCache?.total ?? 0)
+  const [loading, setLoading] = useState(initialCache === undefined)
+  // A failed background refresh keeps the last answer and shows the banner.
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [hours, setHours] = useState(168)
-  const [outcome, setOutcome] = useState<Outcome>('rejected')
-  const [counts, setCounts] = useState<{ rejected: number; retried: number; accepted: number }>({ rejected: 0, retried: 0, accepted: 0 })
-  const [reasonFilter, setReasonFilter] = useState<string | null>(null)
+  const [hours, setHours] = useState(() => parseHours(searchParams.get('hours')))
+  const [outcome, setOutcome] = useState<Outcome>(() => parseOutcome(searchParams.get('outcome')))
+  const [counts, setCounts] = useState<{ rejected: number; retried: number; accepted: number }>(initialCache?.counts ?? { rejected: 0, retried: 0, accepted: 0 })
+  const [reasonFilter, setReasonFilter] = useState<string | null>(() => searchParams.get('reason') || null)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Adopt URL changes made from outside (back/forward, a new deep link).
+  const urlHours = parseHours(searchParams.get('hours'))
+  const urlOutcome = parseOutcome(searchParams.get('outcome'))
+  const urlReason = searchParams.get('reason') || null
+  useEffect(() => { setHours(urlHours) }, [urlHours])
+  useEffect(() => { setOutcome(urlOutcome) }, [urlOutcome])
+  useEffect(() => { setReasonFilter(urlReason) }, [urlReason])
+
+  // Write the filters back, omitting defaults and keeping unrelated params.
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const set = (key: string, value: string | null) => {
+      if (value === null) params.delete(key)
+      else params.set(key, value)
+    }
+    set('hours', hours === DEFAULT_HOURS ? null : String(hours))
+    set('outcome', outcome === DEFAULT_OUTCOME ? null : outcome)
+    set('reason', reasonFilter)
+    const next = params.toString()
+    if (next !== searchParams.toString()) {
+      router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hours, outcome, reasonFilter])
+
+  const applyPayload = useCallback((payload: FailuresPayload) => {
+    setFailures(payload.failures)
+    setSummary(payload.summary)
+    setTotal(payload.total)
+    setCounts(payload.counts)
+  }, [])
+
   const fetchFailures = useCallback(async () => {
+    const url = failuresUrl(hours, outcome, reasonFilter)
     try {
-      const params = new URLSearchParams({ limit: '500', hours: String(hours), outcome })
-      if (reasonFilter) params.append('reason', reasonFilter)
-      const resp = await fetch(`/api/events/failures?${params.toString()}`)
+      const resp = await trackedFetch(url, undefined, { background: peekCached(url) !== undefined })
       if (!resp.ok) {
         throw new Error(`Request failed with status ${resp.status}`)
       }
       const data = await resp.json()
-      setFailures(Array.isArray(data.failures) ? data.failures : [])
-      setSummary(Array.isArray(data.summary) ? data.summary : [])
-      setTotal(typeof data.total === 'number' ? data.total : 0)
-      setCounts({
-        rejected: typeof data?.counts?.rejected === 'number' ? data.counts.rejected : 0,
-        retried: typeof data?.counts?.retried === 'number' ? data.counts.retried : 0,
-        accepted: typeof data?.counts?.accepted === 'number' ? data.counts.accepted : 0,
-      })
+      applyPayload(rememberCached(url, parseFailuresPayload(data)))
       setError(null)
+      setRefreshError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load failures')
+      // Keep whatever answer is on screen (exact or nearest) when a refresh fails.
+      if (nearestFailures(hours, outcome, reasonFilter) !== undefined) {
+        console.error('Failed to refresh failures:', e)
+        setRefreshError(e instanceof Error ? e.message : String(e))
+      } else setError(e instanceof Error ? e.message : 'Failed to load failures')
     } finally {
       setLoading(false)
+      setRetrying(false)
     }
-  }, [hours, reasonFilter, outcome])
+  }, [hours, reasonFilter, outcome, applyPayload])
 
   useEffect(() => {
-    setLoading(true)
+    // A filter combination seen before shows its last answer at once; a new
+    // one shows the nearest cached answer, or keeps what is on screen, while
+    // its own answer loads. The skeleton is only for a page with no data at all.
+    const nearest = nearestFailures(hours, outcome, reasonFilter)
+    if (nearest) {
+      applyPayload(nearest)
+      setError(null)
+      setLoading(false)
+    }
+    // A banner from another filter combination does not apply to this one.
+    setRefreshError(null)
     fetchFailures()
     const interval = setInterval(fetchFailures, 30000)
     return () => clearInterval(interval)
-  }, [fetchFailures])
+  }, [fetchFailures, hours, outcome, reasonFilter, applyPayload])
 
   const filteredFailures = useMemo(() => {
     if (!searchQuery.trim()) return failures
@@ -168,7 +293,7 @@ export default function ClientFailuresPage() {
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+      <div className="flex-1 flex flex-col min-h-0 page-container px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
 
         {/* Outcome switch: rejected is the page's job, the other two are
             context. Every count is always shown so no side can go unnoticed. */}
@@ -229,6 +354,13 @@ export default function ClientFailuresPage() {
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {OUTCOME_COPY[outcome].blurb}
               </p>
+              <RefreshErrorBanner
+                error={refreshError}
+                updatedAt={cachedAt(failuresUrl(hours, outcome, reasonFilter))}
+                retrying={retrying}
+                onRetry={() => { setRetrying(true); fetchFailures() }}
+                className="mt-2 w-fit"
+              />
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
               <select
@@ -236,6 +368,9 @@ export default function ClientFailuresPage() {
                 onChange={(e) => setHours(parseInt(e.target.value, 10))}
                 className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
+                {!HOURS_OPTIONS.some(o => o.value === hours) && (
+                  <option value={hours}>Last {hours} hours</option>
+                )}
                 {HOURS_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -263,9 +398,11 @@ export default function ClientFailuresPage() {
 
           {/* Body */}
           {loading ? (
-            <div className="flex-1 flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
-            </div>
+            <SkeletonTimeout onRetry={() => { void fetchFailures() }}>
+              <div className="flex-1 flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white"></div>
+              </div>
+            </SkeletonTimeout>
           ) : error ? (
             <div className="flex-1 flex items-center justify-center py-16">
               <div className="text-center">

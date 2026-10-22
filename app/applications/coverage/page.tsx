@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { safeInternalPath } from "@/src/lib/security/safeUrl"
+import { csvCell } from "@/src/lib/csv"
 
 interface DarkDevice {
   serialNumber: string
@@ -110,10 +111,7 @@ export default function CoveragePage() {
   const exportCsv = () => {
     if (!data) return
     const header = ['Status','Serial','Device','Platform','OS','Usage','Catalog','Location','LastSeen','LastUsage','DaysSinceUsage','TotalHoursEver']
-    const escape = (v: unknown) => {
-      const s = v == null ? '' : String(v)
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-    }
+    const escape = csvCell
     const lines = [header.join(',')]
     rows.forEach(r => lines.push([
       r.bucket, r.serialNumber, r.deviceName, r.platform, r.osName,
@@ -140,7 +138,7 @@ export default function CoveragePage() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black">
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-6">
 
         {/* Back link */}
         <div className="mb-4">

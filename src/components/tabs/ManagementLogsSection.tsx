@@ -15,6 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { CopyButton } from '../ui/CopyButton'
 import { logProductName, normalizeLogRoot, type LogFileEntry, type LogRoot, type LogsInfo, type LogTail } from '../../lib/data-processing/modules/logs'
+import { levelSummaryCounts, TOOL_WINDOW_HOURS, type ToolLevel } from '../../lib/dashboard/reportRules'
 
 interface ManagementLogsSectionProps {
   serialNumber?: string
@@ -22,6 +23,11 @@ interface ManagementLogsSectionProps {
   logs: LogsInfo | null
   /** The installs module when loaded; each root's version falls back to its tool's installed version here */
   installs?: unknown
+  /** Deep link (`?tool=&level=`): the tool tab to open and the level to filter it to */
+  initialTool?: string | null
+  initialLevel?: ToolLevel | null
+  /** Reports the user's tool and level choice so the page can keep it in the URL; the first tool and no level are reported as null */
+  onSelectionChange?: (tool: string | null, level: ToolLevel | null) => void
 }
 
 type TailState =
@@ -98,6 +104,16 @@ interface LevelFilter {
 }
 
 const DEFAULT_LEVEL_FILTER: LevelFilter = { errors: false, warnings: false, debug: false }
+
+/** The filter a `level=` deep link opens with: only that level. */
+const levelFilterFor = (level: ToolLevel | null | undefined): LevelFilter =>
+  level === 'error' ? { errors: true, warnings: false, debug: false }
+    : level === 'warning' ? { errors: false, warnings: true, debug: false }
+      : DEFAULT_LEVEL_FILTER
+
+/** The `level=` value a filter stands for: one of errors or warnings alone, else none. */
+const levelParamFor = (filter: LevelFilter): ToolLevel | null =>
+  filter.errors && !filter.warnings ? 'error' : filter.warnings && !filter.errors ? 'warning' : null
 
 function passesLevelFilter(level: LineLevel, filter: LevelFilter): boolean {
   if (level === 'debug') return filter.debug && !filter.errors && !filter.warnings
@@ -447,7 +463,7 @@ function installedVersionFor(tool: string, platform: string | undefined, install
   return undefined
 }
 
-export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs, installs }) => {
+export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs, installs, initialTool, initialLevel, onSelectionChange }) => {
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [tails, setTails] = useState<Record<string, TailState>>({})
   const [selectedFile, setSelectedFile] = useState<Record<string, string>>({})
@@ -473,12 +489,44 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     [logs]
   )
   const firstTool = logs && logs.roots.length > 0 ? logs.roots[0].tool : null
+  const deepLinkTool = initialTool && logs?.roots.some(r => r.tool === initialTool) ? initialTool : null
   useEffect(() => {
     setTails({})
     requestedTails.current = new Set()
-    setActiveTool(firstTool)
+    setActiveTool(deepLinkTool ?? firstTool)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNumber, logsKey])
+
+  // Deep link: open the linked tool filtered to the linked level, on load and
+  // when the URL changes from outside. The section's own reports come back as
+  // the same props and are skipped, so a user's choice is never undone.
+  const lastReported = useRef<string | null>(null)
+  const pendingLevelFile = useRef<ToolLevel | null>(null)
+  const sectionRef = useRef<HTMLDivElement>(null)
+  const scrolledToDeepLink = useRef(false)
+  useEffect(() => {
+    const key = `${deepLinkTool ?? ''}|${initialLevel ?? ''}`
+    if (key === lastReported.current) return
+    lastReported.current = key
+    if (deepLinkTool) setActiveTool(deepLinkTool)
+    setFilter('')
+    setLevelFilter(levelFilterFor(initialLevel))
+    pendingLevelFile.current = initialLevel ?? null
+  }, [deepLinkTool, initialLevel])
+
+  // Bring the viewer into view once when the page opens on a deep link.
+  useEffect(() => {
+    if (!deepLinkTool || scrolledToDeepLink.current || !sectionRef.current) return
+    scrolledToDeepLink.current = true
+    sectionRef.current.scrollIntoView({ block: 'start' })
+  }, [deepLinkTool])
+
+  const report = (tool: string | null, filter: LevelFilter) => {
+    const toolParam = tool && tool !== firstTool ? tool : null
+    const levelParam = levelParamFor(filter)
+    lastReported.current = `${toolParam ?? ''}|${levelParam ?? ''}`
+    onSelectionChange?.(toolParam, levelParam)
+  }
 
   // Fetch a tool's tails the first time its tab is opened. A
   // failed fetch is retried when the tab is opened again or Retry is pressed;
@@ -543,6 +591,20 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     }
     return flags
   }, [loadedRoot])
+  // A level deep link opens the first log that has lines of that level when
+  // the primary one has none, so the viewer does not open empty.
+  useEffect(() => {
+    const level = pendingLevelFile.current
+    if (!level || !activeTool || !loadedRoot) return
+    pendingLevelFile.current = null
+    const has = (file: string | null | undefined) => {
+      const flags = file ? fileFlags.get(file) : undefined
+      return level === 'error' ? Boolean(flags?.errors) : Boolean(flags?.warnings)
+    }
+    if (has(currentFile)) return
+    const match = loadedRoot.tails.find(t => has(t.file))?.file
+    if (match) setSelectedFile(prev => ({ ...prev, [activeTool]: match }))
+  }, [activeTool, loadedRoot, fileFlags, currentFile])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
   // Every text log is shown as rows: lines with a recognised shape become
@@ -590,7 +652,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     }
     return seen !== undefined
   }, [classifiedLines])
-  const toggleLevel = (key: keyof LevelFilter) => setLevelFilter(current => ({ ...current, [key]: !current[key] }))
+  const toggleLevel = (key: keyof LevelFilter) => {
+    const next = { ...levelFilter, [key]: !levelFilter[key] }
+    setLevelFilter(next)
+    report(activeTool, next)
+  }
   // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
   const jsonDocument = useMemo<unknown>(() => {
     if (!isJson || tailLines.length === 0) return null
@@ -628,6 +694,8 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     setActiveTool(tool)
     setFilter('')
     setLevelFilter(DEFAULT_LEVEL_FILTER)
+    pendingLevelFile.current = null
+    report(tool, DEFAULT_LEVEL_FILTER)
     if (tails[tool]?.state === 'error') setRetryNonce(n => n + 1)
   }
 
@@ -638,9 +706,13 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     setSelectedFile(prev => ({ ...prev, [activeTool]: file }))
     setFilter('')
     setLevelFilter(DEFAULT_LEVEL_FILTER)
+    pendingLevelFile.current = null
+    report(activeTool, DEFAULT_LEVEL_FILTER)
   }
 
   const activeVersion = active ? (active.version || installedVersionFor(active.tool, logs?.platform, installs)) : undefined
+  // The ingest summary's counts for the card's window, when the API stamped one
+  const activeWindowCounts = active?.levelSummary ? levelSummaryCounts(active.levelSummary) : null
   const totalFiles = roots.reduce((n, r) => n + (r.fileCount ?? r.files.length), 0)
   const totalBytes = roots.reduce((n, r) => n + (r.totalBytes ?? 0), 0)
   const filesWithoutTails: LogFileEntry[] = active
@@ -648,7 +720,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     : []
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div ref={sectionRef} className="scroll-mt-24 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Always open: the log viewer is the point of this card, and the MDM root alone is worth the space */}
       <div className="px-6 py-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</h3>
@@ -707,6 +779,15 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Last written</div>
                   <div className="text-sm text-gray-900 dark:text-white">{formatWhen(active.newestModified) || 'Unknown'}</div>
                 </div>
+                {activeWindowCounts && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Last {TOOL_WINDOW_HOURS} h</div>
+                    <div className="flex flex-wrap items-center gap-x-3 text-sm" title="Error and warning lines the server counted at check-in, the numbers the dashboard card uses">
+                      <span className={activeWindowCounts.errors > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}>{activeWindowCounts.errors} {activeWindowCounts.errors === 1 ? 'error' : 'errors'}</span>
+                      <span className={activeWindowCounts.warnings > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-600 dark:text-gray-400'}>{activeWindowCounts.warnings} {activeWindowCounts.warnings === 1 ? 'warning' : 'warnings'}</span>
+                    </div>
+                  </div>
+                )}
                 {active.latestSession && (
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Latest run</div>

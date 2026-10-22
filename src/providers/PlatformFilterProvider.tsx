@@ -59,6 +59,18 @@ interface PlatformFilterProviderProps {
   defaultPlatform?: Platform
 }
 
+/**
+ * The `platform` URL parameter. The toggle writes `mac` / `win`; deep links
+ * from the dashboard insights API may say `macOS` / `Windows`, which are
+ * accepted and rewritten to the short form.
+ */
+export function platformFromParam(value: string | null): 'macOS' | 'Windows' | null {
+  const v = (value || '').trim().toLowerCase()
+  if (v === 'mac' || v === 'macos') return 'macOS'
+  if (v === 'win' || v === 'windows') return 'Windows'
+  return null
+}
+
 export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: PlatformFilterProviderProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -69,9 +81,8 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   //   2) localStorage (for persistence across navigation)
   //   3) default value
   const getInitialPlatform = (): Platform => {
-    const urlPlatform = searchParams.get('platform')
-    if (urlPlatform === 'mac') return 'macOS'
-    if (urlPlatform === 'win') return 'Windows'
+    const fromUrl = platformFromParam(searchParams.get('platform'))
+    if (fromUrl) return fromUrl
     
     // Check localStorage (client-side only)
     if (typeof window !== 'undefined') {
@@ -90,10 +101,16 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   // one another while a router.replace is still in flight.
   useEffect(() => {
     const urlPlatform = searchParams.get('platform')
-    if (urlPlatform === 'mac' || urlPlatform === 'win') {
-      const nextPlatform = urlPlatform === 'mac' ? 'macOS' : 'Windows'
+    const nextPlatform = platformFromParam(urlPlatform)
+    if (nextPlatform) {
       setPlatformFilterState(nextPlatform)
       localStorage.setItem(STORAGE_KEY, nextPlatform)
+      const short = nextPlatform === 'macOS' ? 'mac' : 'win'
+      if (urlPlatform !== short) {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('platform', short)
+        router.replace(`${pathname}?${params.toString()}`)
+      }
       return
     }
 

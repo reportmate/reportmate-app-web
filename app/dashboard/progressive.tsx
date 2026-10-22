@@ -26,6 +26,7 @@ import { WarningStatsWidget, ErrorStatsWidget } from "../../src/lib/modules/widg
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
+import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 
 export default function ProgressiveDashboard() {
   useComponentTracker('ProgressiveDashboard')
@@ -113,14 +114,14 @@ export default function ProgressiveDashboard() {
 
   // Show skeleton only while FAST devices are loading (<3 seconds)
   if (fastLoading) {
-    return <DashboardSkeleton />
+    return <SkeletonTimeout page><DashboardSkeleton /></SkeletonTimeout>
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
       {/* Header */}
       <header className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="page-container px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16 w-full">
             {/* Brand */}
             <div className="flex items-center gap-4">
@@ -178,7 +179,7 @@ export default function ProgressiveDashboard() {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="page-container px-4 sm:px-6 lg:px-8 py-8">
         {/* Two-column layout */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
           
