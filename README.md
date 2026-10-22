@@ -1,10 +1,10 @@
 # ReportMate Web Dashboard
 
-A Next.js-based real-time dashboard for monitoring fleet events via SignalR, part of the ReportMate ecosystem.
+A Next.js dashboard for the ReportMate fleet, part of the ReportMate ecosystem. It reads device, module and event data from the [ReportMate API](https://github.com/reportmate/reportmate-api), a FastAPI service backed by PostgreSQL, and receives live events through Azure Web PubSub.
 
 ## Features
 
-- **Real-time Event Streaming** via SignalR with automatic reconnection
+- **Real-time Event Streaming** via Azure Web PubSub with automatic reconnection
 - **Professional Dashboard UI** inspired by MunkiReport's event module
 - **Status-based Event Display** with color-coded indicators and icons
 - **Smart Payload Formatting** that adapts to different data types
@@ -12,7 +12,7 @@ A Next.js-based real-time dashboard for monitoring fleet events via SignalR, par
 - **Modern Design** with glassmorphism effects and smooth animations
 - **Responsive Layout** that works on all screen sizes
 - **Dark Theme** optimized for monitoring environments
-- **Modular Architecture** with plugin system for extensibility
+- **Modular Architecture** with a module registry, widgets and charts per reporting module
 
 ## Quick Start
 
@@ -20,7 +20,7 @@ A Next.js-based real-time dashboard for monitoring fleet events via SignalR, par
 
 - Node.js 18+
 - pnpm (recommended) or npm
-- ReportMate backend services (Azure Functions)
+- A reachable [ReportMate API](https://github.com/reportmate/reportmate-api) (FastAPI)
 
 ### 1. Installation
 
@@ -39,9 +39,8 @@ cp .env.local.example .env.local
 Configure your environment variables in `.env.local`:
 
 ```env
-NEXT_PUBLIC_WPS_URL=wss://<your-pubsub>.webpubsub.azure.com/client/?hub=fleet
-NEXT_PUBLIC_WPS_TOKEN=<jwt-from-/api/negotiate>
-API_BASE_URL=https://your-functions-api.azurewebsites.net
+API_BASE_URL=https://your-reportmate-api.example.com
+API_INTERNAL_SECRET=<shared-secret-also-set-on-the-api>
 NEXT_PUBLIC_ENABLE_SIGNALR=true
 ```
 
@@ -75,43 +74,35 @@ pnpm start
 - Security status and compliance
 - Event history and logs
 
-### Module Management (`/modules`)
-- Install/uninstall dashboard modules
-- Enable/disable functionality
-- Module configuration
-- Community module discovery
+### Module Reports
+
+- One fleet report per module: `/applications`, `/hardware`, `/identity`, `/installs`, `/inventory`, `/management`, `/network`, `/peripherals`, `/security` and `/system`
+- Events at `/events` and settings at `/settings`
 
 ## Testing & Demo
 
-### Demo Data Generation
+### Demo Mode
+
+Set `DEMO_MODE=true` to bypass sign-in and run the dashboard read-only, as described in [src/lib/demo-mode.ts](src/lib/demo-mode.ts).
+
+### Checks
+
+Continuous integration runs the same checks on every pull request.
 
 ```bash
-# Generate demo events (default: 10 events every 3 seconds)
-pnpm demo
-
-# Fast demo (20 events every 1 second)
-pnpm demo:fast
-
-# Slow demo (5 events every 5 seconds)  
-pnpm demo:slow
+pnpm exec tsc --noEmit
+pnpm lint
+pnpm test
+pnpm build
 ```
 
-### API Testing
-
-Test the backend connection:
+Playwright tests in [e2e](e2e) check the API, its endpoints and the frontend routes against a running instance.
 
 ```bash
-# Health check
-curl https://reportmate-api.azurewebsites.net/api/negotiate?device=test-device
-
-# Send test event
-curl -X POST https://reportmate-api.azurewebsites.net/api/ingest \
-  -H "Content-Type: application/json" \
-  -d '{
-    "device": "device-001",
-    "kind": "info",
-    "payload": {"message": "Test event from web dashboard"}
-  }'
+pnpm test:e2e
+pnpm test:api-health
+pnpm test:api-endpoints
+pnpm test:routes
 ```
 
 ## Docker Support
@@ -129,16 +120,19 @@ The Dockerfile is optimized for production deployment with:
 - Multi-stage builds for smaller images
 - Next.js standalone output
 - Environment variable injection
-- Health checks
+
+Tagged releases are published to the GitHub Container Registry by [the publish workflow](.github/workflows/ghcr-publish.yml).
 
 ## Architecture
 
 - **Framework**: Next.js 15 with App Router
-- **Styling**: Tailwind CSS 4.x
-- **Real-time**: SignalR (@microsoft/signalr)
+- **Styling**: Tailwind CSS
+- **Backend**: route handlers under [app/api](app/api) proxy each request to the FastAPI service named by `API_BASE_URL`
+- **Real-time**: Azure Web PubSub, using a token minted by the API's negotiate endpoint
+- **Authentication**: NextAuth with Entra ID, Google and credentials providers
 - **Type Safety**: TypeScript
 - **Package Manager**: pnpm
-- **Deployment**: Docker + Azure Container Apps
+- **Deployment**: Docker standalone image, self-hosted with [Docker Compose](https://github.com/reportmate/selfhosted-docker-reportmate) or on Azure or AWS through the ReportMate Terraform modules
 
 ## Configuration
 
@@ -146,34 +140,28 @@ The Dockerfile is optimized for production deployment with:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `NEXT_PUBLIC_WPS_URL` | Azure Web PubSub WebSocket URL | Yes |
-| `API_BASE_URL` | Backend API base URL | Yes |
-| `NEXT_PUBLIC_ENABLE_SIGNALR` | Enable real-time features | No (default: true) |
+| `API_BASE_URL` | ReportMate API (FastAPI) base URL | Yes |
+| `API_INTERNAL_SECRET` | Shared secret sent to the API as `X-Internal-Secret` | Yes, in production |
+| `NEXTAUTH_SECRET` | NextAuth session secret | Yes |
+| `NEXTAUTH_URL` | Public URL of the dashboard | Yes, in production |
+| `NEXT_PUBLIC_ENABLE_SIGNALR` | Enable live events through Web PubSub | No (off unless `true`) |
+| `DEMO_MODE` | Bypass sign-in and run read-only | No |
+
+[.env.example](.env.example) lists the authentication provider settings.
 
 ### Next.js Configuration
 
 The project uses Next.js standalone output for optimal Docker deployment:
 
 ```javascript
-// next.config.mjs
 const nextConfig = {
   output: 'standalone',
-  experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../../'),
-  }
 }
 ```
 
 ## Module System
 
-The dashboard supports a modular plugin architecture:
-
-- **Core Modules**: Built-in functionality (device overview, events, etc.)
-- **Official Modules**: Maintained by the ReportMate team
-- **Community Modules**: Third-party extensions
-- **Runtime Loading**: Install/remove modules without redeployment
-
-See the [Module Development Guide](docs/modules.md) for creating custom modules.
+Each reporting module (hardware, installs, security, network and so on) registers its widgets and charts with the module registry in [src/lib/modules](src/lib/modules). [src/lib/data-processing](src/lib/data-processing) turns API responses into the shapes the module pages render; [MODULAR_MIGRATION.md](MODULAR_MIGRATION.md) describes that split.
 
 ## Contributing
 
@@ -189,13 +177,15 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 
 ## Related Projects
 
-- [ReportMate Infrastructure](https://github.com/reportmate/reportmate-infra-azure) - Azure infrastructure and backend
+- [ReportMate API](https://github.com/reportmate/reportmate-api) - FastAPI backend and PostgreSQL schema
 - [ReportMate Windows Client](https://github.com/reportmate/reportmate-client-win) - Windows data collection client
-- [ReportMate Modules](https://github.com/reportmate) - Official and community modules
+- [ReportMate Mac Client](https://github.com/reportmate/reportmate-client-mac) - macOS data collection client
+- [Self-hosted Docker](https://github.com/reportmate/selfhosted-docker-reportmate) - Docker Compose stack
+- [Terraform for Azure](https://github.com/reportmate/terraform-azurerm-reportmate) and [AWS](https://github.com/reportmate/terraform-aws-reportmate) - cloud deployment
 
 ## Support
 
 - [Development wiki](wiki/README.md)
-- [Documentation](https://docs.reportmate.io)
+- [Website](https://reportmate.app)
 - [Issues](https://github.com/reportmate/reportmate-app-web/issues)
 - [Discussions](https://github.com/reportmate/reportmate-app-web/discussions)
