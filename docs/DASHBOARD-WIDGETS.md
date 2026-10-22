@@ -210,3 +210,17 @@ shows its error state; the rest render.
   After 10 seconds it becomes "Still loading… · Retry", and an error that came back shows at once.
   This covers the dashboard, devices, device detail, events, failures, installs, system,
   hardware, security, management, identity, network and peripherals.
+- Revision 3 on web (API #158 merged):
+  - Per-card loading is the default: the 11 card keys from the API, each from
+    `/api/v1/dashboard/insights/{card}`, unwrapped from the `{card, platform, includeArchived,
+    generatedAt, data}` envelope. App Usage reads `/api/v1/dashboard/insights/appUsage`, cached per
+    usage and catalog combination.
+  - Cards:
+    - Install Health (column 1) shows the Munki/Cimian split, item counts, pending and silent agents.
+    - Storage replaces Hardware.
+    - Management Tools Errors replaces Unmanaged Devices.
+    - Directory Join has an All / Windows / Mac control. The toolbar's platform toggle picks
+      the view when it is set.
+    - App Usage (events column) shows the top 10 with Usage and Catalog chips.
+  - Fixtures in `src/lib/dashboard/__fixtures__/` are generated from the API's own shape
+    functions with SAMPLE data.

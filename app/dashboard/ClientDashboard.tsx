@@ -605,7 +605,7 @@ export default function ClientDashboard() {
 
             {/* App Usage - directly under Recent Events */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading app usage</div>}>
-              <AppUsageCard ctx={insightCtx} />
+              <AppUsageCard platformFilter={platformFilter} />
             </ErrorBoundary>
 
             {/* Platform Distribution - Full Width */}

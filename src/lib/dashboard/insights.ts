@@ -58,34 +58,26 @@ export interface DeviceItem {
   link: InsightLink;
 }
 
-export interface UnmanagedDevicesCard {
-  devices: number;
-  unmanaged: Counted & { pct: number };
-  enrolledPct: number;
-  byPlatform: (Counted & { platform: string; devices: number })[];
-  lastSeen: KeyedCount[];
-  recent: (DeviceItem & { lastSeen?: string | null })[];
-}
-
-export interface HardwareAtRiskCard {
-  devices: number;
-  lowStorage: Counted;
-  lowMemory: Counted;
-  intelMacs: Counted & { macs: number };
-}
-
 export interface NamedDevices {
   name: string;
   devices: number;
   link: InsightLink;
 }
 
-export interface InstallHealthCard {
+/** Install Health's totals; `byAgent` repeats them for Munki and Cimian. */
+export interface InstallAgentCounts {
   devices: number;
   withErrors: Counted;
   withWarnings: Counted;
+  errorItems: Counted;
+  warningItems: Counted;
+  pending: { items: number; devices: number; link: InsightLink };
+  silentAgents: Counted & { thresholdDays?: number };
+}
+
+export interface InstallHealthCard extends InstallAgentCounts {
   topFailing: NamedDevices[];
-  silentAgents: Counted & { thresholdDays: number };
+  byAgent: (InstallAgentCounts & { agent: string; name: string; platform: string })[];
 }
 
 export interface CheckinGapsCard {
@@ -94,12 +86,7 @@ export interface CheckinGapsCard {
   rejected: Counted;
   retried: Counted;
   accepted: Counted;
-  reasons: {
-    reason: string;
-    count: number;
-    devices: number;
-    link: InsightLink;
-  }[];
+  reasons: { reason: string; count: number; devices: number; link: InsightLink }[];
   stale: Counted;
   missing: Counted;
 }
@@ -113,12 +100,7 @@ export interface OSCurrencyCard {
   behind: Counted;
   unsupportedMac: Counted;
   windows10: Counted;
-  lagging: {
-    version: string;
-    label: string;
-    devices: number;
-    link: InsightLink;
-  }[];
+  lagging: { version: string; label: string; devices: number; link: InsightLink }[];
 }
 
 export interface SoftwareRiskCard {
@@ -133,40 +115,52 @@ export interface ExpiringCertificatesCard {
   windowDays: number;
   expiring: { certificates: number; devices: number; link: InsightLink };
   expiredUser: { devices: number; link: InsightLink };
-  soonest: {
-    commonName: string;
-    daysUntilExpiry: number;
+  soonest: { commonName: string; daysUntilExpiry: number; devices: number; link: InsightLink }[];
+}
+
+export interface ManagementToolErrorsCard {
+  windowHours: number;
+  tools: {
+    tool: string;
+    name: string;
+    platform?: string | null;
     devices: number;
+    devicesWithErrors: number;
+    devicesWithWarnings: number;
+    errorLines: number;
+    warningLines: number;
     link: InsightLink;
+    warningsLink: InsightLink;
+  }[];
+  topErrors: {
+    message: string;
+    tool: string;
+    name: string;
+    devices: number;
+    lines: number;
+    link: InsightLink;
+    sampleDevice?: { serialNumber: string; link: InsightLink };
   }[];
 }
 
-export interface LocalAdminExposureCard {
+export interface StorageCard {
   devices: number;
-  extraAdmins: Counted;
-  byAdminCount: KeyedCount[];
-  topDevices: (DeviceItem & { admins: number })[];
-  join: KeyedCount[];
-  workgroup: Counted & { byPlatform: { platform: string; count: number }[] };
+  freeSpace: KeyedCount[];
+  lowStorage: Counted & { byPlatform: (Counted & { platform: string })[] };
+  capacity: KeyedCount[];
+  fullest: (DeviceItem & { freePct: number; freeBytes: number; totalBytes: number })[];
 }
 
-export interface UnusedSoftwareCard {
-  days: number;
-  minInstalls: number;
-  leastUsed: {
-    name: string;
-    activeDevices: number;
-    installedDevices: number;
-    usageRate: number;
-    link: InsightLink;
-  }[];
-  mostUsed: {
-    name: string;
-    totalHours: number;
-    activeHours: number;
-    activeDevices: number;
-    link: InsightLink;
-  }[];
+export interface DirectoryJoinView {
+  devices: number;
+  segments: KeyedCount[];
+  extraAdmins: Counted;
+  shared: Counted;
+  assigned: Counted;
+}
+
+export interface DirectoryJoinCard {
+  views: { all: DirectoryJoinView; windows: DirectoryJoinView; mac: DirectoryJoinView };
 }
 
 export interface ConnectivityProblemsCard {
@@ -176,18 +170,36 @@ export interface ConnectivityProblemsCard {
   onVpn: Counted;
 }
 
+/** App Usage has its own endpoint, filtered by usage and catalog. */
+export interface AppUsageCard {
+  days: number;
+  filters: { usages: string[]; catalogs: string[] };
+  available: {
+    usages: { value: string; devices: number }[];
+    catalogs: { value: string; devices: number }[];
+  };
+  link: InsightLink;
+  apps: {
+    name: string;
+    totalHours: number;
+    activeHours: number;
+    devices: number;
+    activeDevices: number;
+    link: InsightLink;
+  }[];
+}
+
 export interface InsightCards {
+  installHealth: InstallHealthCard | CardError;
   rebootDebt: RebootDebtCard | CardError;
   protectionGaps: ProtectionGapsCard | CardError;
-  unmanagedDevices: UnmanagedDevicesCard | CardError;
-  hardwareAtRisk: HardwareAtRiskCard | CardError;
-  installHealth: InstallHealthCard | CardError;
+  managementToolErrors: ManagementToolErrorsCard | CardError;
+  storage: StorageCard | CardError;
   checkinGaps: CheckinGapsCard | CardError;
   osCurrency: OSCurrencyCard | CardError;
   softwareRisk: SoftwareRiskCard | CardError;
   expiringCertificates: ExpiringCertificatesCard | CardError;
-  localAdminExposure: LocalAdminExposureCard | CardError;
-  unusedSoftware: UnusedSoftwareCard | CardError;
+  directoryJoin: DirectoryJoinCard | CardError;
   connectivityProblems: ConnectivityProblemsCard | CardError;
 }
 
@@ -239,29 +251,28 @@ export interface InsightsState {
   refresh: () => void;
 }
 
-/** The card keys, in spec order. The API's final per-card keys replace these. */
+/** The API's card keys (reportmate-api dashboard_insights.CARD_KEYS). App Usage is separate. */
 export const INSIGHT_CARD_KEYS: InsightCardKey[] = [
+  "installHealth",
   "rebootDebt",
   "protectionGaps",
-  "unmanagedDevices",
-  "hardwareAtRisk",
-  "installHealth",
+  "managementToolErrors",
+  "storage",
   "checkinGaps",
   "osCurrency",
   "softwareRisk",
   "expiringCertificates",
-  "localAdminExposure",
-  "unusedSoftware",
+  "directoryJoin",
   "connectivityProblems",
 ];
 
 /**
- * Per-card loading: `GET /api/v1/dashboard/insights/{card}`, every card in
- * parallel so they paint as they land. Off until the API ships those routes;
- * set NEXT_PUBLIC_INSIGHTS_PER_CARD=true to switch.
+ * Per-card loading, the default: `GET /api/v1/dashboard/insights/{card}`
+ * for every card in parallel, each painted as it lands. Set
+ * NEXT_PUBLIC_INSIGHTS_PER_CARD=false to use the combined document instead.
  */
 export const INSIGHTS_PER_CARD =
-  process.env.NEXT_PUBLIC_INSIGHTS_PER_CARD === "true";
+  process.env.NEXT_PUBLIC_INSIGHTS_PER_CARD !== "false";
 
 const cardUrl = (key: string, scope: string) =>
   `/api/v1/dashboard/insights/${encodeURIComponent(key)}?platform=${encodeURIComponent(scope)}`;
@@ -279,11 +290,14 @@ async function failureText(res: Response): Promise<string> {
 }
 
 /**
- * A per-card answer: the section itself, or wrapped as `{card}`, `{data}` or
- * `{cards: {key: …}}`, whichever the API settles on.
+ * A per-card answer. The API sends `{card, platform, includeArchived,
+ * generatedAt, data}`; a bare section or `{cards: {key: …}}` is accepted too.
  */
 export function unwrapCard(key: string, body: any): unknown {
   if (body && typeof body === "object") {
+    // The API's envelope: {card, platform, includeArchived, generatedAt, data}
+    if (typeof body.card === "string" && body.data && typeof body.data === "object")
+      return body.data;
     if (body.cards && typeof body.cards === "object" && key in body.cards)
       return body.cards[key];
     if (body.card && typeof body.card === "object") return body.card;
@@ -417,6 +431,90 @@ export function useDashboardInsights(
       clearInterval(timer);
       // A request counter, not a DOM ref: bumping it drops answers still in
       // flight for the platform being left.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      latest.current++;
+    };
+  }, [load]);
+
+  return { ...state, refresh: load };
+}
+
+// MARK: - App Usage
+
+export const APP_USAGE_DAYS = 30;
+
+export const appUsageUrl = (
+  platform: string,
+  usages: string[],
+  catalogs: string[],
+  days = APP_USAGE_DAYS,
+) => {
+  const scope = platform === "macOS" || platform === "Windows" ? platform : "all";
+  const params = new URLSearchParams({ platform: scope, days: String(days) });
+  if (usages.length) params.set("usages", usages.join(","));
+  if (catalogs.length) params.set("catalogs", catalogs.join(","));
+  return `/api/v1/dashboard/insights/appUsage?${params.toString().replace(/%2C/gi, ",")}`;
+};
+
+export interface AppUsageState {
+  data: AppUsageCard | null;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+}
+
+/**
+ * The App Usage card for one platform and usage/catalog selection. Each
+ * combination is its own cached request; switching chips shows the last
+ * answer for that combination at once, or keeps the current one on screen
+ * while the new one loads.
+ */
+export function useAppUsage(
+  platform: string,
+  usages: string[],
+  catalogs: string[],
+): AppUsageState {
+  const url = appUsageUrl(platform, usages, catalogs);
+  const [state, setState] = useState<Omit<AppUsageState, "refresh">>(() => ({
+    data: peekCached<AppUsageCard>(url) ?? null,
+    loading: true,
+    error: null,
+  }));
+  const latest = useRef(0);
+
+  const load = useCallback(async () => {
+    const id = ++latest.current;
+    const cached = peekCached<AppUsageCard>(url);
+    setState((s) => ({ data: cached ?? s.data, loading: true, error: null }));
+    try {
+      const res = await trackedFetch(
+        url,
+        { cache: "no-store", credentials: "include" },
+        { background: cached !== undefined },
+      );
+      if (!res.ok) throw new Error(await failureText(res));
+      const section = unwrapCard("appUsage", await res.json());
+      if (!section || typeof section !== "object") throw new Error("Unexpected response");
+      if (isCardError(section)) throw new Error(section.error);
+      rememberCached(url, section);
+      if (id === latest.current)
+        setState({ data: section as AppUsageCard, loading: false, error: null });
+    } catch (err) {
+      if (id === latest.current)
+        setState((s) => ({
+          ...s,
+          loading: false,
+          error: err instanceof Error ? err.message : "Failed to load",
+        }));
+    }
+  }, [url]);
+
+  useEffect(() => {
+    load();
+    const timer = setInterval(load, INSIGHTS_REFRESH_MS);
+    return () => {
+      clearInterval(timer);
+      // A request counter, not a DOM ref.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       latest.current++;
     };

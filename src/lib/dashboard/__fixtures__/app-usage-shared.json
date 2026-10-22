@@ -1,0 +1,91 @@
+{
+  "card": "appUsage",
+  "platform": "all",
+  "includeArchived": false,
+  "generatedAt": "2026-10-22T15:00:00+00:00",
+  "data": {
+    "generatedAt": "2026-10-22T15:00:00+00:00",
+    "platform": "all",
+    "days": 30,
+    "filters": {
+      "usages": [
+        "Shared"
+      ],
+      "catalogs": []
+    },
+    "available": {
+      "usages": [
+        {
+          "value": "Assigned",
+          "devices": 400
+        },
+        {
+          "value": "Shared",
+          "devices": 500
+        }
+      ],
+      "catalogs": [
+        {
+          "value": "Staff",
+          "devices": 300
+        },
+        {
+          "value": "Curriculum",
+          "devices": 600
+        }
+      ]
+    },
+    "link": {
+      "path": "/applications",
+      "params": {
+        "type": "usage",
+        "period": "30",
+        "usages": "Shared"
+      }
+    },
+    "apps": [
+      {
+        "name": "SampleApp 0",
+        "totalHours": 50.0,
+        "activeHours": 5.0,
+        "devices": 10,
+        "activeDevices": 5,
+        "link": {
+          "path": "/applications/usage/SampleApp%200",
+          "params": {
+            "days": "30",
+            "usages": "Shared"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 1",
+        "totalHours": 40.0,
+        "activeHours": 4.0,
+        "devices": 9,
+        "activeDevices": 4,
+        "link": {
+          "path": "/applications/usage/SampleApp%201",
+          "params": {
+            "days": "30",
+            "usages": "Shared"
+          }
+        }
+      },
+      {
+        "name": "SampleApp 2",
+        "totalHours": 30.0,
+        "activeHours": 3.0,
+        "devices": 8,
+        "activeDevices": 3,
+        "link": {
+          "path": "/applications/usage/SampleApp%202",
+          "params": {
+            "days": "30",
+            "usages": "Shared"
+          }
+        }
+      }
+    ]
+  }
+}

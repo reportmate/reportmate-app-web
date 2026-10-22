@@ -2,8 +2,228 @@
   "generatedAt": "2026-10-22T15:00:00+00:00",
   "platform": "all",
   "includeArchived": false,
-  "computeSeconds": 1.2,
+  "computeSeconds": 2.7,
   "cards": {
+    "installHealth": {
+      "devices": 926,
+      "withErrors": {
+        "count": 6,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "errors"
+          }
+        }
+      },
+      "withWarnings": {
+        "count": 8,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "warnings"
+          }
+        }
+      },
+      "errorItems": {
+        "count": 9,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "errors"
+          }
+        }
+      },
+      "warningItems": {
+        "count": 218,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "warnings"
+          }
+        }
+      },
+      "pending": {
+        "items": 92,
+        "devices": 49,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "filter": "pending"
+          }
+        }
+      },
+      "silentAgents": {
+        "count": 11,
+        "thresholdDays": 7,
+        "link": {
+          "path": "/installs",
+          "params": {
+            "stale": "1"
+          }
+        }
+      },
+      "topFailing": [
+        {
+          "name": "SampleAppA",
+          "devices": 3,
+          "link": {
+            "path": "/installs",
+            "params": {
+              "item": "SampleAppA",
+              "filter": "errors"
+            }
+          }
+        },
+        {
+          "name": "SampleAppB",
+          "devices": 1,
+          "link": {
+            "path": "/installs",
+            "params": {
+              "item": "SampleAppB",
+              "filter": "errors"
+            }
+          }
+        }
+      ],
+      "byAgent": [
+        {
+          "agent": "munki",
+          "name": "Munki",
+          "platform": "macOS",
+          "devices": 550,
+          "withErrors": {
+            "count": 1,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "munki"
+              }
+            }
+          },
+          "withWarnings": {
+            "count": 7,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "munki"
+              }
+            }
+          },
+          "errorItems": {
+            "count": 1,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "munki"
+              }
+            }
+          },
+          "warningItems": {
+            "count": 209,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "munki"
+              }
+            }
+          },
+          "pending": {
+            "items": 80,
+            "devices": 40,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "pending",
+                "agent": "munki"
+              }
+            }
+          },
+          "silentAgents": {
+            "count": 4,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "stale": "1",
+                "agent": "munki"
+              }
+            }
+          }
+        },
+        {
+          "agent": "cimian",
+          "name": "Cimian",
+          "platform": "Windows",
+          "devices": 376,
+          "withErrors": {
+            "count": 5,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "cimian"
+              }
+            }
+          },
+          "withWarnings": {
+            "count": 1,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "cimian"
+              }
+            }
+          },
+          "errorItems": {
+            "count": 8,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "errors",
+                "agent": "cimian"
+              }
+            }
+          },
+          "warningItems": {
+            "count": 9,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "warnings",
+                "agent": "cimian"
+              }
+            }
+          },
+          "pending": {
+            "items": 12,
+            "devices": 9,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "filter": "pending",
+                "agent": "cimian"
+              }
+            }
+          },
+          "silentAgents": {
+            "count": 7,
+            "link": {
+              "path": "/installs",
+              "params": {
+                "stale": "1",
+                "agent": "cimian"
+              }
+            }
+          }
+        }
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
+    },
     "rebootDebt": {
       "devices": 931,
       "uptime30dPlus": {
@@ -109,7 +329,8 @@
             }
           }
         }
-      ]
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
     "protectionGaps": {
       "devices": 931,
@@ -192,160 +413,16 @@
             "cve": "critical"
           }
         }
-      }
-    },
-    "unmanagedDevices": {
-      "devices": 931,
-      "unmanaged": {
-        "count": 17,
-        "pct": 2,
-        "link": {
-          "path": "/management",
-          "params": {
-            "enrolled": "0"
-          }
-        }
       },
-      "enrolledPct": 98,
-      "byPlatform": [
-        {
-          "platform": "macOS",
-          "count": 12,
-          "devices": 550,
-          "link": {
-            "path": "/management",
-            "params": {
-              "enrolled": "0"
-            }
-          }
-        },
-        {
-          "platform": "Windows",
-          "count": 5,
-          "devices": 381,
-          "link": {
-            "path": "/management",
-            "params": {
-              "enrolled": "0"
-            }
-          }
-        }
-      ],
-      "lastSeen": [
-        {
-          "key": "24h",
-          "label": "Seen in the last 24 hours",
-          "count": 11,
-          "link": {
-            "path": "/management",
-            "params": {
-              "enrolled": "0"
-            }
-          }
-        },
-        {
-          "key": "7d",
-          "label": "Seen 1-7 days ago",
-          "count": 3,
-          "link": {
-            "path": "/management",
-            "params": {
-              "enrolled": "0"
-            }
-          }
-        },
-        {
-          "key": "silent",
-          "label": "Silent over 7 days",
-          "count": 3,
-          "link": {
-            "path": "/management",
-            "params": {
-              "enrolled": "0"
-            }
-          }
-        }
-      ],
-      "recent": [
-        {
-          "serialNumber": "SAMPLE1",
-          "name": "SAMPLE1",
-          "platform": "macOS",
-          "lastSeen": "2026-10-22T10:00:00Z",
-          "link": {
-            "path": "/device/SAMPLE1",
-            "params": {}
-          }
-        },
-        {
-          "serialNumber": "SAMPLE2",
-          "name": "SAMPLE2",
-          "platform": "Windows",
-          "lastSeen": "2026-10-21T09:00:00Z",
-          "link": {
-            "path": "/device/SAMPLE2",
-            "params": {}
-          }
-        }
-      ]
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
-    "hardwareAtRisk": {
-      "error": "Timed out after 20s"
+    "managementToolErrors": {
+      "error": "Database unavailable",
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
-    "installHealth": {
-      "devices": 926,
-      "withErrors": {
-        "count": 6,
-        "link": {
-          "path": "/installs",
-          "params": {
-            "filter": "errors"
-          }
-        }
-      },
-      "withWarnings": {
-        "count": 8,
-        "link": {
-          "path": "/installs",
-          "params": {
-            "filter": "warnings"
-          }
-        }
-      },
-      "topFailing": [
-        {
-          "name": "SampleAppA",
-          "devices": 3,
-          "link": {
-            "path": "/installs",
-            "params": {
-              "item": "SampleAppA",
-              "filter": "errors"
-            }
-          }
-        },
-        {
-          "name": "SampleAppB",
-          "devices": 1,
-          "link": {
-            "path": "/installs",
-            "params": {
-              "item": "SampleAppB",
-              "filter": "errors"
-            }
-          }
-        }
-      ],
-      "silentAgents": {
-        "count": 11,
-        "thresholdDays": 7,
-        "link": {
-          "path": "/installs",
-          "params": {
-            "stale": "1"
-          }
-        }
-      }
+    "storage": {
+      "error": "Timed out after 20s",
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
     "checkinGaps": {
       "hours": 24,
@@ -422,7 +499,8 @@
             "status": "missing"
           }
         }
-      }
+      },
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
     "osCurrency": {
       "devices": 771,
@@ -480,7 +558,8 @@
             }
           }
         }
-      ]
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
     "softwareRisk": {
       "devices": 931,
@@ -513,7 +592,8 @@
             }
           }
         }
-      ]
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
     "expiringCertificates": {
       "devices": 931,
@@ -562,144 +642,243 @@
             }
           }
         }
-      ]
+      ],
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
-    "localAdminExposure": {
-      "devices": 916,
-      "extraAdmins": {
-        "count": 773,
-        "link": {
-          "path": "/identity",
-          "params": {
-            "admins": "extra"
+    "directoryJoin": {
+      "views": {
+        "all": {
+          "devices": 916,
+          "segments": [
+            {
+              "key": "entra",
+              "label": "Entra joined",
+              "count": 313,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "entra"
+                }
+              }
+            },
+            {
+              "key": "domain",
+              "label": "Domain joined",
+              "count": 0,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "domain"
+                }
+              }
+            },
+            {
+              "key": "hybrid",
+              "label": "Hybrid joined",
+              "count": 46,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "hybrid"
+                }
+              }
+            },
+            {
+              "key": "workgroup",
+              "label": "Workgroup",
+              "count": 342,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "workgroup"
+                }
+              }
+            }
+          ],
+          "extraAdmins": {
+            "count": 773,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "admins": "extra"
+              }
+            }
+          },
+          "shared": {
+            "count": 546,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "usage": "shared"
+              }
+            }
+          },
+          "assigned": {
+            "count": 363,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "usage": "assigned"
+              }
+            }
+          }
+        },
+        "windows": {
+          "devices": 381,
+          "segments": [
+            {
+              "key": "entra",
+              "label": "Entra joined",
+              "count": 313,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "entra",
+                  "platform": "Windows"
+                }
+              }
+            },
+            {
+              "key": "domain",
+              "label": "Domain joined",
+              "count": 0,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "domain",
+                  "platform": "Windows"
+                }
+              }
+            },
+            {
+              "key": "hybrid",
+              "label": "Hybrid joined",
+              "count": 46,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "hybrid",
+                  "platform": "Windows"
+                }
+              }
+            },
+            {
+              "key": "workgroup",
+              "label": "Workgroup",
+              "count": 22,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "join": "workgroup",
+                  "platform": "Windows"
+                }
+              }
+            }
+          ],
+          "extraAdmins": {
+            "count": 273,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "admins": "extra",
+                "platform": "Windows"
+              }
+            }
+          },
+          "shared": {
+            "count": 200,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "usage": "shared",
+                "platform": "Windows"
+              }
+            }
+          },
+          "assigned": {
+            "count": 150,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "usage": "assigned",
+                "platform": "Windows"
+              }
+            }
+          }
+        },
+        "mac": {
+          "devices": 535,
+          "segments": [
+            {
+              "key": "psso",
+              "label": "Platform SSO / Entra",
+              "count": 180,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "psso",
+                  "platform": "macOS"
+                }
+              }
+            },
+            {
+              "key": "bound",
+              "label": "AD-bound",
+              "count": 8,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "bound",
+                  "platform": "macOS"
+                }
+              }
+            },
+            {
+              "key": "unbound",
+              "label": "Not bound",
+              "count": 347,
+              "link": {
+                "path": "/identity",
+                "params": {
+                  "directory": "unbound",
+                  "platform": "macOS"
+                }
+              }
+            }
+          ],
+          "extraAdmins": {
+            "count": 500,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "admins": "extra",
+                "platform": "macOS"
+              }
+            }
+          },
+          "shared": {
+            "count": 346,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "usage": "shared",
+                "platform": "macOS"
+              }
+            }
+          },
+          "assigned": {
+            "count": 213,
+            "link": {
+              "path": "/identity",
+              "params": {
+                "usage": "assigned",
+                "platform": "macOS"
+              }
+            }
           }
         }
       },
-      "byAdminCount": [
-        {
-          "key": "2",
-          "label": "2 admins",
-          "count": 650,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "admins": "extra"
-            }
-          }
-        },
-        {
-          "key": "3",
-          "label": "3 admins",
-          "count": 100,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "admins": "extra"
-            }
-          }
-        },
-        {
-          "key": "4+",
-          "label": "4 or more admins",
-          "count": 23,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "admins": "extra"
-            }
-          }
-        }
-      ],
-      "topDevices": [
-        {
-          "serialNumber": "SAMPLE3",
-          "name": "SAMPLE3",
-          "platform": "Windows",
-          "admins": 6,
-          "link": {
-            "path": "/device/SAMPLE3",
-            "params": {}
-          }
-        },
-        {
-          "serialNumber": "SAMPLE4",
-          "name": "SAMPLE4",
-          "platform": "macOS",
-          "admins": 5,
-          "link": {
-            "path": "/device/SAMPLE4",
-            "params": {}
-          }
-        }
-      ],
-      "join": [
-        {
-          "key": "entra",
-          "label": "Entra joined",
-          "count": 313,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "join": "entra"
-            }
-          }
-        },
-        {
-          "key": "domain",
-          "label": "Domain joined",
-          "count": 8,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "join": "domain"
-            }
-          }
-        },
-        {
-          "key": "hybrid",
-          "label": "Hybrid joined",
-          "count": 46,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "join": "hybrid"
-            }
-          }
-        },
-        {
-          "key": "workgroup",
-          "label": "Workgroup",
-          "count": 349,
-          "link": {
-            "path": "/identity",
-            "params": {
-              "join": "workgroup"
-            }
-          }
-        }
-      ],
-      "workgroup": {
-        "count": 349,
-        "link": {
-          "path": "/identity",
-          "params": {
-            "join": "workgroup"
-          }
-        },
-        "byPlatform": [
-          {
-            "platform": "macOS",
-            "count": 320
-          },
-          {
-            "platform": "Windows",
-            "count": 29
-          }
-        ]
-      }
-    },
-    "unusedSoftware": {
-      "error": "Database unavailable"
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     },
     "connectivityProblems": {
       "devices": 924,
@@ -717,16 +896,21 @@
         "measured": 600,
         "link": {
           "path": "/network",
-          "params": {}
+          "params": {
+            "quality": "poor"
+          }
         }
       },
       "onVpn": {
         "count": 41,
         "link": {
           "path": "/network",
-          "params": {}
+          "params": {
+            "vpn": "1"
+          }
         }
-      }
+      },
+      "generatedAt": "2026-10-22T15:00:00+00:00"
     }
   }
 }

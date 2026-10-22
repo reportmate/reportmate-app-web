@@ -23,17 +23,19 @@ describe('useDashboardInsights', () => {
     const cards = fixture.cards as Record<string, unknown>
     global.fetch = jest.fn(async (url: string) => {
       const key = decodeURIComponent(String(url).split('/insights/')[1].split('?')[0])
-      if (key === 'hardwareAtRisk') return json(503, { error: 'Card not available' })
-      return json(200, key === 'osCurrency' ? { card: cards[key] } : cards[key])
+      if (key === 'storage') return json(503, { error: 'Card not available' })
+      // The API's envelope; one card answers bare to check that is accepted too
+      if (key === 'osCurrency') return json(200, cards[key])
+      return json(200, { card: key, platform: 'macOS', includeArchived: false, generatedAt: 'x', data: cards[key] })
     }) as unknown as typeof fetch
     const { result } = renderHook(() => useDashboardInsights('macOS', { perCard: true }))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(global.fetch).toHaveBeenCalledTimes(INSIGHT_CARD_KEYS.length)
-    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('/api/v1/dashboard/insights/rebootDebt?platform=macOS')
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('/api/v1/dashboard/insights/installHealth?platform=macOS')
     const got = result.current.data!.cards as Record<string, unknown>
     expect(got.rebootDebt).toEqual(cards.rebootDebt)
     expect(got.osCurrency).toEqual(cards.osCurrency)
-    expect(got.hardwareAtRisk).toEqual({ error: 'Card not available (HTTP 503)' })
+    expect(got.storage).toEqual({ error: 'Card not available (HTTP 503)' })
     expect(result.current.pending.size).toBe(0)
   })
 
@@ -52,7 +54,8 @@ describe('useDashboardInsights', () => {
 describe('unwrapCard', () => {
   it('accepts the section bare or wrapped', () => {
     expect(unwrapCard('x', { a: 1 })).toEqual({ a: 1 })
-    expect(unwrapCard('x', { card: { a: 1 } })).toEqual({ a: 1 })
+    expect(unwrapCard('x', { card: 'x', platform: 'all', includeArchived: false, generatedAt: 't', data: { a: 1 } })).toEqual({ a: 1 })
+    expect(unwrapCard('x', { card: 'x', data: { error: 'Timed out' } })).toEqual({ error: 'Timed out' })
     expect(unwrapCard('x', { cards: { x: { a: 1 } } })).toEqual({ a: 1 })
     expect(unwrapCard('x', { error: 'nope' })).toEqual({ error: 'nope' })
   })

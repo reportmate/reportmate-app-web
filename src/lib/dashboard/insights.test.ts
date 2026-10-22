@@ -39,8 +39,8 @@ describe('withDefaultParams', () => {
 })
 
 describe('the API fixture', () => {
-  it('has all twelve cards', () => {
-    expect(Object.keys(fixture.cards)).toHaveLength(12)
+  it('has the eleven API cards', () => {
+    expect(Object.keys(fixture.cards)).toHaveLength(11)
     expect(Object.values(fixture.cards).some(isCardError)).toBe(false)
   })
   it('links only to reports that read their parameters', () => {

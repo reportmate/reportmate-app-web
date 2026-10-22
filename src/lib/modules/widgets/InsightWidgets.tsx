@@ -11,23 +11,25 @@ import React, { useEffect, useState } from "react";
 import { SKELETON_LIMIT_MS } from "../../data-cache";
 import Link from "next/link";
 import {
+  APP_USAGE_DAYS,
+  type AppUsageCard as AppUsageCardData,
   type CheckinGapsCard,
   type ConnectivityProblemsCard,
+  type DirectoryJoinCard,
   type ExpiringCertificatesCard,
-  type HardwareAtRiskCard,
   type InsightCardKey,
   type InsightCards as InsightCardData,
   type InsightsState,
   type InstallHealthCard,
-  type LocalAdminExposureCard,
+  type ManagementToolErrorsCard,
   type OSCurrencyCard,
   type ProtectionGapsCard,
   type RebootDebtCard,
   type SoftwareRiskCard,
-  type UnmanagedDevicesCard,
-  type UnusedSoftwareCard,
+  type StorageCard,
   isCardError,
   linkHref,
+  useAppUsage,
   withDefaultParams,
 } from "../../dashboard/insights";
 
@@ -615,85 +617,6 @@ function ProtectionGaps({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - 3 Unmanaged Devices
-
-function UnmanagedDevices({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "unmanagedDevices");
-  const d: UnmanagedDevicesCard | null = card.status === "ready" ? card.data : null;
-  return (
-    <InsightCard
-      title="Unmanaged Devices"
-      subtitle="Not enrolled in MDM"
-      link="/management"
-      tone="purple"
-      icon={<Icon d={ICONS.clipboard} />}
-      card={card}
-    >
-      {d && (
-        <>
-          <div className="flex gap-2">
-            <BigStat value={d.unmanaged.count} label={`unmanaged, ${d.unmanaged.pct}% of ${d.devices}`} tone="red" link={linkHref(d.unmanaged.link)} />
-          </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{d.enrolledPct}% of the fleet is enrolled.</p>
-          {d.byPlatform.length > 1 && (
-            <div className="mt-4">
-              <SectionLabel>By platform</SectionLabel>
-              <BarList
-                color="rgba(168,85,247,0.55)"
-                items={d.byPlatform.map((p) => ({
-                  label: p.platform,
-                  count: p.count,
-                  detail: `${p.count} of ${p.devices}`,
-                  link: linkHref(p.link),
-                }))}
-              />
-            </div>
-          )}
-          <div className="mt-4">
-            <SectionLabel>Last seen</SectionLabel>
-            <BarList
-              color="rgba(168,85,247,0.55)"
-              labelWidth="w-36"
-              items={d.lastSeen.map((b) => ({ label: b.label, count: b.count, link: linkHref(b.link) }))}
-            />
-          </div>
-          {d.recent.length > 0 && (
-            <div className="mt-4">
-              <SectionLabel>Most recently seen</SectionLabel>
-              <DeviceList items={d.recent.map((r) => ({ key: r.serialNumber, name: r.name, detail: r.platform || "", link: linkHref(r.link) }))} />
-            </div>
-          )}
-        </>
-      )}
-    </InsightCard>
-  );
-}
-
-// MARK: - 4 Hardware at Risk
-
-function HardwareAtRisk({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "hardwareAtRisk");
-  const d: HardwareAtRiskCard | null = card.status === "ready" ? card.data : null;
-  return (
-    <InsightCard
-      title="Hardware at Risk"
-      subtitle="Low storage, low memory, Intel Macs"
-      link="/hardware"
-      tone="teal"
-      icon={<Icon d={ICONS.chip} />}
-      card={card}
-    >
-      {d && (
-        <div className="grid grid-cols-3 gap-2">
-          <BigStat value={d.lowStorage.count} label="under 10% free" tone="red" link={linkHref(d.lowStorage.link)} />
-          <BigStat value={d.lowMemory.count} label="8 GB RAM or less" tone="orange" link={linkHref(d.lowMemory.link)} />
-          <BigStat value={d.intelMacs.count} label={`Intel Macs of ${d.intelMacs.macs}`} tone="yellow" link={linkHref(d.intelMacs.link)} />
-        </div>
-      )}
-    </InsightCard>
-  );
-}
-
 // MARK: - 5 Install Health (column 1, under Fleet Status)
 
 /** A hero-size figure: the most prominent numbers on the dashboard. */
@@ -732,6 +655,7 @@ function HeroStat({
 export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
   const card = slot(ctx, "installHealth");
   const d: InstallHealthCard | null = card.status === "ready" ? card.data : null;
+  const agents = d?.byAgent ?? [];
   return (
     <InsightCard
       title="Install Health"
@@ -747,7 +671,56 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
             <HeroStat value={d.withErrors.count} label="devices with errors" tone="red" link={linkHref(d.withErrors.link)} />
             <HeroStat value={d.withWarnings.count} label="devices with warnings" tone="yellow" link={linkHref(d.withWarnings.link)} />
           </div>
-          <div className="mt-5">
+          {agents.length > 0 && (
+            <table className="mt-4 w-full text-sm">
+              <thead>
+                <tr className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <th className="text-left font-semibold pb-1"></th>
+                  <th className="text-right font-semibold pb-1">Errors</th>
+                  <th className="text-right font-semibold pb-1">Warnings</th>
+                  <th className="text-right font-semibold pb-1">Pending</th>
+                  <th className="text-right font-semibold pb-1">Silent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agents.map((a) => (
+                  <tr key={a.agent} className="border-t border-gray-100 dark:border-gray-700/60">
+                    <td className="py-1 text-gray-900 dark:text-gray-100">
+                      {a.name} <span className="text-xs text-gray-400">{a.devices}</span>
+                    </td>
+                    {[
+                      { c: a.withErrors.count, l: a.withErrors.link, t: "red" as Tone, title: "devices with errors" },
+                      { c: a.withWarnings.count, l: a.withWarnings.link, t: "yellow" as Tone, title: "devices with warnings" },
+                      { c: a.pending.devices, l: a.pending.link, t: "blue" as Tone, title: `devices with ${a.pending.items} pending items` },
+                      { c: a.silentAgents.count, l: a.silentAgents.link, t: "orange" as Tone, title: "agents silent over 7 days" },
+                    ].map((cell, i) => (
+                      <td key={i} className="py-1 text-right">
+                        <Link
+                          href={linkHref(cell.l)}
+                          title={`${cell.c} ${cell.title}`}
+                          className={`tabular-nums font-medium hover:underline ${cell.c ? TONES[cell.t].text : "text-gray-400 dark:text-gray-500"}`}
+                        >
+                          {cell.c}
+                        </Link>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={d.errorItems.count} label="error items" tone="red" link={linkHref(d.errorItems.link)} />
+            <StatChip value={d.warningItems.count} label="warning items" tone="yellow" link={linkHref(d.warningItems.link)} />
+            <StatChip value={d.pending.items} label={`pending on ${plural(d.pending.devices, "device")}`} tone="blue" link={linkHref(d.pending.link)} />
+            <StatChip
+              value={d.silentAgents.count}
+              label={`agents silent over ${d.silentAgents.thresholdDays ?? 7} days`}
+              tone="orange"
+              link={linkHref(d.silentAgents.link)}
+            />
+          </div>
+          <div className="mt-4">
             <SectionLabel>Top failing items</SectionLabel>
             {d.topFailing.length ? (
               <BarList
@@ -758,14 +731,6 @@ export function InstallHealthHero({ ctx }: { ctx: InsightContext }) {
             ) : (
               <p className="text-sm text-gray-400 dark:text-gray-500">No failing items</p>
             )}
-          </div>
-          <div className="flex flex-wrap gap-2 mt-4">
-            <StatChip
-              value={d.silentAgents.count}
-              label={`agents silent over ${d.silentAgents.thresholdDays} days`}
-              tone="orange"
-              link={linkHref(d.silentAgents.link)}
-            />
           </div>
         </>
       )}
@@ -952,40 +917,80 @@ function ExpiringCertificates({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - 10 Local Admin Exposure
+// MARK: - Management Tools Errors
 
-function LocalAdminExposure({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "localAdminExposure");
-  const d: LocalAdminExposureCard | null = card.status === "ready" ? card.data : null;
+function ManagementToolErrors({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "managementToolErrors");
+  const d: ManagementToolErrorsCard | null = card.status === "ready" ? card.data : null;
+  const tools = d ? d.tools.filter((t) => t.devicesWithErrors || t.devicesWithWarnings || t.errorLines) : [];
   return (
     <InsightCard
-      title="Local Admin Exposure"
-      subtitle="Extra local admins and unjoined devices"
-      link="/identity"
-      tone="purple"
-      icon={<Icon d={ICONS.users} />}
+      title="Management Tools Errors"
+      subtitle={`Errors and warnings in the tools' logs · last ${d?.windowHours ?? 24} h`}
+      link="/devices"
+      tone="red"
+      icon={<Icon d={ICONS.warning} />}
       card={card}
     >
       {d && (
         <>
-          <div className="flex gap-2">
-            <BigStat value={d.extraAdmins.count} label={`with extra local admins, of ${d.devices}`} tone="orange" link={linkHref(d.extraAdmins.link)} />
-            <BigStat value={d.workgroup.count} label="not Entra or domain joined" tone="red" link={linkHref(d.workgroup.link)} />
-          </div>
-          {d.byAdminCount.length > 0 && (
-            <div className="mt-4">
-              <SectionLabel>Admins per device</SectionLabel>
-              <BarList
-                color={TONES.orange.hex}
-                labelWidth="w-32"
-                items={d.byAdminCount.map((b) => ({ label: b.label, count: b.count, link: linkHref(b.link) }))}
-              />
-            </div>
+          {tools.length ? (
+            <ul className="space-y-0.5">
+              <li className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 pb-1">
+                <span className="flex-1">Tool</span>
+                <span className="w-16 text-right">Errors</span>
+                <span className="w-16 text-right">Warnings</span>
+                <span className="w-14 text-right">Lines</span>
+              </li>
+              {tools.slice(0, 8).map((t) => (
+                <li key={`${t.tool}:${t.name}`} className="flex items-center gap-2 text-sm">
+                  <Link href={linkHref(t.link)} className={`flex-1 min-w-0 truncate py-0.5 text-gray-900 dark:text-gray-100 ${ROW_LINK}`}>
+                    {t.name}
+                    {t.platform && <span className="ml-1 text-xs text-gray-400">{t.platform}</span>}
+                  </Link>
+                  <Link
+                    href={linkHref(t.link)}
+                    title={`${t.devicesWithErrors} of ${t.devices} devices with errors`}
+                    className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithErrors ? TONES.red.text : "text-gray-400 dark:text-gray-500"}`}
+                  >
+                    {t.devicesWithErrors}
+                  </Link>
+                  <Link
+                    href={linkHref(t.warningsLink)}
+                    title={`${t.devicesWithWarnings} of ${t.devices} devices with warnings`}
+                    className={`w-16 text-right tabular-nums font-medium hover:underline ${t.devicesWithWarnings ? TONES.yellow.text : "text-gray-400 dark:text-gray-500"}`}
+                  >
+                    {t.devicesWithWarnings}
+                  </Link>
+                  <span className="w-14 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400" title="Error lines">
+                    {t.errorLines}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-400 dark:text-gray-500">No errors or warnings logged</p>
           )}
-          {d.topDevices.length > 0 && (
+          {d.topErrors.length > 0 && (
             <div className="mt-4">
-              <SectionLabel>Most admins</SectionLabel>
-              <DeviceList items={d.topDevices.map((t) => ({ key: t.serialNumber, name: t.name, detail: plural(t.admins, "admin"), link: linkHref(t.link) }))} />
+              <SectionLabel>Most common errors</SectionLabel>
+              <ul className="space-y-1.5">
+                {d.topErrors.map((m) => (
+                  <li key={`${m.tool}:${m.message}`} className="text-sm">
+                    <Link href={linkHref(m.link)} className={`block py-0.5 ${ROW_LINK}`} title={m.message}>
+                      <span className="block truncate font-mono text-xs text-gray-900 dark:text-gray-100">{m.message}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {m.name} · {plural(m.devices, "device")} · {plural(m.lines, "line")}
+                      </span>
+                    </Link>
+                    {m.sampleDevice && (
+                      <Link href={linkHref(m.sampleDevice.link)} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                        Open a device&apos;s log
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </>
@@ -994,35 +999,260 @@ function LocalAdminExposure({ ctx }: { ctx: InsightContext }) {
   );
 }
 
-// MARK: - 11 App Usage (wide events column, under Recent Events)
+// MARK: - Storage
 
-const APP_USAGE_TOP = 10;
+const gb = (bytes: number) =>
+  bytes >= 1e12 ? `${(bytes / 1e12).toFixed(1)} TB` : `${Math.round(bytes / 1e9)} GB`;
 
-/** The most-used apps. Sits in the wide events column under Recent Events. */
-export function AppUsageCard({ ctx }: { ctx: InsightContext }) {
-  const card = slot(ctx, "unusedSoftware");
-  const d: UnusedSoftwareCard | null = card.status === "ready" ? card.data : null;
-  const hours = (h: number) => (h >= 1000 ? `${Math.round(h / 1000)}k h` : `${Math.round(h)} h`);
-  const top = d ? d.mostUsed.slice(0, APP_USAGE_TOP) : [];
+function Storage({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "storage");
+  const d: StorageCard | null = card.status === "ready" ? card.data : null;
+  const freeColors = [TONES.red.hex, TONES.orange.hex, TONES.yellow.hex, TONES.green.hex];
+  return (
+    <InsightCard
+      title="Storage"
+      subtitle="Free space, low-storage devices and capacity"
+      link="/hardware"
+      tone="teal"
+      icon={<Icon d={ICONS.chip} />}
+      card={card}
+    >
+      {d && (
+        <>
+          <Donut
+            center={String(d.devices)}
+            data={d.freeSpace.map((b, i) => ({
+              label: b.label,
+              count: b.count,
+              color: freeColors[i] ?? TONES.gray.hex,
+              link: linkHref(b.link),
+            }))}
+          />
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={d.lowStorage.count} label="under 10% free" tone="red" link={linkHref(d.lowStorage.link)} />
+            {d.lowStorage.byPlatform.length > 1 &&
+              d.lowStorage.byPlatform.map((p) => (
+                <StatChip key={p.platform} value={p.count} label={p.platform} tone="orange" link={linkHref(p.link)} />
+              ))}
+          </div>
+          <div className="mt-4">
+            <SectionLabel>Capacity</SectionLabel>
+            <BarList
+              color={TONES.teal.hex}
+              items={d.capacity.map((c) => ({ label: c.label, count: c.count, link: linkHref(c.link) }))}
+            />
+          </div>
+          {d.fullest.length > 0 && (
+            <div className="mt-4">
+              <SectionLabel>Fullest</SectionLabel>
+              <DeviceList
+                items={d.fullest.map((f) => ({
+                  key: f.serialNumber,
+                  name: f.name,
+                  detail: `${f.freePct}% free · ${gb(f.freeBytes)} of ${gb(f.totalBytes)}`,
+                  urgent: f.freePct < 5,
+                  link: linkHref(f.link),
+                }))}
+              />
+            </div>
+          )}
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - Directory Join
+
+type DirectoryView = "all" | "windows" | "mac";
+const DIRECTORY_VIEWS: { key: DirectoryView; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "windows", label: "Windows" },
+  { key: "mac", label: "Mac" },
+];
+const SEGMENT_COLORS: Record<string, string> = {
+  entra: "#3b82f6",
+  domain: "#6366f1",
+  hybrid: "#14b8a6",
+  workgroup: "#9ca3af",
+  psso: "#3b82f6",
+  bound: "#6366f1",
+  unbound: "#9ca3af",
+};
+
+function DirectoryJoin({ ctx }: { ctx: InsightContext }) {
+  const card = slot(ctx, "directoryJoin");
+  const d: DirectoryJoinCard | null = card.status === "ready" ? card.data : null;
+  // The toolbar's platform toggle picks the view; with it off, the card's own control does
+  const forced: DirectoryView | null =
+    ctx.platformFilter === "Windows" ? "windows" : ctx.platformFilter === "macOS" ? "mac" : null;
+  const [chosen, setChosen] = useState<DirectoryView>("all");
+  const view = forced ?? chosen;
+  const v = d?.views?.[view];
+  return (
+    <InsightCard
+      title="Directory Join"
+      subtitle="Join type, extra local admins, shared and assigned"
+      link="/identity"
+      tone="purple"
+      icon={<Icon d={ICONS.users} />}
+      card={card}
+    >
+      {d && v && (
+        <>
+          {!forced && (
+            <div role="radiogroup" aria-label="Platform" className="inline-flex mb-4 rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-900/40">
+              {DIRECTORY_VIEWS.map((o) => (
+                <button
+                  key={o.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={view === o.key}
+                  onClick={() => setChosen(o.key)}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    view === o.key
+                      ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <Donut
+            center={String(v.devices)}
+            data={v.segments.map((s) => ({
+              label: s.label,
+              count: s.count,
+              color: SEGMENT_COLORS[s.key] ?? TONES.gray.hex,
+              link: linkHref(s.link),
+            }))}
+          />
+          <div className="flex flex-wrap gap-2 mt-4">
+            <StatChip value={v.extraAdmins.count} label="with extra local admins" tone="orange" link={linkHref(v.extraAdmins.link)} />
+            <StatChip value={v.shared.count} label="shared" tone="blue" link={linkHref(v.shared.link)} />
+            <StatChip value={v.assigned.count} label="assigned" tone="teal" link={linkHref(v.assigned.link)} />
+          </div>
+        </>
+      )}
+    </InsightCard>
+  );
+}
+
+// MARK: - App Usage (wide events column, under Recent Events)
+
+/** A row of toggle chips, like Platform Distribution's filter pills. */
+function ChipRow({
+  label,
+  options,
+  selected,
+  onToggle,
+  tone,
+}: {
+  label: string;
+  options: { value: string; devices: number }[];
+  selected: string[];
+  onToggle: (value: string) => void;
+  tone: "purple" | "green";
+}) {
+  if (!options.length) return null;
+  const on =
+    tone === "purple"
+      ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 ring-1 ring-purple-300 dark:ring-purple-700"
+      : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 ring-1 ring-green-300 dark:ring-green-700";
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 w-14 shrink-0">{label}</span>
+      {options.map((o) => {
+        const isOn = selected.includes(o.value);
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={isOn}
+            title={`${o.devices} devices`}
+            onClick={() => onToggle(o.value)}
+            className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+              isOn ? on : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+            }`}
+          >
+            {o.value}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The ten most-used apps, with Usage and Catalog chips that filter the card
+ * in place; each app link carries the filters. Reads its own endpoint.
+ */
+export function AppUsageCard({ platformFilter }: { platformFilter: string }) {
+  const [usages, setUsages] = useState<string[]>([]);
+  const [catalogs, setCatalogs] = useState<string[]>([]);
+  const state = useAppUsage(platformFilter, usages, catalogs);
+  const d = state.data;
+  const toggle = (set: React.Dispatch<React.SetStateAction<string[]>>) => (v: string) =>
+    set((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v].sort()));
+  const cardState: CardSlot<AppUsageCardData> = d
+    ? { status: "ready", data: d }
+    : state.error && !state.loading
+      ? { status: "error", error: state.error, retry: state.refresh, retrying: state.loading }
+      : { status: "loading", retry: state.refresh };
+  const hours = (h: number) => (h >= 1000 ? `${(h / 1000).toFixed(h >= 10000 ? 0 : 1)}k h` : `${Math.round(h)} h`);
   return (
     <InsightCard
       title="App Usage"
-      subtitle={`Most used apps · last ${d?.days ?? 30} days${ctx.platformFilter !== "all" ? " · All platforms" : ""}`}
-      link={`/applications?type=usage&period=${d?.days ?? 30}`}
+      subtitle={`Most used apps · last ${d?.days ?? APP_USAGE_DAYS} days`}
+      link={d ? linkHref(d.link) : `/applications?type=usage&period=${APP_USAGE_DAYS}`}
       tone="teal"
       icon={<Icon d={ICONS.apps} />}
-      card={card}
+      card={cardState}
     >
-      {d &&
-        (top.length ? (
-          <BarList
-            color={TONES.teal.hex}
-            labelWidth="w-56"
-            items={top.map((a) => ({ label: a.name, count: a.totalHours, detail: hours(a.totalHours), link: linkHref(a.link) }))}
-          />
-        ) : (
-          <p className="text-sm text-gray-400 dark:text-gray-500">No usage recorded</p>
-        ))}
+      {d && (
+        <>
+          <div className="space-y-1.5 mb-4">
+            <ChipRow label="Usage" options={d.available.usages} selected={usages} onToggle={toggle(setUsages)} tone="purple" />
+            <ChipRow label="Catalog" options={d.available.catalogs} selected={catalogs} onToggle={toggle(setCatalogs)} tone="green" />
+            {(usages.length > 0 || catalogs.length > 0) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUsages([]);
+                  setCatalogs([]);
+                }}
+                className="px-2.5 py-0.5 text-xs font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/30 dark:hover:bg-yellow-900/50 border border-yellow-200 dark:border-yellow-800 rounded-full"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+          {state.error && (
+            <p className="mb-2 text-xs text-amber-700 dark:text-amber-300">
+              Couldn&apos;t refresh ·{" "}
+              <button type="button" onClick={state.refresh} className="underline">Retry</button>
+            </p>
+          )}
+          {d.apps.length ? (
+            <div className={state.loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
+              <BarList
+                color={TONES.teal.hex}
+                labelWidth="w-56"
+                items={d.apps.map((a) => ({
+                  label: a.name,
+                  count: a.totalHours,
+                  detail: hours(a.totalHours),
+                  link: linkHref(a.link),
+                }))}
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 dark:text-gray-500">No usage recorded for this selection</p>
+          )}
+        </>
+      )}
     </InsightCard>
   );
 }
@@ -1070,13 +1300,13 @@ function ConnectivityProblems({ ctx }: { ctx: InsightContext }) {
 const CARDS: { id: InsightCardKey; Card: React.FC<{ ctx: InsightContext }> }[] = [
   { id: "rebootDebt", Card: RebootDebt },
   { id: "protectionGaps", Card: ProtectionGaps },
-  { id: "unmanagedDevices", Card: UnmanagedDevices },
-  { id: "hardwareAtRisk", Card: HardwareAtRisk },
+  { id: "managementToolErrors", Card: ManagementToolErrors },
+  { id: "storage", Card: Storage },
   { id: "checkinGaps", Card: CheckinGaps },
   { id: "osCurrency", Card: OSCurrency },
   { id: "softwareRisk", Card: SoftwareRisk },
   { id: "expiringCertificates", Card: ExpiringCertificates },
-  { id: "localAdminExposure", Card: LocalAdminExposure },
+  { id: "directoryJoin", Card: DirectoryJoin },
   { id: "connectivityProblems", Card: ConnectivityProblems },
 ];
 
