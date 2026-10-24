@@ -1,6 +1,6 @@
 # Frontend Dockerfile for Next.js
-# Use Node.js 20 LTS for better security and performance
-FROM node:20-alpine AS base
+# Node.js 24 LTS: 20 is end-of-life and gets no security fixes
+FROM node:24-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -10,10 +10,9 @@ WORKDIR /app
 
 # Install pnpm. PINNED: `npm install -g pnpm` resolves the latest release the
 # base image can run, so the toolchain moved on its own and broke this build.
-# 10.34.5 is the newest pnpm that supports the Node 20 base above -- 11.x
-# requires Node >=22.13 and dies on `node:sqlite`, and 12.x is a standalone
-# binary that ignores the Node constraint entirely, which is how it got pulled
-# in on 2026-08-26 and turned ignored build scripts into a hard error.
+# 10.34.5 matches pnpm-lock.yaml. 12.x is a standalone binary that ignores the
+# Node constraint, which is how it got pulled in on 2026-08-26 and turned
+# ignored build scripts into a hard error. Move to 11.x deliberately, not by drift.
 RUN npm install -g pnpm@10.34.5
 
 # Install dependencies based on the preferred package manager
