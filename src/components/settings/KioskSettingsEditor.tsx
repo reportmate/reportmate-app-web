@@ -28,7 +28,7 @@ const HOME_PAGES: Array<{ path: string; label: string }> = [
   { path: "/system", label: "System" },
 ]
 
-const ZOOM_STEPS = [1, 1.1, 1.25, 1.5, 1.75, 2]
+const ZOOM_STEPS = [0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
 
 type Status = { type: "idle" | "saving" | "saved" | "error"; message?: string }
 
@@ -89,13 +89,14 @@ export function KioskSettingsEditor({ readOnly = false }: { readOnly?: boolean }
 
         <div>
           <label className={label} htmlFor="kiosk-zoom">Zoom</label>
-          <select id="kiosk-zoom" className={input} value={String(kiosk.zoom)} disabled={readOnly}
-            onChange={e => update({ zoom: Number(e.target.value) })}>
+          <select id="kiosk-zoom" className={input} value={kiosk.fitDashboard !== false ? 'fit' : String(kiosk.zoom)} disabled={readOnly}
+            onChange={e => update(e.target.value === 'fit' ? { fitDashboard: true } : { fitDashboard: false, zoom: Number(e.target.value) })}>
+            <option value="fit">Fit four dashboard columns (default)</option>
             {(ZOOM_STEPS.includes(kiosk.zoom) ? ZOOM_STEPS : [...ZOOM_STEPS, kiosk.zoom].sort((a, b) => a - b)).map(z => (
               <option key={z} value={String(z)}>{Math.round(z * 100)}%</option>
             ))}
           </select>
-          <p className={hint}>Page scale on the display.</p>
+          <p className={hint}>Fit sets the dashboard scale when it opens. Choose a percentage for a fixed scale; browser zoom remains available.</p>
         </div>
 
         <div>

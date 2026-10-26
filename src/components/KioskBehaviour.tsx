@@ -10,27 +10,40 @@
 
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { usePathname } from 'next/navigation'
 import { KIOSK_ROLE, safeKioskPath } from '../lib/kiosk/role'
 import { useSettingsOptional } from '../providers/SettingsProvider'
 import { DEFAULT_KIOSK_SETTINGS } from '../lib/settings/defaults'
 import { useTheme } from './theme-provider'
+import { fitDashboardZoom, KIOSK_ZOOM_EVENT } from '../lib/kiosk/display'
 
 const ACTIVITY = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'] as const
 
 export function KioskBehaviour() {
+  const pathname = usePathname()
   const { data: session } = useSession()
   const settings = useSettingsOptional()
   const { setTheme } = useTheme()
   const isKiosk = (session as { role?: string } | null)?.role === KIOSK_ROLE
   const kiosk = { ...DEFAULT_KIOSK_SETTINGS, ...(settings?.settings.kiosk ?? {}) }
-  const { zoom, idleMinutes, theme } = kiosk
+  const { zoom, fitDashboard, idleMinutes, theme } = kiosk
   const homePath = safeKioskPath(kiosk.homePath)
 
   useEffect(() => {
     if (!isKiosk) return
-    document.documentElement.style.setProperty('zoom', String(zoom))
-    return () => { document.documentElement.style.removeProperty('zoom') }
-  }, [isKiosk, zoom])
+    const initialZoom = fitDashboard && pathname === '/dashboard'
+      ? fitDashboardZoom(window.innerWidth, zoom)
+      : zoom
+    document.documentElement.style.setProperty('zoom', String(initialZoom))
+    document.documentElement.dataset.kioskZoom = String(initialZoom)
+    window.dispatchEvent(new Event(KIOSK_ZOOM_EVENT))
+    // Set the initial fit only: browser zoom remains under the user's control.
+    return () => {
+      document.documentElement.style.removeProperty('zoom')
+      delete document.documentElement.dataset.kioskZoom
+      window.dispatchEvent(new Event(KIOSK_ZOOM_EVENT))
+    }
+  }, [isKiosk, zoom, fitDashboard, pathname])
 
   useEffect(() => {
     if (!isKiosk) return
