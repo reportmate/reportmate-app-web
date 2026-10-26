@@ -94,6 +94,8 @@ export interface KioskSettings {
   homePath: string
   /** Page zoom, 1 = 100%. */
   zoom: number
+  /** Fit four dashboard columns on entry; false uses the fixed zoom instead. */
+  fitDashboard?: boolean
   /** Minutes without input before the display returns home; 0 disables the return. */
   idleMinutes: number
   theme: "dark" | "light" | "system"

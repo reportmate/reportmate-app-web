@@ -47,6 +47,7 @@ export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
 export const DEFAULT_KIOSK_SETTINGS: KioskSettings = {
   homePath: "/events",
   zoom: 1.25,
+  fitDashboard: true,
   idleMinutes: 5,
   theme: "dark",
 }

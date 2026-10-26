@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState } from "react";
 import { SKELETON_LIMIT_MS } from "../../data-cache";
+import { dashboardLayoutAtZoom, KIOSK_ZOOM_EVENT } from "../../kiosk/display";
 import { barWidth, compactHours, countOf, fmtBytes, fmtCount, fmtNumber, fmtPercent, fmtPercentOf, fmtPlural, MISSING } from "../../dashboard/format";
 import { DIRECTORY_SERVICE_COLORS } from "../../dashboard/reportRules";
 import Link from "next/link";
@@ -101,14 +102,22 @@ export function useInsightLayout(): InsightLayout {
   useEffect(() => {
     const wide = window.matchMedia("(min-width: 2200px)");
     const desktop = window.matchMedia("(min-width: 1680px)");
-    const update = () =>
-      setLayout(wide.matches ? "wide" : desktop.matches ? "desktop" : "narrow");
+    const update = () => {
+      const kioskZoom = Number(document.documentElement.dataset.kioskZoom);
+      setLayout(kioskZoom > 0
+        ? dashboardLayoutAtZoom(window.innerWidth, kioskZoom)
+        : wide.matches ? "wide" : desktop.matches ? "desktop" : "narrow");
+    };
     update();
     wide.addEventListener("change", update);
     desktop.addEventListener("change", update);
+    window.addEventListener(KIOSK_ZOOM_EVENT, update);
+    window.addEventListener("resize", update);
     return () => {
       wide.removeEventListener("change", update);
       desktop.removeEventListener("change", update);
+      window.removeEventListener(KIOSK_ZOOM_EVENT, update);
+      window.removeEventListener("resize", update);
     };
   }, []);
   return layout;

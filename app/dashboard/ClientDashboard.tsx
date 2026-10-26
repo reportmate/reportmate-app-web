@@ -596,7 +596,7 @@ export default function ClientDashboard() {
         {(() => {
           const showMac = platformFilter === 'all' || platformFilter === 'macOS'
           const showWin = platformFilter === 'all' || platformFilter === 'Windows'
-          const gridCols = showMac && showWin ? 'lg:grid-cols-2 desktop:grid-cols-1 wide:grid-cols-2' : 'lg:grid-cols-1'
+          const gridCols = showMac && showWin && layout !== 'desktop' ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
           
           return (
             <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
