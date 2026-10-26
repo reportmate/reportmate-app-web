@@ -13,7 +13,7 @@
   }
   @media (min-width: 1680px) {
     .page-container {
-      max-width: min(96vw, 2400px);
+      max-width: min(96%, 2400px);
     }
   }
 }
