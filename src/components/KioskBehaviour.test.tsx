@@ -38,7 +38,7 @@ describe('kiosk dashboard fitting', () => {
     render(<><DashboardLayout /><KioskBehaviour /></>)
     expect(DEFAULT_KIOSK_SETTINGS.fitDashboard).toBe(true)
     expect(Number(document.documentElement.dataset.kioskZoom)).toBeCloseTo(1920 / 2208)
-    expect(screen.getByTestId('layout')).toHaveTextContent('wide')
+    expect(screen.getByTestId('layout').textContent).toBe('wide')
   })
 
   it('allows subsequent browser zoom without refitting against the user', () => {
@@ -49,14 +49,14 @@ describe('kiosk dashboard fitting', () => {
       window.dispatchEvent(new Event('resize'))
     })
     expect(document.documentElement.dataset.kioskZoom).toBe(initialZoom)
-    expect(screen.getByTestId('layout')).toHaveTextContent('desktop')
+    expect(screen.getByTestId('layout').textContent).toBe('desktop')
   })
 
   it('honors an explicitly selected percentage instead of fitting', () => {
     mockKiosk = { idleMinutes: 0, fitDashboard: false, zoom: 1.1 }
     render(<><DashboardLayout /><KioskBehaviour /></>)
     expect(document.documentElement.dataset.kioskZoom).toBe('1.1')
-    expect(screen.getByTestId('layout')).toHaveTextContent('desktop')
+    expect(screen.getByTestId('layout').textContent).toBe('desktop')
   })
 
   it('keeps the configured scale on other kiosk pages', () => {
