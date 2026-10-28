@@ -3,7 +3,7 @@
  * Displays device hardware information and specifications
  */
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { StorageVisualization } from '../storage'
 import { CopyButton } from '../ui/CopyButton'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
@@ -267,6 +267,24 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Normalize snake_case to camelCase for all hardware data
   const rawHardware = device?.modules?.hardware || device?.hardware || data || {}
   const hardwareData = normalizeKeys(rawHardware) as any
+
+  useEffect(() => {
+    let frame: number | undefined
+    const scrollToStorage = () => {
+      if (window.location.hash !== '#storage-analysis') return
+      frame = window.requestAnimationFrame(() => {
+        document.getElementById('storage-analysis')?.scrollIntoView({ block: 'start' })
+      })
+    }
+    scrollToStorage()
+    window.addEventListener('hashchange', scrollToStorage)
+    window.addEventListener('popstate', scrollToStorage)
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame)
+      window.removeEventListener('hashchange', scrollToStorage)
+      window.removeEventListener('popstate', scrollToStorage)
+    }
+  }, [rawHardware])
   
   if (!hardwareData || Object.keys(hardwareData).length === 0) {
     return (
@@ -855,7 +873,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       )}
 
       {/* Storage Visualization Section */}
-      <div className="space-y-4">
+      <div id="storage-analysis" className="space-y-4 scroll-mt-44">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
           <HardDrive className="w-6 h-6 text-gray-500" />
           Storage Analysis

@@ -140,10 +140,11 @@ const DonutChart: React.FC<{
   // Directory sums miss hidden files, system snapshots, APFS overhead, etc.
   const usedSpace = capacity - freeSpace
   const usedPercentage = Math.min(100, Math.round((usedSpace / capacity) * 100))
+  const unattributedPercentage = Math.max(0, (usedSpace / capacity) * 100 - accumulatedPercentage)
 
   return (
     <div className="relative inline-block">
-      <svg width={radius * 2} height={radius * 2}>
+      <svg width={radius * 2} height={radius * 2} role="img" aria-label="Drive storage: colored directories, gray unattributed usage, and light gray free space">
         {/* Background circle */}
         <circle
           stroke="#E5E7EB"
@@ -156,6 +157,21 @@ const DonutChart: React.FC<{
           transform={`rotate(-90 ${radius} ${radius})`}
         />
         {segments}
+        {unattributedPercentage > 0 && (
+          <circle
+            stroke="#9CA3AF"
+            fill="transparent"
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${(unattributedPercentage / 100) * circumference} ${circumference}`}
+            strokeDashoffset={-accumulatedPercentage * (circumference / 100)}
+            r={normalizedRadius}
+            cx={radius}
+            cy={radius}
+            transform={`rotate(-90 ${radius} ${radius})`}
+          >
+            <title>Used space not accounted for by the directory scan</title>
+          </circle>
+        )}
       </svg>
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="text-center">
@@ -273,7 +289,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
   const selectedDevice = validDevices[selectedDeviceIndex] || null
   const sortedDirectories = useMemo(() => {
     if (!selectedDevice) return []
-    return selectedDevice.rootDirectories.sort((a, b) => b.size - a.size)
+    return [...selectedDevice.rootDirectories].sort((a, b) => b.size - a.size)
   }, [selectedDevice])
 
   if (validDevices.length === 0) {
@@ -316,6 +332,8 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
   // that the client cannot enumerate directly
   const totalUsedSpace = selectedDevice.capacity - selectedDevice.freeSpace
   const usedPercentage = Math.round((totalUsedSpace / selectedDevice.capacity) * 100)
+  const directoryTotal = sortedDirectories.reduce((total, directory) => total + directory.size, 0)
+  const unattributedSpace = Math.max(0, totalUsedSpace - directoryTotal)
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
@@ -453,6 +471,13 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
             </div>
           </div>
           
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Listed directories: {formatBytes(directoryTotal)} of {formatBytes(totalUsedSpace)} used.
+          {unattributedSpace > 0 && <> {formatBytes(unattributedSpace)} of used space is not accounted for by this directory scan.</>}
+          {' '}Directory sizes can be older than the drive totals and can omit files or protected storage.
+          {selectedDevice.lastAnalyzed && <> Last directory scan: {new Date(selectedDevice.lastAnalyzed).toLocaleString()}.</>}
+        </p>
+
         {/* Directory Tree */}
         <div className="space-y-1 max-h-96 overflow-y-auto pr-2">
           {sortedDirectories.map((directory) => (

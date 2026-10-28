@@ -27,7 +27,8 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
   // Listen for URL hash changes to update the active tab during loading
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '')
+      const fragment = window.location.hash.slice(1)
+      const hash = fragment === 'storage-analysis' ? 'hardware' : fragment
       if (hash && tabs.some(tab => tab.id === hash)) {
         setActiveTab(hash)
       }
