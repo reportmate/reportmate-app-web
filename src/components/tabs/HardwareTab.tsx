@@ -3,7 +3,7 @@
  * Displays device hardware information and specifications
  */
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { StorageVisualization } from '../storage'
 import { CopyButton } from '../ui/CopyButton'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
@@ -265,7 +265,10 @@ const formatBytes = (bytes: number) => {
 
 export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Normalize snake_case to camelCase for all hardware data
-  const rawHardware = device?.modules?.hardware || device?.hardware || data || {}
+  const rawHardware = useMemo(
+    () => device?.modules?.hardware || device?.hardware || data || {},
+    [device, data]
+  )
   const hardwareData = normalizeKeys(rawHardware) as any
 
   useEffect(() => {
