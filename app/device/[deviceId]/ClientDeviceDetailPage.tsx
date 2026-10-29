@@ -427,7 +427,8 @@ export default function ClientDeviceDetailPage() {
   // With no tab hash, a `?tab=` query parameter (dashboard deep links) picks the tab.
   useEffect(() => {
     const syncHashToTab = () => {
-      const hash = window.location.hash.replace('#', '') as TabType
+      const fragment = window.location.hash.slice(1)
+      const hash = (fragment === 'storage-analysis' ? 'hardware' : fragment) as TabType
       const queryTab = (new URLSearchParams(window.location.search).get('tab') || '').toLowerCase() as TabType
       if (hash && tabs.some(tab => tab.id === hash)) {
         setActiveTab(hash)
