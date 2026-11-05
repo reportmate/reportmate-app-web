@@ -18,6 +18,12 @@ import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { ManagementShieldIcon, ManagementViewSwitch } from "@/src/components/management/ManagementViewSwitch"
 import { csvCell } from "@/src/lib/csv"
 import { ToolLogsReport } from "@/src/components/management/ToolLogsReport"
+import { ProfilesReport } from "@/src/components/management/ProfilesReport"
+import { EnrollmentHealthCells, EnrollmentHealthFilterBar, EnrollmentHealthHeaders } from "@/src/components/management/EnrollmentHealth"
+import {
+  ENROLLMENT_HEALTH_PARAMS, activeEnrollmentHealthCount, healthCsvHeaders, healthCsvValues, matchesEnrollmentHealth,
+  parseEnrollmentHealth, writeEnrollmentHealth, type EnrollmentHealth, type EnrollmentHealthFilters,
+} from "@/src/lib/management/enrollment-health"
 
 const MANAGEMENT_URL = '/api/v1/management'
 
@@ -28,7 +34,7 @@ const MANAGEMENT_URL = '/api/v1/management'
 // `lastSeen=24h|1-7d|7d+` buckets lastSeen age the way the API's Unmanaged
 // Devices card does. `platform` belongs to the global toggle, which also
 // accepts `platform=macOS|Windows`.
-const OWNED_PARAMS = ['provider', 'enrolled', 'enrollmentType', 'lastSeen']
+const OWNED_PARAMS = ['provider', 'enrolled', 'enrollmentType', 'lastSeen', ...ENROLLMENT_HEALTH_PARAMS]
 
 /** Query string with commas left readable (`provider=Unmanaged,Apple`). */
 const commaQuery = (qs: string) => qs.replace(/%2C/gi, ',')
@@ -40,10 +46,11 @@ function parseManagementParams(sp: URLSearchParams) {
     enrolled: enrolled === '0' || enrolled === '1' ? enrolled : '',
     enrollmentTypes: paramList(sp.get('enrollmentType')),
     lastSeen: lastSeenFromParam(sp.get('lastSeen')),
+    health: parseEnrollmentHealth(sp),
   }
 }
 
-interface Management {
+interface Management extends EnrollmentHealth {
   id: string
   deviceId: string
   deviceName: string
@@ -176,6 +183,7 @@ function ManagementPageContent() {
   const [enrolledFilter, setEnrolledFilter] = useState(initialUrl.enrolled)
   const [enrollmentTypeFilters, setEnrollmentTypeFilters] = useState<string[]>(initialUrl.enrollmentTypes)
   const [lastSeenFilter, setLastSeenFilter] = useState<LastSeenBucket | null>(initialUrl.lastSeen)
+  const [healthFilters, setHealthFilters] = useState<EnrollmentHealthFilters>(initialUrl.health)
   // Clicking a bar selects just that provider; clicking a selected bar removes it.
   const selectProvider = (label: string) =>
     setProviderFilters(prev => (prev.includes(label) ? prev.filter(p => p !== label) : [label]))
@@ -267,6 +275,7 @@ function ManagementPageContent() {
     setEnrolledFilter('')
     setEnrollmentTypeFilters([])
     setLastSeenFilter(null)
+    setHealthFilters({ nonCompliant: false, syncOlderThanDays: null, certExpiringDays: null })
     setEnrollmentStatusFilter('all')
     setTypeFilter('all')
     setSearchQuery('')
@@ -286,6 +295,7 @@ function ManagementPageContent() {
     setEnrolledFilter(parsed.enrolled)
     setEnrollmentTypeFilters(parsed.enrollmentTypes)
     setLastSeenFilter(parsed.lastSeen)
+    setHealthFilters(parsed.health)
   }, [searchParams])
 
   useEffect(() => {
@@ -295,11 +305,12 @@ function ManagementPageContent() {
     if (enrolledFilter) params.set('enrolled', enrolledFilter)
     if (enrollmentTypeFilters.length) params.set('enrollmentType', enrollmentTypeFilters.join(','))
     if (lastSeenFilter) params.set('lastSeen', lastSeenFilter)
+    writeEnrollmentHealth(params, healthFilters)
     const next = commaQuery(params.toString())
     if (next === commaQuery(window.location.search.replace(/^\?/, ''))) return
     lastUrlRef.current = next
     router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
-  }, [providerFilters, enrolledFilter, enrollmentTypeFilters, lastSeenFilter, pathname, router])
+  }, [providerFilters, enrolledFilter, enrollmentTypeFilters, lastSeenFilter, healthFilters, pathname, router])
 
   // Handle column sort click
   const handleSort = (column: 'device' | 'provider' | 'status' | 'type' | 'deviceId') => {
@@ -369,7 +380,15 @@ function ManagementPageContent() {
             location: mgmt.location,
             department: mgmt.department,
             autopilotConfig: mgmt.autopilotConfig,
-            osName: mgmt.osName
+            osName: mgmt.osName,
+            // Enrollment health: null means the device did not collect it (shown as unknown).
+            complianceState: mgmt.complianceState ?? null,
+            complianceSource: mgmt.complianceSource ?? null,
+            lastMdmSync: mgmt.lastMdmSync ?? null,
+            mdmCertificateExpires: mgmt.mdmCertificateExpires ?? null,
+            userApprovedMdm: mgmt.userApprovedMdm ?? null,
+            installedFromDep: mgmt.installedFromDep ?? null,
+            depCapable: mgmt.depCapable ?? null,
           }
         })
         
@@ -457,6 +476,9 @@ function ManagementPageContent() {
   // A provider from the URL with no devices still shows (at 0) so it can be cleared.
   for (const p of providerFilters) if (!(p in providerCounts)) providerCounts[p] = 0
 
+  // One reference time per render so every row is judged against the same clock.
+  const healthNow = Date.now()
+
   // Filter management first, then calculate counts based on filtered data
   const baseFilteredManagement = management.filter(m => {
     // Search query - includes management and inventory fields
@@ -488,6 +510,9 @@ function ManagementPageContent() {
 
     // `lastSeen=24h|1-7d|7d+`
     if (lastSeenFilter && lastSeenBucket(m.lastSeen) !== lastSeenFilter) return false
+
+    // `compliance=non_compliant`, `syncOlderThan=<days>`, `certExpiring=<days>`
+    if (!matchesEnrollmentHealth({ ...m, platform: normalizePlatform(m.platform) }, healthFilters, healthNow)) return false
     
     // Enrollment Status filter
     if (enrollmentStatusFilter !== 'all' && m.enrollmentStatus !== enrollmentStatusFilter) return false
@@ -966,7 +991,7 @@ function ManagementPageContent() {
                   <button
                     onClick={() => {
                       // Build CSV from filtered data only
-                      const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Provider', 'Enrollment Status', 'Enrollment Type', 'Usage', 'Catalog', 'Location']
+                      const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Provider', 'Enrollment Status', 'Enrollment Type', 'Usage', 'Catalog', 'Location', ...healthCsvHeaders()].map(csvCell)
                       const rows = filteredManagement.map(m => [
                         m.deviceName || '',
                         m.serialNumber || '',
@@ -976,7 +1001,8 @@ function ManagementPageContent() {
                         m.enrollmentType || '',
                         m.usage || '',
                         m.catalog || '',
-                        m.location || ''
+                        m.location || '',
+                        ...healthCsvValues({ ...m, platform: normalizePlatform(m.platform) })
                       ].map(csvCell).join(','))
                       
                       const csv = [headers.join(','), ...rows].join('\n')
@@ -1008,6 +1034,7 @@ function ManagementPageContent() {
             enrolledFilter !== '' ||
             enrollmentTypeFilters.length > 0 || 
             lastSeenFilter !== null ||
+            activeEnrollmentHealthCount(healthFilters) > 0 ||
             enrollmentStatusFilter !== 'all' || 
             typeFilter !== 'all' || 
             searchQuery !== '' ||
@@ -1087,6 +1114,8 @@ function ManagementPageContent() {
             locationCounts={locationCounts}
           />
           
+          <EnrollmentHealthFilterBar filters={healthFilters} onChange={setHealthFilters} />
+
           {/* Widgets Accordion */}
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
             <button
@@ -1237,12 +1266,13 @@ function ManagementPageContent() {
                       )}
                     </div>
                   </th>
+                  <EnrollmentHealthHeaders />
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1262,7 +1292,7 @@ function ManagementPageContent() {
                   </tr>
                 ) : filteredManagement.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -1372,6 +1402,7 @@ function ManagementPageContent() {
                           )}
                         </div>
                       </td>
+                      <EnrollmentHealthCells device={{ ...mgmt, platform: normalizePlatform(mgmt.platform) }} now={healthNow} />
                     </tr>
                   ))
                 )}
@@ -1384,10 +1415,14 @@ function ManagementPageContent() {
   )
 }
 
-/** `tab=logs` is the Logs tab (the Fleet Management Tools report); otherwise Enrollment. */
+/** `tab=logs` is the Fleet Management Tools logs, `tab=profiles` / `tab=preferences` the profile reports; otherwise Enrollment. */
 function ManagementTabs() {
   const searchParams = useSearchParams()
-  return searchParams.get('tab') === 'logs' ? <ToolLogsReport /> : <ManagementPageContent />
+  const tab = searchParams.get('tab')
+  if (tab === 'logs') return <ToolLogsReport />
+  if (tab === 'profiles') return <ProfilesReport key="profile" kind="profile" />
+  if (tab === 'preferences') return <ProfilesReport key="preference" kind="preference" />
+  return <ManagementPageContent />
 }
 
 export default function ManagementPage() {

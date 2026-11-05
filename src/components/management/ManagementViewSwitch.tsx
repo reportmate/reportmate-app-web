@@ -14,10 +14,13 @@ export function ManagementShieldIcon({ className = "w-5 h-5" }: { className?: st
 
 /**
  * The Management report's header: the title is itself the switch between its
- * two tabs, "Device Management Service | Management Tools Logs", at title size.
- * /management and /management?tab=logs; the global `platform` carries across.
+ * tabs, "Device Management Service | Configuration Profiles | Managed Preferences |
+ * Management Tools Logs", at title size. /management, ?tab=profiles,
+ * ?tab=preferences and ?tab=logs; the global `platform` carries across.
  */
-export function ManagementViewSwitch({ current }: { current: "enrollment" | "logs" }) {
+export type ManagementTab = "enrollment" | "profiles" | "preferences" | "logs"
+
+export function ManagementViewSwitch({ current }: { current: ManagementTab }) {
   const searchParams = useSearchParams()
   const platform = searchParams?.get("platform")
   const withPlatform = (query: string) => {
@@ -28,6 +31,8 @@ export function ManagementViewSwitch({ current }: { current: "enrollment" | "log
   }
   const items = [
     { key: "enrollment", label: "Device Management Service", href: withPlatform("") },
+    { key: "profiles", label: "Configuration Profiles", href: withPlatform("tab=profiles") },
+    { key: "preferences", label: "Managed Preferences", href: withPlatform("tab=preferences") },
     { key: "logs", label: "Management Tools Logs", href: withPlatform("tab=logs") },
   ] as const
   return (
