@@ -28,7 +28,7 @@ const emptyOptions = { usages: [], catalogs: [], areas: [], fleets: [], location
 function DetectionCoverage({ coverage }: { coverage: Coverage }) {
   return <p className="text-xs text-gray-600 dark:text-gray-400">
     {coverage.devices.toLocaleString()} devices in scope: {coverage.reporting.toLocaleString()} report detections
-    {coverage.notReporting > 0 && <>, <strong className="font-semibold">{coverage.notReporting.toLocaleString()} do not</strong> (macOS clients report no individual detections; not counted as clean)</>}
+    {coverage.notReporting > 0 && <>, <strong className="font-semibold">{coverage.notReporting.toLocaleString()} do not</strong> (older macOS clients and devices with no readable detection source; not counted as clean)</>}
     {(coverage.unknown || 0) > 0 && <>, {coverage.unknown!.toLocaleString()} sent a list that could not be read</>}.
     {coverage.devicesWithDetections !== undefined && <> {coverage.devicesWithDetections.toLocaleString()} devices have matching detections.</>}
   </p>

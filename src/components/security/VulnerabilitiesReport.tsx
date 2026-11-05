@@ -37,7 +37,7 @@ export function CoverageNote({ coverage }: { coverage: Coverage }) {
     {coverage.devices.toLocaleString()} devices in scope: {coverage.reporting.toLocaleString()} report a CVE list
     {coverage.notReporting > 0 && <>, <strong className="font-semibold">{coverage.notReporting.toLocaleString()} do not</strong> (coverage unknown, not counted as clean)</>}
     {(coverage.unknown || 0) > 0 && <>, {coverage.unknown!.toLocaleString()} sent a list that could not be read</>}.
-    {(coverage.listMayBeIncomplete || 0) > 0 && <> {coverage.listMayBeIncomplete!.toLocaleString()} macOS devices reached the client&apos;s 50-entry limit, so their lists may be incomplete.</>}
+    {(coverage.listMayBeIncomplete || 0) > 0 && <> {coverage.listMayBeIncomplete!.toLocaleString()} macOS devices sent a list cut at the client&apos;s limit, so their lists may be incomplete.</>}
   </p>
 }
 
