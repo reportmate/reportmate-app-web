@@ -16,6 +16,8 @@ import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/da
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { csvCell } from "@/src/lib/csv"
+import { IdentityViewSwitch } from "@/src/components/identity/IdentityViewSwitch"
+import { PostureReport } from "@/src/components/identity/PostureReport"
 
 const IDENTITY_URL = '/api/v1/identity'
 
@@ -537,7 +539,7 @@ function IdentityPageContent() {
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Identity & Users</h2>
+                    <IdentityViewSwitch current="users" />
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       User accounts, sessions, and identity management across {filteredDevices.length} devices
                     </p>
@@ -1532,10 +1534,15 @@ function IdentityPageContent() {
   )
 }
 
+function IdentityTabs() {
+  const searchParams = useSearchParams()
+  return searchParams.get('tab') === 'posture' ? <PostureReport /> : <IdentityPageContent />
+}
+
 export default function IdentityPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
-      <IdentityPageContent />
+      <IdentityTabs />
     </Suspense>
   )
 }
