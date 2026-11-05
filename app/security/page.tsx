@@ -30,6 +30,9 @@ import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/da
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { csvCell } from "@/src/lib/csv"
+import { SecurityViewSwitch } from "@/src/components/security/SecurityViewSwitch"
+import { VulnerabilitiesReport } from "@/src/components/security/VulnerabilitiesReport"
+import { ThreatsReport } from "@/src/components/security/ThreatsReport"
 
 const SECURITY_URL = '/api/v1/security'
 
@@ -934,7 +937,7 @@ function SecurityPageContent() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Fleet Security</h2>
+                <SecurityViewSwitch current="posture" />
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   Security posture across {filteredDevices.length} device{filteredDevices.length !== 1 ? 's' : ''}
                 </p>
@@ -1428,10 +1431,16 @@ function SecurityPageContent() {
   )
 }
 
+/** `tab=vulnerabilities` and `tab=threats` are the fleet reports; otherwise the posture table. */
+function SecurityTabs() {
+  const tab = useSearchParams().get('tab')
+  return tab === 'vulnerabilities' ? <VulnerabilitiesReport /> : tab === 'threats' ? <ThreatsReport /> : <SecurityPageContent />
+}
+
 export default function SecurityPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
-      <SecurityPageContent />
+      <SecurityTabs />
     </Suspense>
   )
 }
