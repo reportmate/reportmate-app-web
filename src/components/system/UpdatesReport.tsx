@@ -241,7 +241,7 @@ export function UpdatesReport() {
             <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-start justify-between gap-4">
               <p className="text-xs text-gray-500 dark:text-gray-400 max-w-2xl">{hasSelection
                 ? "Each device in scope shows the selected updates as pending or installed. Not reported means the update is in neither the pending list nor the recent install history, which is not proof it is missing."
-                : "One row per device and pending update. Devices with an empty pending list show once as None pending reported; clients send an empty list both when nothing is pending and when the update search failed."}</p>
+                : "One row per device and pending update. A device with no pending updates shows once: No pending updates only when its last update search succeeded and is within the maximum age, Search failed with the error when the search failed, and Unknown when the client does not report its search."}</p>
               <details className="text-sm text-gray-600 dark:text-gray-300 max-w-xl"><summary className="cursor-pointer py-1">Columns</summary>
                 <div className="flex flex-wrap gap-2 mt-2" aria-label="Visible columns">{UPDATE_COLUMNS.filter(([key]) => key !== "deviceName").map(([key, label]) => <Choice disabled={pending} key={key} active={view.columns.includes(key)} onClick={() => toggleColumn(key)}>{label}</Choice>)}
                   <button type="button" className="text-xs text-blue-600 dark:text-blue-400 hover:underline" disabled={pending} onClick={() => update({ columns: null, sort: null, direction: null })}>Reset columns</button>

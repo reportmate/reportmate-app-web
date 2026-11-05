@@ -50,8 +50,12 @@ export interface UacInfo {
 export interface LapsInfo {
   windowsLapsConfigured?: boolean
   legacyLapsInstalled?: boolean
-  backupDirectory?: string   // "Active Directory" / "Azure AD" / "Configured" / ""
+  backupDirectory?: string   // "Active Directory" / "Azure AD" / "Disabled" / "Configured" / ""
   adminAccountName?: string
+  /** Policy root in force: csp, gpo, local, legacyGpo or none. Absent from older clients. */
+  policySource?: string
+  lastPasswordRotation?: string
+  lastPasswordRotationDirectory?: string
 }
 
 export interface PasswordPolicyInfo {

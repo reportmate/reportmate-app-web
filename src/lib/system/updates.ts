@@ -6,7 +6,7 @@ export const UPDATES_API = "/api/v1/system/updates"
 export const UPDATE_OPTIONS_API = `${UPDATES_API}/filters`
 export const UPDATES_PAGE_SIZE = 1000
 
-export const UPDATE_STATES = ["pending", "installed", "not_reported", "none", "unknown"] as const
+export const UPDATE_STATES = ["pending", "installed", "not_reported", "none", "search_failed", "unknown"] as const
 export const UPDATE_SCOPE_KEYS = ["usages", "catalogs", "areas", "fleets", "locations", "rooms", "inventoryStates"] as const
 export const UPDATE_PARAMS = [
   "updates", "cves", "states", "securityOnly", "deferred", "rebootRequired", "minAgeDays", "freshness", "maxAgeHours",
@@ -57,8 +57,23 @@ export interface UpdateRow {
   updateType: string | null
   ageDays: number | null
   ageSource: "offered" | "released" | null
+  /** The client's last OS update search. Absent from an older API; not_reported from an older client. */
+  updateSearch?: UpdateSearch
   reportedState: string
   state: UpdateState
+}
+
+export interface UpdateSearch {
+  status: "succeeded" | "failed" | "not_reported"
+  error: string | null
+  checkedAt: string | null
+  freshness: "fresh" | "stale" | "unknown"
+}
+
+export function updateSearchLabel(search: UpdateSearch | undefined): string {
+  if (!search || search.status === "not_reported") return "Not reported"
+  if (search.status === "failed") return "Search failed"
+  return search.freshness === "fresh" ? "Succeeded" : search.freshness === "stale" ? "Succeeded, older than maximum age" : "Succeeded, time unknown"
 }
 
 export interface UpdatesReport {
@@ -141,7 +156,8 @@ export function updateStateLabel(state: string): string {
     case "pending": return "Pending"
     case "installed": return "Installed"
     case "not_reported": return "Not reported"
-    case "none": return "None pending reported"
+    case "none": return "No pending updates"
+    case "search_failed": return "Search failed"
     case "missing": return "No collection"
     default: return "Unknown"
   }
@@ -162,12 +178,12 @@ export const UPDATE_COLUMNS = [
   ["severity", "Severity"], ["cves", "CVEs"], ["flags", "Flags"], ["version", "Version"], ["ageDays", "Age (days)"],
   ["deferredUntil", "Deferred until"], ["installDate", "Installed"], ["inventoryState", "Inventory"],
   ["usage", "Usage"], ["catalog", "Catalog"], ["area", "Area"], ["fleet", "Fleet"], ["location", "Location"],
-  ["room", "Room"], ["collectedAt", "Update collection"], ["lastSeen", "Last seen"],
+  ["room", "Room"], ["updateSearch", "Last update search"], ["collectedAt", "Update collection"], ["lastSeen", "Last seen"],
 ] as const
 export type UpdateColumn = typeof UPDATE_COLUMNS[number][0]
 export interface UpdatesView { sort: UpdateColumn; direction: "asc" | "desc"; columns: UpdateColumn[] }
 
-const defaultColumns: UpdateColumn[] = ["deviceName", "state", "title", "category", "severity", "cves", "flags", "ageDays", "collectedAt"]
+const defaultColumns: UpdateColumn[] = ["deviceName", "state", "title", "category", "severity", "cves", "flags", "ageDays", "updateSearch", "collectedAt"]
 
 export function readUpdatesView(params: URLSearchParams): UpdatesView {
   const requested = params.has("columns") ? (params.get("columns") || "").split(",") : defaultColumns
@@ -200,6 +216,7 @@ export function updateSortValue(row: UpdateRow, column: UpdateColumn): string | 
     case "ageDays": return row.ageDays
     case "inventoryState": return row.inventoryState ? inventoryLabel(row.inventoryState) : null
     case "deferredUntil": case "installDate": case "collectedAt": case "lastSeen": return dateValue(row[column])
+    case "updateSearch": return row.updateSearch && row.updateSearch.status !== "not_reported" ? updateSearchLabel(row.updateSearch) : null
     default: return row[column] || null
   }
 }
@@ -219,7 +236,7 @@ export function updatesCsv(rows: UpdateRow[], generatedAt: string, reportUrl: st
     "State", "Last Reported State", "Update", "KB", "Product Key", "Category", "Severity", "CVEs", "Security",
     "Mandatory", "Downloaded", "Restart Required", "Deferred", "Deferred Until", "First Offered", "Released",
     "Installed", "Version", "Build", "Update Type", "Age (Days)", "Age Measured From",
-    "Pending Updates Reported", "Update Collection Valid", "Update Collection Time", "Update Collection Freshness",
+    "Pending Updates Reported", "Update Search", "Update Search Error", "Update Search Time", "Update Collection Valid", "Update Collection Time", "Update Collection Freshness",
     "Last Seen", "Report Generated At", "Report URL",
   ]
   return [csvRow(headers), ...rows.map(row => csvRow([
@@ -231,7 +248,8 @@ export function updatesCsv(rows: UpdateRow[], generatedAt: string, reportUrl: st
     row.updateKey ? yesNo(row.mandatory) : null, row.updateKey ? yesNo(row.downloaded) : null,
     row.updateKey ? yesNo(row.rebootRequired) : null, row.updateKey ? yesNo(row.deferred) : null,
     row.deferredUntil, row.firstOfferedAt, row.releaseDate, row.installDate, row.version, row.buildVersion,
-    row.updateType, row.ageDays, row.ageSource, row.pendingCount, row.collectionValid ? "Yes" : "No",
+    row.updateType, row.ageDays, row.ageSource, row.pendingCount,
+    updateSearchLabel(row.updateSearch), row.updateSearch?.error ?? null, row.updateSearch?.checkedAt ?? null, row.collectionValid ? "Yes" : "No",
     row.collectedAt, row.freshness, row.lastSeen, generatedAt, reportUrl,
   ]))].join("\r\n")
 }

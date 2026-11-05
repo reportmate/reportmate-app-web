@@ -39,6 +39,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { extractIdentity, type IdentityInfo } from '../../lib/data-processing/modules/identity'
+import { formatRelativeTime } from '../../lib/time'
 
 interface IdentityTabProps {
   device: any
@@ -666,6 +667,14 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                         value={lapsData.windowsLapsConfigured ? `Windows LAPS${lapsData.backupDirectory ? ` (${lapsData.backupDirectory})` : ''}` : lapsData.legacyLapsInstalled ? 'Legacy LAPS' : 'Not Configured'}
                         variant={(lapsData.windowsLapsConfigured || lapsData.legacyLapsInstalled) ? 'success' : 'neutral'}
                       />
+                      <DetailRow
+                        label="LAPS Policy Source"
+                        value={({ csp: 'MDM (LAPS CSP)', gpo: 'Group Policy', local: 'Local configuration', legacyGpo: 'Legacy LAPS Group Policy', none: 'No policy' } as Record<string, string>)[lapsData.policySource ?? ''] || 'Not reported'}
+                        variant="neutral"
+                      />
+                      {lapsData.lastPasswordRotation && (
+                        <DetailRow label="Last Password Backup" value={formatRelativeTime(lapsData.lastPasswordRotation)} variant="neutral" />
+                      )}
                     </div>
                   )}
                   {autoLoginData && (
