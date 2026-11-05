@@ -5,6 +5,7 @@ export const POSTURE_API = "/api/v1/identity/posture"
 export const SCOPE_KEYS = ["usages", "catalogs", "areas", "fleets", "locations", "rooms", "inventoryStates"] as const
 export const QUICK_VIEWS = [
   ["noLaps", "No LAPS", "Windows"],
+  ["noValidPrt", "No valid PRT", "Windows"],
   ["autoLogin", "Auto-login on", "Windows"],
   ["expiredPssoToken", "Expired Platform SSO token", "macOS"],
   ["activationLock", "Activation Lock on", "macOS"],
@@ -18,11 +19,26 @@ export const POSTURE_VIEW_PARAMS = ["sort", "direction", "columns"] as const
 export type Freshness = "fresh" | "stale" | "unknown"
 export type Tri = boolean | null
 
+export type PrtState = "valid" | "expired" | "none" | "not_available" | "failed" | "not_reported" | "unknown"
+
 export interface PssoUser { username: string | null; registered: Tri; tokenExpiration: string | null; token: "valid" | "expired" | "not_registered" | "unknown" }
 
 export interface PostureReported {
   laps?: "configured" | "not_configured" | "unknown"
   lapsBackupDirectory?: string | null
+  /** Policy root the client found LAPS in; null from clients that do not report it. */
+  lapsPolicySource?: "csp" | "gpo" | "local" | "legacyGpo" | "none" | null
+  lapsLastRotation?: string | null
+  /** Entra PRT of the signed-in user. not_reported: older client; not_available: nobody signed in. */
+  prtState?: PrtState
+  prtUser?: string | null
+  prtCollectedAt?: string | null
+  prtUpdateTime?: string | null
+  prtExpiryTime?: string | null
+  ssoReason?: string | null
+  cloudTgt?: Tri
+  onPremTgt?: Tri
+  passwordComplexity?: Tri
   autoLogin?: Tri
   autoLoginStoredPassword?: Tri
   uacEnabled?: Tri
@@ -129,6 +145,25 @@ export const triLabel = (value: Tri | undefined, yes = "Yes", no = "No") => valu
 
 const num = (value: number | null | undefined, unit = "") => typeof value === "number" ? `${value}${unit}` : "Unknown"
 
+const LAPS_SOURCES: Record<string, string> = {
+  csp: "MDM (LAPS CSP)", gpo: "Group Policy", local: "Local configuration", legacyGpo: "Legacy LAPS Group Policy", none: "No policy",
+}
+/** Undefined (older API) and null (older client) are both not reported. */
+export function lapsSourceLabel(r: PostureReported): string {
+  return r.lapsPolicySource ? LAPS_SOURCES[r.lapsPolicySource] || "Unknown" : "Not reported"
+}
+const PRT_LABELS: Record<PrtState, string> = {
+  valid: "Valid", expired: "Expired", none: "No PRT", not_available: "No user signed in",
+  failed: "Collection failed", not_reported: "Not reported", unknown: "Unknown",
+}
+export function prtLabel(r: PostureReported): string {
+  return PRT_LABELS[r.prtState || "not_reported"]
+}
+export function kerberosLabel(r: PostureReported): string {
+  if (!r.prtState || ["not_reported", "not_available", "failed"].includes(r.prtState)) return prtLabel(r)
+  return `Cloud TGT ${triLabel(r.cloudTgt)} · On-prem TGT ${triLabel(r.onPremTgt)}`
+}
+
 export function lapsLabel(r: PostureReported): string {
   if (r.laps === "configured") return r.lapsBackupDirectory ? `Configured (${r.lapsBackupDirectory})` : "Configured"
   return r.laps === "not_configured" ? "Not configured" : "Unknown"
@@ -142,7 +177,9 @@ export function uacLabel(r: PostureReported): string {
   return r.uacLevel || (r.uacEnabled ? "On" : "Unknown")
 }
 export function passwordPolicyLabel(r: PostureReported): string {
-  return `Min length ${num(r.minPasswordLength)} · Lockout after ${num(r.lockoutThreshold)} for ${num(r.lockoutDurationMinutes, " min")}`
+  const complexity = r.passwordComplexity === true ? "Complexity required" : r.passwordComplexity === false ? "No complexity"
+    : r.passwordComplexity === undefined ? "Complexity not reported" : "Complexity unknown"
+  return `Min length ${num(r.minPasswordLength)} · ${complexity} · Lockout after ${num(r.lockoutThreshold)} for ${num(r.lockoutDurationMinutes, " min")}`
 }
 export function helloLabel(r: PostureReported): string {
   const providers = r.helloProviders == null ? "Providers unknown" : r.helloProviders.length ? r.helloProviders.join(", ") : "No providers"
@@ -168,7 +205,9 @@ export function secureTokenLabel(r: PostureReported): string {
 
 export const POSTURE_COLUMNS = [
   ["deviceName", "Device", "all"], ["platform", "Platform", "all"], ["inventoryState", "Inventory", "all"],
-  ["laps", "LAPS", "Windows"], ["autoLogin", "Auto-login", "Windows"], ["uac", "UAC", "Windows"],
+  ["laps", "LAPS", "Windows"], ["lapsSource", "LAPS policy source", "Windows"],
+  ["prt", "Entra PRT (signed-in user)", "Windows"], ["kerberos", "Kerberos tickets (signed-in user)", "Windows"],
+  ["autoLogin", "Auto-login", "Windows"], ["uac", "UAC", "Windows"],
   ["passwordPolicy", "Password policy", "Windows"], ["hello", "Windows Hello", "Windows"],
   ["credentialGuard", "Credential Guard", "Windows"], ["tpm", "TPM ownership", "Windows"],
   ["failedLogins", "Failed sign-ins (7 days)", "Windows"],
@@ -180,7 +219,7 @@ export const POSTURE_COLUMNS = [
 export type PostureColumn = typeof POSTURE_COLUMNS[number][0]
 
 const DEFAULT_COLUMNS: Record<string, PostureColumn[]> = {
-  Windows: ["deviceName", "laps", "autoLogin", "uac", "passwordPolicy", "hello", "credentialGuard", "tpm", "failedLogins", "identityCollectedAt"],
+  Windows: ["deviceName", "laps", "lapsSource", "prt", "autoLogin", "uac", "passwordPolicy", "hello", "credentialGuard", "tpm", "failedLogins", "identityCollectedAt"],
   macOS: ["deviceName", "psso", "secureToken", "bootstrapToken", "activationLock", "findMy", "recoveryKey", "identityCollectedAt", "securityCollectedAt"],
   all: ["deviceName", "platform", "laps", "autoLogin", "psso", "activationLock", "recoveryKey", "inventoryState", "identityCollectedAt"],
 }
@@ -209,6 +248,9 @@ export function columnText(device: PostureDevice, column: PostureColumn): string
     case "platform": return device.platform
     case "inventoryState": return inventoryLabel(device.inventoryState)
     case "laps": return lapsLabel(r)
+    case "lapsSource": return lapsSourceLabel(r)
+    case "prt": return prtLabel(r)
+    case "kerberos": return kerberosLabel(r)
     case "autoLogin": return autoLoginLabel(r)
     case "uac": return uacLabel(r)
     case "passwordPolicy": return passwordPolicyLabel(r)
@@ -238,7 +280,7 @@ function sortValue(device: PostureDevice, column: PostureColumn): string | numbe
     return Number.isFinite(time) ? time : null
   }
   if (column === "failedLogins") return typeof device.reported?.failedLoginsLast7Days === "number" ? device.reported.failedLoginsLast7Days : null
-  return value === "Unknown" ? null : value
+  return value === "Unknown" || value === "Not reported" ? null : value
 }
 
 /** Unknown and not-applicable values always sort last, in either direction. */
@@ -260,7 +302,7 @@ export function postureCsv(devices: PostureDevice[], generatedAt: string, report
     "Device Name", "Computer Name", "Serial Number", "Asset Tag", "Platform", "Inventory State", "Archived in ReportMate",
     "Usage", "Catalog", "Area", "Fleet", "Location", "Room",
     ...POSTURE_COLUMNS.filter(([key]) => !["deviceName", "platform", "inventoryState", "identityCollectedAt", "securityCollectedAt", "lastSeen"].includes(key)).map(([, label]) => label),
-    "Platform SSO Users", ...QUICK_VIEWS.map(([, label]) => `Quick View: ${label}`),
+    "Platform SSO Users", "PRT User", "PRT Collected At", "PRT Expiry", "LAPS Last Rotation", ...QUICK_VIEWS.map(([, label]) => `Quick View: ${label}`),
     "Identity Collection Time", "Identity Collection Freshness", "Security Collection Time", "Security Collection Freshness",
     "Last Seen", "Report Generated At", "Report URL",
   ]
@@ -271,6 +313,7 @@ export function postureCsv(devices: PostureDevice[], generatedAt: string, report
     device.usage, device.catalog, device.area, device.fleet, device.location, device.room,
     ...postureKeys.map(key => columnText(device, key) ?? "Not applicable"),
     (device.reported?.pssoUsers || []).map(u => `${u.username || "Unknown user"}: ${u.token}${u.tokenExpiration ? ` (expires ${u.tokenExpiration})` : ""}`).join("\n"),
+    device.reported?.prtUser, device.reported?.prtCollectedAt, device.reported?.prtExpiryTime, device.reported?.lapsLastRotation,
     ...QUICK_VIEWS.map(([key, , platform]) => platform !== device.platform ? "Not applicable" : triLabel(device.checks?.[key])),
     device.identityCollectedAt, device.identityFreshness, device.securityCollectedAt, device.securityFreshness,
     device.lastSeen, generatedAt, reportUrl,

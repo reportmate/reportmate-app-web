@@ -7,7 +7,7 @@ const base = {
   computerName: null, assetTag: null, usage: null, catalog: null, area: null, fleet: null, location: null, room: null,
   archived: false, inventoryState: null, lastSeen: null, identityCollectedAt: null, securityCollectedAt: null,
   identityFreshness: 'fresh' as const, securityFreshness: 'fresh' as const,
-  checks: { noLaps: null, autoLogin: null, expiredPssoToken: null, activationLock: null, noRecoveryKey: null },
+  checks: { noLaps: null, noValidPrt: null, autoLogin: null, expiredPssoToken: null, activationLock: null, noRecoveryKey: null },
 }
 const win = (serial: string, reported: PostureDevice['reported']): PostureDevice => ({ ...base, serialNumber: serial, deviceName: serial, platform: 'Windows', reported })
 const mac = (serial: string, reported: PostureDevice['reported']): PostureDevice => ({ ...base, serialNumber: serial, deviceName: serial, platform: 'macOS', reported })
@@ -61,4 +61,29 @@ it('exports every posture field in row order with not-applicable marked', () => 
   expect(lines[1]).toContain('Not applicable')
   expect(lines[1]).toContain('sample: expired')
   expect(lines[2]).toContain('"On"')
+})
+
+it('keeps an unreported PRT apart from no PRT and no signed-in user', () => {
+  expect(columnText(win('W1', {}), 'prt')).toBe('Not reported')
+  expect(columnText(win('W2', { prtState: 'not_reported' }), 'prt')).toBe('Not reported')
+  expect(columnText(win('W3', { prtState: 'not_available' }), 'prt')).toBe('No user signed in')
+  expect(columnText(win('W4', { prtState: 'none' }), 'prt')).toBe('No PRT')
+  expect(columnText(win('W5', { prtState: 'expired' }), 'prt')).toBe('Expired')
+  expect(columnText(win('W6', { prtState: 'valid', cloudTgt: true, onPremTgt: false }), 'kerberos')).toBe('Cloud TGT Yes · On-prem TGT No')
+  expect(columnText(win('W7', { prtState: 'not_available' }), 'kerberos')).toBe('No user signed in')
+  expect(columnText(mac('M1', { prtState: 'none' }), 'prt')).toBeNull()
+})
+
+it('reports the LAPS policy source and password complexity only when sent', () => {
+  expect(columnText(win('W1', { lapsPolicySource: 'gpo' }), 'lapsSource')).toBe('Group Policy')
+  expect(columnText(win('W2', { lapsPolicySource: null }), 'lapsSource')).toBe('Not reported')
+  expect(columnText(win('W3', {}), 'passwordPolicy')).toContain('Complexity not reported')
+  expect(columnText(win('W4', { passwordComplexity: null }), 'passwordPolicy')).toContain('Complexity unknown')
+  expect(columnText(win('W5', { passwordComplexity: false }), 'passwordPolicy')).toContain('No complexity')
+})
+
+it('sorts not-reported PRT states last', () => {
+  const devices = [win('A', {}), win('B', { prtState: 'valid' }), win('C', { prtState: 'none' })]
+  const view = readPostureView(new URLSearchParams('columns=prt&sort=prt'), 'Windows')
+  expect(postureRows(devices, view).map(d => d.serialNumber)).toEqual(['C', 'B', 'A'])
 })

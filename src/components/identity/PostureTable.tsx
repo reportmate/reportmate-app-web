@@ -14,6 +14,7 @@ function When({ value, freshness }: { value: string | null; freshness?: Freshnes
 /** Values that are a posture finding, per column. */
 const RISKS: Partial<Record<PostureColumn, (text: string) => boolean>> = {
   laps: t => t === "Not configured",
+  prt: t => t === "No PRT" || t === "Expired",
   autoLogin: t => t.startsWith("On"),
   uac: t => t === "Off",
   psso: t => t === "Token expired",
@@ -27,7 +28,7 @@ const RISKS: Partial<Record<PostureColumn, (text: string) => boolean>> = {
 function Value({ device, column }: { device: PostureDevice; column: PostureColumn }) {
   const text = columnText(device, column)
   if (text === null) return <span className="text-gray-400">Not applicable</span>
-  if (text === "Unknown") return <span className="text-gray-500 dark:text-gray-400 italic">Unknown</span>
+  if (text === "Unknown" || text === "Not reported") return <span className="text-gray-500 dark:text-gray-400 italic">{text}</span>
   return <span className={RISKS[column]?.(text) ? "text-red-700 dark:text-red-300 font-medium" : ""}>{text}</span>
 }
 
@@ -48,6 +49,21 @@ function Cell({ device, column }: { device: PostureDevice; column: PostureColumn
         {u.username || "Unknown user"}: {u.token === "expired" ? "expired" : u.token === "valid" ? "valid" : "token unknown"}{u.tokenExpiration && <> · <time dateTime={u.tokenExpiration} title={formatExactTime(u.tokenExpiration)}>{u.tokenExpiration.slice(0, 10)}</time></>}
       </div>)}
     </>
+    case "prt": {
+      const r = device.reported || {}
+      return <><Value device={device} column={column} />
+        {device.platform === "Windows" && r.prtUser && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{r.prtUser}</div>}
+        {device.platform === "Windows" && r.prtExpiryTime && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Expires <time dateTime={r.prtExpiryTime} title={formatExactTime(r.prtExpiryTime)}>{formatRelativeTime(r.prtExpiryTime)}</time></div>}
+        {device.platform === "Windows" && r.prtCollectedAt && r.prtState !== "not_reported" && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Read <time dateTime={r.prtCollectedAt} title={formatExactTime(r.prtCollectedAt)}>{formatRelativeTime(r.prtCollectedAt)}</time></div>}
+        {device.platform === "Windows" && r.prtState === "failed" && r.ssoReason && <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">{r.ssoReason}</div>}
+      </>
+    }
+    case "lapsSource": {
+      const rotated = device.reported?.lapsLastRotation
+      return <><Value device={device} column={column} />
+        {device.platform === "Windows" && rotated && <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Password backed up <time dateTime={rotated} title={formatExactTime(rotated)}>{formatRelativeTime(rotated)}</time></div>}
+      </>
+    }
     default: return <Value device={device} column={column} />
   }
 }
@@ -69,7 +85,7 @@ export function PostureTable({ devices, view, onSort, pending }: {
     <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-sm text-gray-900 dark:text-gray-100">
       {devices.length === 0 && <tr><td colSpan={view.columns.length} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">No devices match these filters.</td></tr>}
       {devices.map(device => <tr key={device.serialNumber} className={`align-top hover:bg-gray-50 dark:hover:bg-gray-700/30 ${device.identityFreshness !== "fresh" ? "opacity-80" : ""}`}>
-        {view.columns.map(column => <td key={column} className={`px-4 py-3 ${column === "deviceName" ? "min-w-[190px]" : column === "hello" || column === "passwordPolicy" || column === "psso" ? "min-w-[200px] max-w-xs" : "whitespace-nowrap"}`}>
+        {view.columns.map(column => <td key={column} className={`px-4 py-3 ${column === "deviceName" ? "min-w-[190px]" : column === "hello" || column === "passwordPolicy" || column === "psso" || column === "prt" ? "min-w-[200px] max-w-xs" : "whitespace-nowrap"}`}>
           <Cell device={device} column={column} />
         </td>)}
       </tr>)}

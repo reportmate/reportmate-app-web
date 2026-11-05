@@ -1,6 +1,6 @@
 import {
   jsonList, readUpdatesView, updateFlags, updatesApiQuery, updatesCsv, updatesPageQuery, updatesUrlQuery,
-  updatesViewRows, type UpdateRow,
+  updatesViewRows, updateSearchLabel, updateStateLabel, type UpdateRow,
 } from './updates'
 
 const base: UpdateRow = {
@@ -64,4 +64,24 @@ it('exports one CSV line per row with update and collection columns', () => {
   for (const header of ['Serial Number', 'KB', 'CVEs', 'Restart Required', 'Deferred Until', 'Update Collection Valid', 'Report URL']) expect(lines[0]).toContain(`"${header}"`)
   expect(lines[1]).toContain('"KB5000001"')
   expect(lines[1]).toContain('"CVE-2026-0001"')
+})
+
+it('labels the last update search and keeps a missing one as not reported', () => {
+  expect(updateSearchLabel(undefined)).toBe('Not reported')
+  expect(updateSearchLabel({ status: 'not_reported', error: null, checkedAt: null, freshness: 'unknown' })).toBe('Not reported')
+  expect(updateSearchLabel({ status: 'failed', error: 'Timed out', checkedAt: '2026-06-30T00:00:00Z', freshness: 'fresh' })).toBe('Search failed')
+  expect(updateSearchLabel({ status: 'succeeded', error: null, checkedAt: '2026-06-30T00:00:00Z', freshness: 'fresh' })).toBe('Succeeded')
+  expect(updateSearchLabel({ status: 'succeeded', error: null, checkedAt: '2026-06-01T00:00:00Z', freshness: 'stale' })).toContain('older')
+  expect(updateStateLabel('search_failed')).toBe('Search failed')
+  expect(updateStateLabel('none')).toBe('No pending updates')
+})
+
+it('exports the update search status and error', () => {
+  const failed = { ...base, updateKey: null, state: 'search_failed' as const, reportedState: 'search_failed',
+    updateSearch: { status: 'failed' as const, error: 'Search timed out', checkedAt: '2026-06-30T00:00:00Z', freshness: 'fresh' as const } }
+  const lines = updatesCsv([failed, base], '2026-06-30T00:00:00Z', 'https://example.com/system?tab=updates').split('\r\n')
+  for (const header of ['Update Search', 'Update Search Error', 'Update Search Time']) expect(lines[0]).toContain(`"${header}"`)
+  expect(lines[1]).toContain('"Search failed"')
+  expect(lines[1]).toContain('"Search timed out"')
+  expect(lines[2]).toContain('"Not reported"')
 })
