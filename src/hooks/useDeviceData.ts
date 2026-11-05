@@ -48,7 +48,7 @@ interface Device {
 
 interface UseDeviceDataOptions {
   includeModuleData?: boolean
-  moduleType?: 'inventory' | 'system' | 'applications' | 'hardware' | 'management' | 'network' | 'peripherals' | 'profiles' | 'security' | 'installs'
+  moduleType?: 'inventory' | 'system' | 'applications' | 'hardware' | 'management' | 'network' | 'peripherals' | 'security' | 'installs'
 }
 
 interface UseDeviceDataReturn {

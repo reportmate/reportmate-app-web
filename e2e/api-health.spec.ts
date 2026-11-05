@@ -125,7 +125,6 @@ test.describe('FastAPI Fleet Module Endpoints', () => {
     '/api/v1/system',
     '/api/v1/peripherals',
     '/api/v1/identity',
-    '/api/v1/profiles',
   ]
 
   for (const endpoint of fleetEndpoints) {
