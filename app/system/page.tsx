@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { SystemViewSwitch } from "@/src/components/system/SystemViewSwitch"
 import { ServicesReport } from "@/src/components/system/ServicesReport"
+import { UpdatesReport } from "@/src/components/system/UpdatesReport"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { OSVersionPieChart } from "@/src/lib/modules/graphs/OSVersionPieChart"
@@ -1524,6 +1525,7 @@ function SystemPageContent() {
 
 function SystemTabs() {
   const searchParams = useSearchParams()
+  if (searchParams.get('tab') === 'updates') return <UpdatesReport />
   return searchParams.get('tab') === 'services' ? <ServicesReport /> : <SystemPageContent />
 }
 

@@ -3,11 +3,11 @@
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
-export function SystemViewSwitch({ current }: { current: "os" | "services" }) {
+export function SystemViewSwitch({ current }: { current: "os" | "services" | "updates" }) {
   const params = useSearchParams()
-  const href = (services: boolean) => {
+  const href = (tab: string | false) => {
     const next = new URLSearchParams()
-    if (services) next.set("tab", "services")
+    if (tab) next.set("tab", tab)
     const platform = params.get("platform")
     if (platform) next.set("platform", platform)
     return `/system${next.size ? `?${next}` : ""}`
@@ -16,7 +16,8 @@ export function SystemViewSwitch({ current }: { current: "os" | "services" }) {
     <nav aria-label="System tabs" className="inline-flex flex-wrap rounded-lg border border-gray-300 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-900">
       {([
         { key: "os", label: "Operating System Information", href: href(false) },
-        { key: "services", label: "Services", href: href(true) },
+        { key: "services", label: "Services", href: href("services") },
+        { key: "updates", label: "Updates", href: href("updates") },
       ] as const).map(item => (
         <Link key={item.key} href={item.href} aria-current={current === item.key ? "page" : undefined}
           className={`px-3 py-0.5 rounded-md text-lg font-semibold transition-colors ${current === item.key
