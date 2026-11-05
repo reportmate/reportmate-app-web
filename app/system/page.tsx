@@ -7,6 +7,9 @@ import Link from "next/link"
 import { SystemViewSwitch } from "@/src/components/system/SystemViewSwitch"
 import { ServicesReport } from "@/src/components/system/ServicesReport"
 import { UpdatesReport } from "@/src/components/system/UpdatesReport"
+import { ItemReport } from "@/src/components/system/ItemReport"
+import { BACKGROUND_REPORT } from "@/src/lib/system/background"
+import { EXTENSIONS_REPORT } from "@/src/lib/system/extensions"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { OSVersionPieChart } from "@/src/lib/modules/graphs/OSVersionPieChart"
@@ -1525,8 +1528,11 @@ function SystemPageContent() {
 
 function SystemTabs() {
   const searchParams = useSearchParams()
-  if (searchParams.get('tab') === 'updates') return <UpdatesReport />
-  return searchParams.get('tab') === 'services' ? <ServicesReport /> : <SystemPageContent />
+  const tab = searchParams.get('tab')
+  if (tab === 'updates') return <UpdatesReport />
+  if (tab === 'background') return <ItemReport key="background" config={BACKGROUND_REPORT} />
+  if (tab === 'extensions') return <ItemReport key="extensions" config={EXTENSIONS_REPORT} />
+  return tab === 'services' ? <ServicesReport /> : <SystemPageContent />
 }
 
 export default function SystemPage() {
