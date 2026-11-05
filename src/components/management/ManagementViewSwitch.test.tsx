@@ -6,7 +6,7 @@ let mockParams = new URLSearchParams('platform=mac')
 jest.mock('next/navigation', () => ({ useSearchParams: () => mockParams }))
 
 describe('ManagementViewSwitch (the Management header)', () => {
-  it('is the title: two tabs, with the platform carried across', () => {
+  it('is the title: its tabs, with the platform carried across', () => {
     mockParams = new URLSearchParams('platform=mac')
     render(<ManagementViewSwitch current="logs" />)
     const logs = screen.getByRole('link', { name: 'Management Tools Logs' })
@@ -14,6 +14,15 @@ describe('ManagementViewSwitch (the Management header)', () => {
     expect(logs.getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('link', { name: 'Device Management Service' }).getAttribute('href')).toBe('/management?platform=mac')
     expect(screen.queryByText('Enrollment')).toBeNull()
+  })
+
+  it('links the profile and preference reports with the platform carried across', () => {
+    mockParams = new URLSearchParams('platform=win')
+    render(<ManagementViewSwitch current="profiles" />)
+    const profiles = screen.getByRole('link', { name: 'Configuration Profiles' })
+    expect(profiles.getAttribute('href')).toBe('/management?tab=profiles&platform=win')
+    expect(profiles.getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('link', { name: 'Managed Preferences' }).getAttribute('href')).toBe('/management?tab=preferences&platform=win')
   })
 
   it('marks Device Management Service current on the enrollment tab', () => {
