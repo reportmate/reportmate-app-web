@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
@@ -160,12 +161,7 @@ export default function CoveragePage() {
               </p>
             </div>
             {data && (
-              <button
-                onClick={exportCsv}
-                className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg text-gray-900 dark:text-white font-medium"
-              >
-                Export CSV
-              </button>
+              <ExportCsvButton onClick={exportCsv} />
             )}
           </div>
 

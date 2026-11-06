@@ -15,6 +15,8 @@ import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "../../lib/data-cache"
 import { RefreshErrorBanner } from "../ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "../ui/SkeletonTimeout"
+import { ExportCsvButton } from "../ui/ExportCsvButton"
+import { ReportLoading } from "../ui/LoadingProgress"
 import { CopyButton } from "../ui/CopyButton"
 import { formatExactTime, formatRelativeTime } from "../../lib/time"
 import { fmtCount } from "../../lib/dashboard/format"
@@ -421,18 +423,7 @@ export function ToolLogsReport() {
                   options={[{ value: "all", label: "All" }, { value: "error", label: "Errors" }, { value: "warning", label: "Warnings" }]}
                   onChange={v => update({ level: v === "all" ? null : v })}
                 />
-                <button
-                  type="button"
-                  onClick={exportCsv}
-                  disabled={!view}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-                  title="Export the devices below to CSV"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export to CSV
-                </button>
+                <ExportCsvButton onClick={exportCsv} disabled={!view} details="CSV of the devices listed below, with the filters applied." />
               </div>
             </div>
           </div>
@@ -479,9 +470,16 @@ export function ToolLogsReport() {
           )}
 
           {!view ? (
-            <SkeletonTimeout error={error} onRetry={retry}>
-              <TableSkeleton />
-            </SkeletonTimeout>
+            error ? (
+              <SkeletonTimeout error={error} onRetry={retry}>
+                <TableSkeleton />
+              </SkeletonTimeout>
+            ) : (
+              <>
+                <ReportLoading message="Loading management tools logs…" onRetry={retry} />
+                <TableSkeleton />
+              </>
+            )
           ) : (
             <>
               <Section title="Per tool" subtitle="Click a tool to filter the messages and devices to it.">

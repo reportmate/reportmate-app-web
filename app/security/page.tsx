@@ -29,6 +29,8 @@ import {
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { csvCell } from "@/src/lib/csv"
 import { SecurityViewSwitch } from "@/src/components/security/SecurityViewSwitch"
 import { VulnerabilitiesReport } from "@/src/components/security/VulnerabilitiesReport"
@@ -964,13 +966,7 @@ function SecurityPageContent() {
                     className="block w-48 md:w-64 pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>
-                <button
-                  onClick={exportCSV}
-                  className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
-                  title="Export CSV"
-                >
-                  Export
-                </button>
+                <ExportCsvButton onClick={exportCSV} />
               </div>
             </div>
           </div>
@@ -1439,7 +1435,7 @@ function SecurityTabs() {
 
 export default function SecurityPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <SecurityTabs />
     </Suspense>
   )

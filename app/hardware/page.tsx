@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
@@ -33,6 +34,7 @@ import { FitText } from "@/src/components/ui/FitText"
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import { csvCell } from "@/src/lib/csv"
 
 const HARDWARE_URL = '/api/v1/hardware'
@@ -940,10 +942,7 @@ function HardwarePageContent() {
                   <input type="text" placeholder="Search devices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
                 </div>
                 {(totalActiveFilters > 0 || searchQuery) && <button onClick={clearAllFilters} className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap">Clear Selection</button>}
-                <button onClick={() => { const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Model', 'Processor', 'Memory', 'Storage', 'Architecture']; const rows = filteredHardware.map(h => [h.deviceName || '', h.serialNumber || '', h.assetTag || '', getDeviceModel(h), getProcessorName(h), formatMemory(h.memory), formatStorage(h.storage), h.architecture || ''].map(csvCell).join(',')); const csv = [headers.join(','), ...rows].join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `hardware-report-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }} className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2" title="Export to CSV">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                  Export CSV
-                </button>
+                <ExportCsvButton onClick={() => { const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Model', 'Processor', 'Memory', 'Storage', 'Architecture']; const rows = filteredHardware.map(h => [h.deviceName || '', h.serialNumber || '', h.assetTag || '', getDeviceModel(h), getProcessorName(h), formatMemory(h.memory), formatStorage(h.storage), h.architecture || ''].map(csvCell).join(',')); const csv = [headers.join(','), ...rows].join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `hardware-report-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }} />
               </div>
             </div>
             {deepLinkPills.length > 0 && (
@@ -1001,26 +1000,28 @@ function HardwarePageContent() {
             </button>
             <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="pb-4">
-                {/* Horizontal scrollable row */}
+                {/* Horizontal scrollable row. On a wide (desktop) screen the spare width is
+                    shared by every list widget, Models a little more, so no one
+                    widget stretches across half the row. */}
                 <div className="flex gap-4 overflow-x-auto px-6 pb-2">
-                  <div className="flex-1 min-w-[22rem]">
+                  <div className="flex-[1.4] min-w-[22rem]">
                     <HardwareTypeChart devices={platformFilteredHardware} loading={loading} selectedModels={selectedModels} onModelToggle={handleModelToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
                   {isMacPlatform ? (
-                    <div className="flex-1 min-w-[28rem]">
+                    <div className="flex-[1.4] min-w-[28rem]">
                       <ChipConfigurationChart devices={platformFilteredHardware} loading={loading} selectedChips={selectedChipConfigs} onChipToggle={handleChipConfigToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                     </div>
                   ) : (
                     <>
-                      <div className="flex-shrink-0 w-72">
+                      <div className="flex-1 min-w-[18rem]">
                         <ProcessorDistributionChart devices={platformFilteredHardware} loading={loading} selectedProcessors={selectedProcessors} onProcessorToggle={handleProcessorToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                       </div>
-                      <div className="flex-shrink-0 w-72">
+                      <div className="flex-1 min-w-[18rem]">
                         <GraphicsDistributionChart devices={platformFilteredHardware} loading={loading} selectedGraphics={selectedGraphics} onGraphicsToggle={handleGraphicsToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} globalSelectedProcessors={selectedProcessors} />
                       </div>
                     </>
                   )}
-                  <div className="flex-shrink-0 w-72 flex flex-col gap-4">
+                  <div className="flex-1 min-w-[18rem] flex flex-col gap-4">
                     <MemoryBreakdownChart devices={platformFilteredHardware} loading={loading} selectedMemoryRanges={selectedMemoryRanges} onMemoryRangeToggle={handleMemoryRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                     <StorageBreakdownChart devices={platformFilteredHardware} loading={loading} selectedStorageRanges={selectedStorageRanges} onStorageRangeToggle={handleStorageRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
@@ -1129,7 +1130,7 @@ function HardwarePageContent() {
 
 export default function HardwarePage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <HardwarePageContent />
     </Suspense>
   )

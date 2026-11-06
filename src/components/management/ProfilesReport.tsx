@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react"
+import { ExportCsvButton } from "../ui/ExportCsvButton"
+import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
@@ -55,7 +57,7 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
   const [reload, setReload] = useState(0)
   const [expanded, setExpanded] = useState(!hasQuery)
   const [copied, setCopied] = useState(false)
-  const [loadProgress, setLoadProgress] = useState("")
+  const [loadProgress, setLoadProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
   const [deviceSearch, setDeviceSearch] = useState(searchValue)
   const rows = useMemo(() => data ? sortProfileRows(data.devices, view) : [], [data, view])
@@ -94,14 +96,14 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
   useEffect(() => {
     const controller = new AbortController()
     setLoading(hasQuery)
-    setLoadProgress("")
+    setLoadProgress(null)
     setError(null)
     setData(null)
     if (!hasQuery) return () => controller.abort()
     const run = async () => {
       try {
         const body = await fetchProfilesReport(query, controller.signal, (loaded, total) => {
-          if (!controller.signal.aborted) setLoadProgress(`${loaded.toLocaleString()} of ${total.toLocaleString()} rows`)
+          if (!controller.signal.aborted) setLoadProgress({ loaded, total, unit: "rows" })
         })
         if (!controller.signal.aborted) setData(body)
       } catch (err) {
@@ -190,7 +192,7 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
                 {copied ? "Link Copied" : "Copy Link"}
               </button>
               <button type="button" onClick={() => setReload(n => n + 1)} disabled={loading || pending} className={secondaryAction}>Refresh</button>
-              {!loading && data && rows.length > 0 && <button type="button" onClick={exportCsv} disabled={pending} title="Export every field for the filtered rows" className={`${actionButton} bg-emerald-600 hover:bg-emerald-700 text-white`}>Export CSV</button>}
+              {!loading && data && rows.length > 0 && <ExportCsvButton onClick={exportCsv} disabled={pending} details="CSV includes every field, including hidden columns, for the filtered rows in this order." />}
             </div>
           </div>
           <div className="flex-1 overflow-auto min-h-0" aria-busy={loading}>
@@ -230,7 +232,7 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
               <div className="flex flex-wrap gap-2" aria-label="Profile state filters"><Choice disabled={pending} active={!params.get("states")} onClick={() => update({ states: null })}>All states</Choice>{PROFILE_STATES.map(state => <Choice disabled={pending} key={state} active={listParam(params, "states").includes(state)} onClick={() => toggle("states", state)}>{stateLabel(state)}{data ? ` ${data.summary[state] || 0}` : ""}</Choice>)}</div>
             </div>}
             {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">Choose {noun} from Selections to build your report.</p><p className="text-sm mt-2">Pick collected {noun} to see which devices have them, which lack them, and which are unknown.</p></div>
-              : loading ? <div role="status" className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading report…{loadProgress && ` ${loadProgress}`}</div>
+              : loading ? <ReportLoading message="Loading report…" count={loadProgress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : data && <ProfilesTable rows={rows} kind={kind} view={view} onSort={sortColumn} pending={pending} />}
           </div>
           <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">

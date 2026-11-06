@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -17,6 +18,7 @@ import { connectionKind, isPoorNetworkQuality, signalPercent } from "@/src/lib/d
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import { csvCell } from "@/src/lib/csv"
 
 const NETWORK_URL = '/api/v1/network'
@@ -745,8 +747,7 @@ function NetworkPageContent() {
                   </div>
                   
                   {/* Export to CSV Button */}
-                  <button
-                    onClick={() => {
+                  <ExportCsvButton onClick={() => {
                       // Build CSV from filtered data only
                       const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'IP Address', 'MAC Address', 'Connection Type', 'Network/SSID', 'DNS', 'Download Mbps', 'Upload Mbps', 'Latency']
                       const rows = filteredNetworkDevices.map(n => {
@@ -777,15 +778,7 @@ function NetworkPageContent() {
                       link.click()
                       document.body.removeChild(link)
                       URL.revokeObjectURL(url)
-                    }}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                    title="Export filtered devices to CSV"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Export to CSV
-                  </button>
+                    }} />
                 </div>
               )}
             </div>
@@ -1223,7 +1216,7 @@ function NetworkPageContent() {
 
 export default function NetworkPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <NetworkPageContent />
     </Suspense>
   )

@@ -1,5 +1,8 @@
 "use client"
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
+import { LoadingProgress } from "@/src/components/ui/LoadingProgress"
 import { useState, useEffect, useRef, Suspense, useMemo, useCallback, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -1979,40 +1982,15 @@ function InstallsPageContent() {
                 />
               </div>
               
-              {/* Loading Progress - Inline with title */}
+              {/* Loading Progress - Inline with title (the shared report loading bar) */}
               {filtersLoading && (
-                <div className="flex-1 min-w-0 ml-6 hidden sm:block">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
-                          {loadingMessage || 'Loading managed installs data...'}
-                        </p>
-                        {loadingProgress.total > 0 && (
-                          <p className="text-xs text-gray-500 dark:text-gray-500 ml-2 flex-shrink-0">
-                            {loadingProgress.current}/{loadingProgress.total}
-                          </p>
-                        )}
-                      </div>
-                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                        <div 
-                          className="bg-emerald-600 h-2 rounded-full transition-all duration-300 ease-out"
-                          style={{ 
-                            width: loadingProgress.total > 0
-                              ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
-                              : '0%'
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
-                      {loadingProgress.total > 0 
-                        ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}%`
-                        : ''
-                      }
-                    </span>
-                  </div>
-                </div>
+                <LoadingProgress
+                  className="flex-1 ml-6 hidden sm:block"
+                  message={loadingMessage || 'Loading managed installs data...'}
+                  current={loadingProgress.current}
+                  total={loadingProgress.total}
+                  onRetry={() => { void fetchFilterOptions() }}
+                />
               )}
             </div>
 
@@ -2068,8 +2046,7 @@ function InstallsPageContent() {
 
               {/* Export CSV Button - Only show after report is generated, hide during loading */}
               {!loading && !filtersLoading && (filteredInstalls.length > 0 || (isConfigReport && configReportData.length > 0)) && (
-                <button
-                  onClick={() => {
+                <ExportCsvButton onClick={() => {
                     if (isConfigReport) {
                       // Export config report CSV with new columns
                       const csvContent = [
@@ -2122,14 +2099,7 @@ function InstallsPageContent() {
                       link.download = `installs-report-${new Date().toISOString().split('T')[0]}.csv`
                       link.click()
                     }
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Export CSV
-                </button>
+                  }} />
               )}
 
               {/* Search Input - Show when in Generate Report mode to filter items */}
@@ -4487,14 +4457,7 @@ function statusPillClass(tone: keyof typeof STATUS_PILL_TONES, active: boolean):
 
 export default function InstallsPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading installs...</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <InstallsPageContent />
     </Suspense>
   )

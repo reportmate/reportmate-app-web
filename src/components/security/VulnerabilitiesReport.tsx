@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState, useTransition } from "react"
+import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
@@ -57,7 +58,7 @@ export function VulnerabilitiesReport() {
   const [loading, setLoading] = useState(true)
   const [optionsLoading, setOptionsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [progress, setProgress] = useState("")
+  const [progress, setProgress] = useState<LoadCount | null>(null)
   const [reload, setReload] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const searchValue = params.get("search") || ""
@@ -88,7 +89,7 @@ export function VulnerabilitiesReport() {
     const controller = new AbortController()
     setLoading(true)
     setError(null)
-    setProgress("")
+    setProgress(null)
     const run = async () => {
       try {
         if (view === "summary") {
@@ -102,7 +103,7 @@ export function VulnerabilitiesReport() {
         } else {
           setReport(null)
           const body = await fetchAllRows<VulnerabilityRow>(VULNERABILITIES_API, query, controller.signal, (loaded, total) => {
-            if (!controller.signal.aborted) setProgress(`${loaded.toLocaleString()} of ${total.toLocaleString()} rows`)
+            if (!controller.signal.aborted) setProgress({ loaded, total, unit: "rows" })
           })
           if (!controller.signal.aborted) setReport(body)
         }
@@ -225,7 +226,7 @@ export function VulnerabilitiesReport() {
               </div>
               {data && <CoverageNote coverage={data.coverage} />}
             </div>
-            {loading && !data ? <div role="status" className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading vulnerability report…{progress && ` ${progress}`}</div>
+            {loading && !data ? <ReportLoading message="Loading vulnerability report…" count={progress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : view === "summary" ? summary && <SummaryTable rows={summaryRows} sort={sort || ""} dir={dir} onSort={onSort} onDrill={drill} pending={pending} />
               : report && <DeviceRowsTable rows={deviceRows} sort={sort || "identifier"} dir={dir} onSort={onSort} pending={pending} />}
           </div>

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState, useTransition } from "react"
+import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
@@ -48,7 +49,7 @@ export function ThreatsReport() {
   const [report, setReport] = useState<PagedReport<DetectionRow> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [progress, setProgress] = useState("")
+  const [progress, setProgress] = useState<LoadCount | null>(null)
   const [reload, setReload] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const searchValue = params.get("search") || ""
@@ -74,10 +75,10 @@ export function ThreatsReport() {
     const controller = new AbortController()
     setLoading(true)
     setError(null)
-    setProgress("")
+    setProgress(null)
     setReport(null)
     fetchAllRows<DetectionRow>(DETECTIONS_API, query, controller.signal, (loaded, total) => {
-      if (!controller.signal.aborted) setProgress(`${loaded.toLocaleString()} of ${total.toLocaleString()} rows`)
+      if (!controller.signal.aborted) setProgress({ loaded, total, unit: "rows" })
     })
       .then(body => { if (!controller.signal.aborted) setReport(body) })
       .catch(err => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : "Detection report unavailable") })
@@ -165,7 +166,7 @@ export function ThreatsReport() {
               </div>
               {report && <DetectionCoverage coverage={report.coverage} />}
             </div>
-            {loading ? <div role="status" className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading threat detections…{progress && ` ${progress}`}</div>
+            {loading ? <ReportLoading message="Loading threat detections…" count={progress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : report && <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead><tr>{DETECTION_COLUMNS.map(([key, label]) => <SortHeader key={key} label={label} column={key} sort={sort} dir={dir} onSort={onSort} disabled={pending} />)}</tr></thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700 text-sm text-gray-900 dark:text-gray-100">
