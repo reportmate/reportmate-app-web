@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react"
+import { ExportCsvButton } from "../ui/ExportCsvButton"
+import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
@@ -42,7 +44,7 @@ export function PostureReport() {
   const [reload, setReload] = useState(0)
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [loadProgress, setLoadProgress] = useState("")
+  const [loadProgress, setLoadProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
   const [deviceSearch, setDeviceSearch] = useState(searchValue)
   const view = useMemo(() => readPostureView(new URLSearchParams(current), platformFilter), [current, platformFilter])
@@ -54,12 +56,12 @@ export function PostureReport() {
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
-    setLoadProgress("")
+    setLoadProgress(null)
     setError(null)
     const run = async () => {
       try {
         const body = await fetchPostureReport(query, controller.signal, (loaded, total) => {
-          if (!controller.signal.aborted) setLoadProgress(`${loaded.toLocaleString()} of ${total.toLocaleString()} devices`)
+          if (!controller.signal.aborted) setLoadProgress({ loaded, total, unit: "devices" })
         })
         if (!controller.signal.aborted) setData(body)
       } catch (err) {
@@ -141,10 +143,7 @@ export function PostureReport() {
                 <svg className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 Refresh
               </button>
-              {!loading && data && rows.length > 0 && <div className="flex flex-col items-start gap-1 max-w-xs"><button type="button" onClick={exportCsv} disabled={pending} aria-describedby="posture-export-details" className={`${actionButton} bg-emerald-600 hover:bg-emerald-700 text-white`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                Export CSV
-              </button><p id="posture-export-details" className="text-xs text-gray-500 dark:text-gray-400">CSV includes every posture field, including hidden columns, for the filtered devices in this order.</p></div>}
+              {!loading && data && rows.length > 0 && <ExportCsvButton onClick={exportCsv} disabled={pending} details="CSV includes every posture field, including hidden columns, for the filtered devices in this order." />}
             </div>
           </div>
           <div className="flex-1 overflow-auto min-h-0" aria-busy={loading}>
@@ -182,7 +181,7 @@ export function PostureReport() {
                 </div>
               </details>
             </div>
-            {loading ? <div role="status" className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading posture report…{loadProgress && ` ${loadProgress}`}</div>
+            {loading ? <ReportLoading message="Loading posture report…" count={loadProgress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : data && <PostureTable devices={rows} view={view} onSort={sortColumn} pending={pending} />}
           </div>
           <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700">

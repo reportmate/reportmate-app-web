@@ -3,6 +3,8 @@
 // Force dynamic rendering and disable caching for applications page
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import React, { useEffect, useState, Suspense, useMemo, useRef } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
@@ -2047,8 +2049,7 @@ function ApplicationsPageContent() {
 
               {/* Export CSV Button - Usage Report */}
               {reportType === 'usage' && utilizationData && utilizationData.applications.length > 0 && (
-                <button
-                  onClick={() => {
+                <ExportCsvButton onClick={() => {
                     const csvContent = [
                       // Active hours leads, because this export is what gets
                       // handed to a faculty head. Process hours is kept but
@@ -2074,20 +2075,12 @@ function ApplicationsPageContent() {
                     link.href = URL.createObjectURL(blob)
                     link.download = `applications-usage-${utilizationDays}days-${new Date().toISOString().split('T')[0]}.csv`
                     link.click()
-                  }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Export Usage CSV
-                </button>
+                  }} label="Export Usage CSV" />
               )}
               
               {/* Export CSV Button - Versions Report (handles both installed and missing modes) */}
               {reportType === 'versions' && (sortedApplications.length > 0 || (reportMode === 'missing' && missingDevices.length > 0)) && (
-                <button
-                  onClick={() => {
+                <ExportCsvButton onClick={() => {
                     if (reportMode === 'missing') {
                       // Export missing devices report
                       const appNames = selectedApplications.join(', ')
@@ -2130,16 +2123,7 @@ function ApplicationsPageContent() {
                       link.download = `applications-${new Date().toISOString().split('T')[0]}.csv`
                       link.click()
                     }
-                  }}
-                  className={`px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2 ${
-                    reportMode === 'missing' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  {reportMode === 'missing' ? 'Export Missing CSV' : 'Export CSV'}
-                </button>
+                  }} label={reportMode === 'missing' ? 'Export Missing CSV' : 'Export CSV'} />
               )}
               
               </div>
@@ -3856,17 +3840,7 @@ function ApplicationsPageContent() {
 
 export default function ApplicationsPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <div className="animate-pulse">
-          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <div className="page-container px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
-            </div>
-          </header>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <ApplicationsPageContent />
     </Suspense>
   )

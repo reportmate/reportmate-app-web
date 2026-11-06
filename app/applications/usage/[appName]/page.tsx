@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
@@ -324,12 +325,7 @@ export default function ApplicationUsageByDevicePage() {
                 {linkCopied ? 'Link Copied' : 'Copy Link'}
               </button>
               {sortedDevices.length > 0 && (
-                <button
-                  onClick={exportCSV}
-                  className="px-3 py-1.5 text-sm text-white rounded-lg bg-green-600 hover:bg-green-700 transition-colors whitespace-nowrap"
-                >
-                  Export CSV
-                </button>
+                <ExportCsvButton onClick={exportCSV} />
               )}
             </div>
           </div>

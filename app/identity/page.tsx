@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -15,6 +16,7 @@ import { joinType, usageKind, paramList, JOIN_LABELS, type JoinType, ADMINS_LABE
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import { csvCell } from "@/src/lib/csv"
 import { IdentityViewSwitch } from "@/src/components/identity/IdentityViewSwitch"
 import { PostureReport } from "@/src/components/identity/PostureReport"
@@ -530,7 +532,7 @@ function IdentityPageContent() {
       <div className="flex-1 page-container px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
@@ -553,126 +555,109 @@ function IdentityPageContent() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-6 text-sm">
-                <div className="text-center">
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                {/* Local Admins Report toggle (acts as a filter; active state = solid fill) */}
+                <button
+                  onClick={() => setShowAdminsReport(!showAdminsReport)}
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
+                    showAdminsReport
+                      ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-500 dark:bg-indigo-600'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                  title="Flat per-(admin, device) report for security review"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  Admins Report
+                </button>
+
+                {/* No Admin Users toggle - only shown while the Admins Report is
+                    active (it's a security-review pivot: "which devices have no
+                    managed admin"). Activating switches back to the device list
+                    since the per-admin report has no rows for zero-admin devices. */}
+                {showAdminsReport && (
+                <button
+                  onClick={() => {
+                    const turningOn = adminFilter !== 'no-admins'
+                    setAdminFilter(turningOn ? 'no-admins' : 'all')
+                    if (turningOn) setShowAdminsReport(false)
+                  }}
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
+                    adminFilter === 'no-admins'
+                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  No Admin Users
+                </button>
+                )}
+
+                {/* Generate Utilization Report */}
+                {platformFilteredDevices.some(d => d.sessionSummary && d.sessionSummary.totalSessions > 0) && (
+                  <button
+                    onClick={() => setShowUtilizationReport(!showUtilizationReport)}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
+                      showUtilizationReport
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                        : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                    title="Show session utilization report for devices with RDP data"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    {showUtilizationReport ? 'Back to List' : 'Utilization Report'}
+                  </button>
+                )}
+
+                {/* Export CSV */}
+                <ExportCsvButton onClick={() => {
+                    const headers = ['Device Name', 'Serial Number', 'Platform', 'Total Users', 'Admin Users', 'Currently Logged In', 'Last Seen']
+                    const rows = filteredDevices.map(d => [
+                      d.deviceName || '',
+                      d.serialNumber || '',
+                      d.platform || '',
+                      d.totalUsers || 0,
+                      d.adminUsers || 0,
+                      d.currentlyLoggedIn || 0,
+                      d.lastSeen || ''
+                    ].map(csvCell).join(','))
+                  
+                    const csv = [headers.join(','), ...rows].join('\n')
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                    const url = URL.createObjectURL(blob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.download = `identity-report-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                    URL.revokeObjectURL(url)
+                  }} />
+
+                {/* Search */}
+                <div className="relative max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search devices or users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div className="text-center text-sm pl-3">
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalLoggedIn}</div>
                   <div className="text-gray-500 dark:text-gray-400">Logged In</div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-            <div className="flex items-center gap-4">
-              {/* Local Admins Report toggle (acts as a filter; active state = solid fill) */}
-              <button
-                onClick={() => setShowAdminsReport(!showAdminsReport)}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
-                  showAdminsReport
-                    ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-500 dark:bg-indigo-600'
-                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-                title="Flat per-(admin, device) report for security review"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                Admins Report
-              </button>
-
-              {/* No Admin Users toggle - only shown while the Admins Report is
-                  active (it's a security-review pivot: "which devices have no
-                  managed admin"). Activating switches back to the device list
-                  since the per-admin report has no rows for zero-admin devices. */}
-              {showAdminsReport && (
-              <button
-                onClick={() => {
-                  const turningOn = adminFilter !== 'no-admins'
-                  setAdminFilter(turningOn ? 'no-admins' : 'all')
-                  if (turningOn) setShowAdminsReport(false)
-                }}
-                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
-                  adminFilter === 'no-admins'
-                    ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                No Admin Users
-              </button>
-              )}
-
-              <div className="flex-1" />
-
-              {/* Generate Utilization Report */}
-              {platformFilteredDevices.some(d => d.sessionSummary && d.sessionSummary.totalSessions > 0) && (
-                <button
-                  onClick={() => setShowUtilizationReport(!showUtilizationReport)}
-                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
-                    showUtilizationReport
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                  title="Show session utilization report for devices with RDP data"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  {showUtilizationReport ? 'Back to List' : 'Utilization Report'}
-                </button>
-              )}
-
-              {/* Export CSV */}
-              <button
-                onClick={() => {
-                  const headers = ['Device Name', 'Serial Number', 'Platform', 'Total Users', 'Admin Users', 'Currently Logged In', 'Last Seen']
-                  const rows = filteredDevices.map(d => [
-                    d.deviceName || '',
-                    d.serialNumber || '',
-                    d.platform || '',
-                    d.totalUsers || 0,
-                    d.adminUsers || 0,
-                    d.currentlyLoggedIn || 0,
-                    d.lastSeen || ''
-                  ].map(csvCell).join(','))
-                  
-                  const csv = [headers.join(','), ...rows].join('\n')
-                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                  const url = URL.createObjectURL(blob)
-                  const link = document.createElement('a')
-                  link.href = url
-                  link.download = `identity-report-${new Date().toISOString().split('T')[0]}.csv`
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                  URL.revokeObjectURL(url)
-                }}
-                className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                title="Export filtered devices to CSV"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Export CSV
-              </button>
-
-              {/* Search */}
-              <div className="relative max-w-md">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search devices or users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
               </div>
             </div>
           </div>
@@ -1140,15 +1125,7 @@ function IdentityPageContent() {
                           {adminAccountFilter && <span className="ml-2 text-yellow-700 dark:text-yellow-300">Filtered to: <code>{adminAccountFilter}</code></span>}
                         </p>
                       </div>
-                      <button
-                        onClick={exportCsv}
-                        className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Export CSV
-                      </button>
+                      <ExportCsvButton onClick={exportCsv} />
                     </div>
 
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -1541,7 +1518,7 @@ function IdentityTabs() {
 
 export default function IdentityPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <IdentityTabs />
     </Suspense>
   )

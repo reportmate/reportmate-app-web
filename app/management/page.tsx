@@ -2,6 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
+import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { useEffect, useRef, useState, Suspense } from "react"
 import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
@@ -15,6 +16,7 @@ import { LAST_SEEN_LABELS, type LastSeenBucket, boolish, lastSeenBucket, lastSee
 import { cachedAt, peekCached, rememberCached, trackedFetch } from "@/src/lib/data-cache"
 import { RefreshErrorBanner } from "@/src/components/ui/RefreshErrorBanner"
 import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
+import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import { ManagementShieldIcon, ManagementViewSwitch } from "@/src/components/management/ManagementViewSwitch"
 import { csvCell } from "@/src/lib/csv"
 import { ToolLogsReport } from "@/src/components/management/ToolLogsReport"
@@ -988,8 +990,7 @@ function ManagementPageContent() {
                   </div>
                   
                   {/* Export to CSV Button */}
-                  <button
-                    onClick={() => {
+                  <ExportCsvButton onClick={() => {
                       // Build CSV from filtered data only
                       const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Provider', 'Enrollment Status', 'Enrollment Type', 'Usage', 'Catalog', 'Location', ...healthCsvHeaders()].map(csvCell)
                       const rows = filteredManagement.map(m => [
@@ -1015,15 +1016,7 @@ function ManagementPageContent() {
                       link.click()
                       document.body.removeChild(link)
                       URL.revokeObjectURL(url)
-                    }}
-                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                    title="Export filtered devices to CSV"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Export to CSV
-                  </button>
+                    }} />
                 </div>
               )}
             </div>
@@ -1427,7 +1420,7 @@ function ManagementTabs() {
 
 export default function ManagementPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse"></div>}>
+    <Suspense fallback={<PageFrameSkeleton />}>
       <ManagementTabs />
     </Suspense>
   )

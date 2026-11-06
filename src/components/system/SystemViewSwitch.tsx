@@ -12,15 +12,16 @@ export function SystemViewSwitch({ current }: { current: SystemTab }) {
     if (tab !== "os") next.set("tab", tab)
     const platform = params.get("platform")
     if (platform) next.set("platform", platform)
-    return `/system${next.size ? `?${next}` : ""}`
+    const query = next.toString()
+    return `/system${query ? `?${query}` : ""}`
   }
   return (
     <nav aria-label="System tabs" className="inline-flex flex-wrap rounded-lg border border-gray-300 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-900">
       {([
-        { key: "os", label: "Operating System Information", href: href("os") },
+        { key: "os", label: "System", href: href("os") },
         { key: "services", label: "Services", href: href("services") },
         { key: "updates", label: "Updates", href: href("updates") },
-        { key: "background", label: "Background Items", href: href("background") },
+        { key: "background", label: "Background", href: href("background") },
         { key: "extensions", label: "Extensions", href: href("extensions") },
       ] as const).map(item => (
         <Link key={item.key} href={item.href} aria-current={current === item.key ? "page" : undefined}

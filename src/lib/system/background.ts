@@ -31,7 +31,7 @@ function detail(row: ItemRow): string | null {
 export const BACKGROUND_REPORT: ItemReportConfig = {
   tab: "background",
   api: BACKGROUND_API,
-  csvName: "background-items-report",
+  csvName: "background-report",
   description: "Scheduled tasks, launchd jobs and Open at Login items across devices.",
   footnote: "Services covers Windows services and the launchd jobs macOS reports as loaded, with running state. This tab covers what Services does not: launchd jobs configured on disk, Open at Login items and Windows scheduled tasks. Rows list reported items only; a device that does not list an item may not have reported it.",
   prompt: "Choose scheduled tasks, launchd jobs or Open at Login items from Selections, or show failed scheduled tasks across the fleet.",

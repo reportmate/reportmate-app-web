@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { ExportCsvButton } from "../ui/ExportCsvButton"
+import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
@@ -74,7 +76,7 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
   const [reload, setReload] = useState(0)
   const [expanded, setExpanded] = useState(!hasQuery)
   const [copied, setCopied] = useState(false)
-  const [progress, setProgress] = useState("")
+  const [progress, setProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
   const [deviceSearch, setDeviceSearch] = useState(searchValue)
   const view = useMemo(() => readItemView(config, params), [config, params])
@@ -110,14 +112,14 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
   useEffect(() => {
     const controller = new AbortController()
     setLoading(hasQuery)
-    setProgress("")
+    setProgress(null)
     setError(null)
     setData(null)
     if (!hasQuery) return () => controller.abort()
     const run = async () => {
       try {
         const body = await fetchItemReport(config.api, query, controller.signal, (loaded, total) => {
-          if (!controller.signal.aborted) setProgress(`${loaded.toLocaleString()} of ${total.toLocaleString()} rows`)
+          if (!controller.signal.aborted) setProgress({ loaded, total, unit: "rows" })
         })
         if (!controller.signal.aborted) setData(body)
       } catch (err) {
@@ -203,10 +205,7 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
                 {copied ? "Link Copied" : "Copy Link"}
               </button>
               <button type="button" onClick={() => setReload(n => n + 1)} disabled={loading || pending} className={secondaryAction}>Refresh</button>
-              {!loading && data && rows.length > 0 && <div className="flex flex-col items-start gap-1 max-w-xs">
-                <button type="button" onClick={exportCsv} disabled={pending} aria-describedby={`${config.tab}-export-details`} className={`${actionButton} bg-emerald-600 hover:bg-emerald-700 text-white`}>Export CSV</button>
-                <p id={`${config.tab}-export-details`} className="text-xs text-gray-500 dark:text-gray-400">CSV includes every column, including hidden ones, for the filtered and sorted rows.</p>
-              </div>}
+              {!loading && data && rows.length > 0 && <ExportCsvButton onClick={exportCsv} disabled={pending} details="CSV includes every column, including hidden ones, for the filtered and sorted rows." />}
             </div>}
           </div>
           {notApplicable ? <div role="status" className="flex-1 px-6 py-12 text-center text-gray-500 dark:text-gray-400">
@@ -260,7 +259,7 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
               </details>
             </div>}
             {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">{config.prompt}</p><p className="text-sm mt-2">Selections list only values devices have reported. Results update as you select.</p></div>
-              : loading ? <div role="status" className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">Loading report…{progress && ` ${progress}`}</div>
+              : loading ? <ReportLoading message="Loading report…" count={progress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : data && <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900/50"><tr>{columns.map(column => {
                   const active = view.sort === column.key
