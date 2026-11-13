@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
-export type SystemTab = "os" | "services" | "updates" | "background" | "extensions"
+export type SystemTab = "os" | "services" | "updates" | "background" | "extensions" | "binaries"
 
 export function SystemViewSwitch({ current }: { current: SystemTab }) {
   const params = useSearchParams()
@@ -23,6 +23,7 @@ export function SystemViewSwitch({ current }: { current: SystemTab }) {
         { key: "updates", label: "Updates", href: href("updates") },
         { key: "background", label: "Background", href: href("background") },
         { key: "extensions", label: "Extensions", href: href("extensions") },
+        { key: "binaries", label: "Binaries", href: href("binaries") },
       ] as const).map(item => (
         <Link key={item.key} href={item.href} aria-current={current === item.key ? "page" : undefined}
           className={`px-3 py-0.5 rounded-md text-lg font-semibold transition-colors ${current === item.key

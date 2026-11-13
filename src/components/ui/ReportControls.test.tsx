@@ -47,5 +47,6 @@ describe('SystemViewSwitch', () => {
     render(<SystemViewSwitch current="os" />)
     expect(screen.getByRole('link', { name: 'System' }).getAttribute('href')).toBe('/system')
     expect(screen.getByRole('link', { name: 'Background' }).getAttribute('href')).toBe('/system?tab=background')
+    expect(screen.getByRole('link', { name: 'Binaries' }).getAttribute('href')).toBe('/system?tab=binaries')
   })
 })

@@ -11,6 +11,7 @@ import { UpdatesReport } from "@/src/components/system/UpdatesReport"
 import { ItemReport } from "@/src/components/system/ItemReport"
 import { BACKGROUND_REPORT } from "@/src/lib/system/background"
 import { EXTENSIONS_REPORT } from "@/src/lib/system/extensions"
+import { BINARIES_REPORT } from "@/src/lib/system/binaries"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
 import { OSVersionPieChart } from "@/src/lib/modules/graphs/OSVersionPieChart"
@@ -937,9 +938,6 @@ function SystemPageContent() {
             <div className="flex items-center justify-between">
               <div>
                 <SystemViewSwitch current="os" />
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  OS versions, activation status, and system uptime {searchFilteredSystems.length} devices
-                </p>
                 <RefreshErrorBanner
                   error={refreshError}
                   updatedAt={cachedAt('/api/v1/system')}
@@ -1525,6 +1523,7 @@ function SystemTabs() {
   if (tab === 'updates') return <UpdatesReport />
   if (tab === 'background') return <ItemReport key="background" config={BACKGROUND_REPORT} />
   if (tab === 'extensions') return <ItemReport key="extensions" config={EXTENSIONS_REPORT} />
+  if (tab === 'binaries') return <ItemReport key="binaries" config={BINARIES_REPORT} />
   return tab === 'services' ? <ServicesReport /> : <SystemPageContent />
 }
 

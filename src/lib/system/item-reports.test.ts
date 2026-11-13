@@ -1,5 +1,6 @@
 import { BACKGROUND_REPORT, taskTime } from './background'
 import { EXTENSIONS_REPORT } from './extensions'
+import { BINARIES_REPORT } from './binaries'
 import {
   hasReportQuery, itemReportCsv, listParam, readItemView, reportApiQuery, reportUrlQuery, sortRows, type ItemRow,
 } from './item-reports'
@@ -68,4 +69,25 @@ it('shows Task Scheduler sentinel times as never or not scheduled', () => {
   expect(taskTime('1899-12-30T00:00:00', 'Not scheduled')).toBe('Not scheduled')
   expect(taskTime('2026-07-14T02:45:50', 'Never')).toBe('2026-07-14T02:45:50')
   expect(taskTime(null, 'Never')).toBeNull()
+})
+
+it('runs the binaries report for selections, categories or running binaries only', () => {
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams())).toBe(false)
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams('sources=os'))).toBe(false)
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams('running=no'))).toBe(false)
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams('running=yes,no'))).toBe(false)
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams('running=yes'))).toBe(true)
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams('categories=server'))).toBe(true)
+  expect(hasReportQuery(BINARIES_REPORT, new URLSearchParams('items=%5B%22binary%3Ahttpd%22%5D'))).toBe(true)
+  const query = new URLSearchParams(reportApiQuery(BINARIES_REPORT, new URLSearchParams('tab=binaries&categories=server&sources=homebrew'), 'macOS'))
+  expect(query.get('categories')).toBe('server')
+  expect(query.get('sources')).toBe('homebrew')
+  expect(query.has('tab')).toBe(false)
+})
+
+it('shows binaries without a version as not reported in the CSV', () => {
+  const csv = itemReportCsv(BINARIES_REPORT, [row({ kind: 'binary', key: 'nginx', name: 'nginx', path: 'C:\\nginx\\nginx.exe', runningState: 'yes', source: 'unknown' })], '2026-01-01T00:00:00Z', 'https://example.test/system?tab=binaries')
+  const [header, line] = csv.split('\r\n')
+  expect(header.startsWith('"Device","Serial number","Platform","Binary","Version","Running"')).toBe(true)
+  expect(line).toContain('"nginx","","Running"')
 })

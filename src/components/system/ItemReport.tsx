@@ -222,7 +222,7 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
               additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
               <div className="space-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
-                <Choices label="Item kinds"><Choice disabled={pending} active={kinds.length === 0} onClick={() => update({ kinds: null })}>All</Choice>{config.kinds.map(([value, label]) => <Choice disabled={pending} key={value} active={kinds.includes(value)} onClick={() => toggle("kinds", value)}>{label}</Choice>)}</Choices>
+                {config.kinds.length > 1 && <Choices label="Item kinds"><Choice disabled={pending} active={kinds.length === 0} onClick={() => update({ kinds: null })}>All</Choice>{config.kinds.map(([value, label]) => <Choice disabled={pending} key={value} active={kinds.includes(value)} onClick={() => toggle("kinds", value)}>{label}</Choice>)}</Choices>}
                 <ServiceSelectionCloud label="Items" options={itemOptions} selected={selected} onToggle={toggleItem} onSelect={chooseItems} loading={optionsLoading} />
                 <div className="flex flex-wrap gap-x-8 gap-y-4">
                   {config.filters.map(filter => {
