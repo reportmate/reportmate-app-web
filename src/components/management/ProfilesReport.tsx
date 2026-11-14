@@ -6,6 +6,7 @@ import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
+import { ReportAccordion } from "../system/ReportAccordion"
 import { ServiceSelectionCloud } from "../system/ServiceSelectionCloud"
 import { ManagementShieldIcon, ManagementViewSwitch } from "./ManagementViewSwitch"
 import { ProfilesTable } from "./ProfilesTable"
@@ -55,7 +56,8 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
   const [error, setError] = useState<string | null>(null)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(!hasQuery)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(!hasQuery)
   const [copied, setCopied] = useState(false)
   const [loadProgress, setLoadProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
@@ -125,7 +127,7 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
 
   const update = (patch: Record<string, string | null>) => {
     const next = profilesUrlQuery(current, kind, patch)
-    if (listParam(new URLSearchParams(next), "identifiers").length === 0) setExpanded(true)
+    if (listParam(new URLSearchParams(next), "identifiers").length === 0) setReportExpanded(true)
     startTransition(() => router.push(`/management?${next}`, { scroll: false }))
   }
   const toggle = (key: string, value: string) => {
@@ -175,6 +177,8 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
   const freshness = params.get("freshness") || "all"
   const activeCount = identifiers.length + listParam(params, "states").length + listParam(params, "inventoryStates").length +
     (preferenceKey ? 1 : 0) + (params.has("freshness") ? 1 : 0) + (params.has("maxAgeHours") ? 1 : 0) + (includeArchived ? 1 : 0)
+  const selectionsActive = listParam(params, "inventoryStates").length + (includeArchived ? 1 : 0)
+  const reportActive = activeCount - selectionsActive
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
@@ -204,23 +208,24 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
               selectedFleets={listParam(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={listParam(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="space-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
-                <ServiceSelectionCloud label={kind === "preference" ? "Preference domains" : "Profiles"}
-                  options={visibleOptions.map(o => ({ value: o.identifier, label: o.name, devices: o.devices }))}
-                  selected={identifiers} onToggle={toggleIdentifier} onSelect={choose} loading={optionsLoading} />
-                {kind === "preference" && identifiers.length > 0 && <Choices label="Preference key">
-                  <Choice disabled={pending} active={!preferenceKey} onClick={() => update({ preferenceKey: null })}>None</Choice>
-                  {availableKeys.slice(0, 200).map(key => <Choice disabled={pending} key={key} active={preferenceKey.toLowerCase() === key.toLowerCase()} onClick={() => update({ preferenceKey: key })}>{key}</Choice>)}
-                </Choices>}
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                  <Choices label="Management collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
                   <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
                   <Choices label="Archive"><Choice disabled={pending} active={includeArchived} onClick={() => update({ includeArchived: includeArchived ? null : "true" })}>Include archived</Choice></Choices>
-                </div>
+              </div>} />
+            <ReportAccordion label={kind === "preference" ? "Preference domains" : "Profiles"} activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Management collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
               </div>
-            </DeviceFilters>
+              <ServiceSelectionCloud label={kind === "preference" ? "Preference domains" : "Profiles"}
+                options={visibleOptions.map(o => ({ value: o.identifier, label: o.name, devices: o.devices }))}
+                selected={identifiers} onToggle={toggleIdentifier} onSelect={choose} loading={optionsLoading} />
+              {kind === "preference" && identifiers.length > 0 && <Choices label="Preference key">
+                <Choice disabled={pending} active={!preferenceKey} onClick={() => update({ preferenceKey: null })}>None</Choice>
+                {availableKeys.slice(0, 200).map(key => <Choice disabled={pending} key={key} active={preferenceKey.toLowerCase() === key.toLowerCase()} onClick={() => update({ preferenceKey: key })}>{key}</Choice>)}
+              </Choices>}
+            </ReportAccordion>
             {identifiers.length > 0 && <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
               {identifiers.map(id => <button type="button" key={id} onClick={() => toggleIdentifier(id)} title={`Remove ${id}`} className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-blue-50 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800">{labelFor(id)}<span aria-hidden="true">×</span></button>)}
               {preferenceKey && <button type="button" onClick={() => update({ preferenceKey: null })} className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-blue-50 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800">Key: {preferenceKey}<span aria-hidden="true">×</span></button>}
@@ -231,7 +236,7 @@ export function ProfilesReport({ kind }: { kind: ProfileKind }) {
               <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-gray-600 dark:text-gray-400">{loading ? "Updating report…" : data ? `${rows.length.toLocaleString()} rows` : ""}</span><input type="search" aria-label="Search devices" placeholder="Search devices…" value={deviceSearch} onChange={e => setDeviceSearch(e.target.value)} className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-900 dark:text-white" /></div>
               <div className="flex flex-wrap gap-2" aria-label="Profile state filters"><Choice disabled={pending} active={!params.get("states")} onClick={() => update({ states: null })}>All states</Choice>{PROFILE_STATES.map(state => <Choice disabled={pending} key={state} active={listParam(params, "states").includes(state)} onClick={() => toggle("states", state)}>{stateLabel(state)}{data ? ` ${data.summary[state] || 0}` : ""}</Choice>)}</div>
             </div>}
-            {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">Choose {noun} from Selections to build your report.</p><p className="text-sm mt-2">Pick collected {noun} to see which devices have them, which lack them, and which are unknown.</p></div>
+            {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">Choose {noun} from the panel above to build your report.</p><p className="text-sm mt-2">Pick collected {noun} to see which devices have them, which lack them, and which are unknown.</p></div>
               : loading ? <ReportLoading message="Loading report…" count={loadProgress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : data && <ProfilesTable rows={rows} kind={kind} view={view} onSort={sortColumn} pending={pending} />}
           </div>

@@ -13,6 +13,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
+import { ReportAccordion } from "../system/ReportAccordion"
 import { ServiceSelectionCloud } from "../system/ServiceSelectionCloud"
 import { peekCached, rememberCached, trackedFetch } from "../../lib/data-cache"
 import {
@@ -60,7 +61,8 @@ export function VulnerabilitiesReport() {
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<LoadCount | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(false)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(false)
   const searchValue = params.get("search") || ""
   const [deviceSearch, setDeviceSearch] = useState(searchValue)
   const qValue = params.get("q") || ""
@@ -154,6 +156,8 @@ export function VulnerabilitiesReport() {
   const activeCount = selectedCves.length + listParam(params, "statuses").length + listParam(params, "severities").length +
     listParam(params, "inventoryStates").length + (exploited !== "all" ? 1 : 0) + (freshness !== "all" ? 1 : 0) +
     (params.has("maxAgeHours") ? 1 : 0) + (params.has("includeArchived") ? 1 : 0)
+  const selectionsActive = listParam(params, "inventoryStates").length + (params.get("includeArchived") === "true" ? 1 : 0)
+  const reportActive = activeCount - selectionsActive
 
   const exportCsv = () => {
     try {
@@ -188,24 +192,25 @@ export function VulnerabilitiesReport() {
               selectedFleets={listParam(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={listParam(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="space-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
-                <ServiceSelectionCloud label="CVEs" loading={optionsLoading} selected={selectedCves} onToggle={toggleCve} onSelect={chooseCves}
-                  options={(catalog?.cves || []).map(c => ({ value: c.identifier, label: c.identifier, devices: c.devices }))} />
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                  <Choices label="Status"><Choice disabled={pending} active={!params.get("statuses")} onClick={() => update({ statuses: null })}>All</Choice>
-                    {CVE_STATUSES.map(s => <Choice disabled={pending} key={s} active={listParam(params, "statuses").includes(s)} onClick={() => toggle("statuses", s)}>{statusLabel(s)}</Choice>)}</Choices>
-                  <Choices label="Severity"><Choice disabled={pending} active={!params.get("severities")} onClick={() => update({ severities: null })}>All</Choice>
-                    {(catalog?.severities || []).map(s => { const value = s.value.toLowerCase(); return <Choice disabled={pending} key={value} active={listParam(params, "severities").includes(value)} onClick={() => toggle("severities", value)}>{severityLabel(s.value)}</Choice> })}</Choices>
-                  <Choices label="Actively exploited">{EXPLOITED_CHOICES.map(([value, label]) => <Choice disabled={pending} key={value} active={exploited === value} onClick={() => update({ exploited: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Security collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "168" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
                   <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>
                     {options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{value === "checked_out" ? "Checked out" : value.charAt(0).toUpperCase() + value.slice(1)}</Choice>)}</Choices>
                   <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
-                </div>
+              </div>} />
+            <ReportAccordion label="Vulnerabilities" activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Status"><Choice disabled={pending} active={!params.get("statuses")} onClick={() => update({ statuses: null })}>All</Choice>
+                  {CVE_STATUSES.map(s => <Choice disabled={pending} key={s} active={listParam(params, "statuses").includes(s)} onClick={() => toggle("statuses", s)}>{statusLabel(s)}</Choice>)}</Choices>
+                <Choices label="Severity"><Choice disabled={pending} active={!params.get("severities")} onClick={() => update({ severities: null })}>All</Choice>
+                  {(catalog?.severities || []).map(s => { const value = s.value.toLowerCase(); return <Choice disabled={pending} key={value} active={listParam(params, "severities").includes(value)} onClick={() => toggle("severities", value)}>{severityLabel(s.value)}</Choice> })}</Choices>
+                <Choices label="Actively exploited">{EXPLOITED_CHOICES.map(([value, label]) => <Choice disabled={pending} key={value} active={exploited === value} onClick={() => update({ exploited: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Security collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "168" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
               </div>
-            </DeviceFilters>
+              <ServiceSelectionCloud label="CVEs" loading={optionsLoading} selected={selectedCves} onToggle={toggleCve} onSelect={chooseCves}
+                options={(catalog?.cves || []).map(c => ({ value: c.identifier, label: c.identifier, devices: c.devices }))} />
+            </ReportAccordion>
             {selectedCves.length > 0 && <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
               {selectedCves.map(cve => <button type="button" key={cve} onClick={() => toggleCve(cve)} title={`Remove ${cve}`} className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-blue-50 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800">{cve}<span aria-hidden="true">×</span></button>)}
               <button type="button" onClick={() => chooseCves([])} className="text-xs text-red-600 dark:text-red-400 hover:underline ml-2">Clear CVEs</button>

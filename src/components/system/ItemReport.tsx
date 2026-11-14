@@ -9,6 +9,7 @@ import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
 import { SystemViewSwitch, type SystemTab } from "./SystemViewSwitch"
 import { ServiceSelectionCloud } from "./ServiceSelectionCloud"
+import { ReportAccordion } from "./ReportAccordion"
 import { peekCached, rememberCached, trackedFetch } from "../../lib/data-cache"
 import { formatExactTime, formatRelativeTime } from "../../lib/time"
 import { inventoryLabel } from "../../lib/system/services"
@@ -74,7 +75,8 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
   const [error, setError] = useState<string | null>(null)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(!hasQuery)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(!hasQuery)
   const [copied, setCopied] = useState(false)
   const [progress, setProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
@@ -190,8 +192,9 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
   const kindLabel = (kind: string) => config.kinds.find(([key]) => key === kind)?.[1] || kind
   const age = params.get("maxAgeHours") || "24"
   const freshness = params.get("freshness") || "all"
-  const activeCount = selected.length + kinds.length + config.filters.reduce((n, f) => n + listParam(params, f.param).length, 0) +
-    listParam(params, "inventoryStates").length + (params.has("freshness") ? 1 : 0) + (params.has("maxAgeHours") ? 1 : 0) + (params.has("includeArchived") ? 1 : 0)
+  const selectionsActive = listParam(params, "inventoryStates").length + (params.has("includeArchived") ? 1 : 0)
+  const reportActive = selected.length + kinds.length + config.filters.reduce((n, f) => n + listParam(params, f.param).length, 0) +
+    (params.has("freshness") ? 1 : 0) + (params.has("maxAgeHours") ? 1 : 0)
   const summaryCount = (summaryKey: string | undefined, value: string) => data && summaryKey ? ` ${data.summary[`${summaryKey}:${value}`] || 0}` : ""
 
   return (
@@ -220,11 +223,14 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
               selectedFleets={listParam(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={listParam(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="space-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
+                <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
+              </div>} />
+            <ReportAccordion label={config.tab.charAt(0).toUpperCase() + config.tab.slice(1)} activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
                 {config.kinds.length > 1 && <Choices label="Item kinds"><Choice disabled={pending} active={kinds.length === 0} onClick={() => update({ kinds: null })}>All</Choice>{config.kinds.map(([value, label]) => <Choice disabled={pending} key={value} active={kinds.includes(value)} onClick={() => toggle("kinds", value)}>{label}</Choice>)}</Choices>}
-                <ServiceSelectionCloud label="Items" options={itemOptions} selected={selected} onToggle={toggleItem} onSelect={chooseItems} loading={optionsLoading} />
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
                   {config.filters.map(filter => {
                     const choices = filter.fromCatalog ? (catalog?.[filter.fromCatalog] || []).map(entry => [entry.value, `${entry.value} (${entry.devices})`] as const) : filter.choices
                     if (choices.length === 0) return null
@@ -233,11 +239,9 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
                   })}
                   <Choices label="System collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
                   <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
-                  <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
-                  <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
-                </div>
               </div>
-            </DeviceFilters>
+              <ServiceSelectionCloud label="Items" options={itemOptions} selected={selected} onToggle={toggleItem} onSelect={chooseItems} loading={optionsLoading} />
+            </ReportAccordion>
             {selected.length > 0 && <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
               {selected.map(value => {
                 const [kind, ...rest] = value.split(":")
@@ -258,7 +262,7 @@ export function ItemReport({ config }: { config: ItemReportConfig }) {
                 </div>
               </details>
             </div>}
-            {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">{config.prompt}</p><p className="text-sm mt-2">Selections list only values devices have reported. Results update as you select.</p></div>
+            {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">{config.prompt}</p><p className="text-sm mt-2">Choices list only values devices have reported. Results update as you select.</p></div>
               : loading ? <ReportLoading message="Loading report…" count={progress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : data && <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-900/50"><tr>{columns.map(column => {

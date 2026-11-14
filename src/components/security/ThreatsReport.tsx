@@ -13,6 +13,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
+import { ReportAccordion } from "../system/ReportAccordion"
 import { peekCached, rememberCached, trackedFetch } from "../../lib/data-cache"
 import {
   DAY_CHOICES, DEFAULT_DAYS, DETECTIONS_API, DETECTION_COLUMNS, DETECTION_PARAMS, VIEW_PARAMS,
@@ -51,7 +52,8 @@ export function ThreatsReport() {
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState<LoadCount | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(false)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(false)
   const searchValue = params.get("search") || ""
   const [deviceSearch, setDeviceSearch] = useState(searchValue)
   const sort = params.get("sort") || "lastSeenAt"
@@ -110,6 +112,8 @@ export function ThreatsReport() {
   const options = catalog?.options || report?.options || emptyOptions
   const activeCount = ["vendors", "categories", "severities", "statuses", "inventoryStates"].reduce((n, key) => n + listParam(params, key).length, 0) +
     (params.has("days") ? 1 : 0) + (params.has("includeArchived") ? 1 : 0)
+  const selectionsActive = listParam(params, "inventoryStates").length + (params.get("includeArchived") === "true" ? 1 : 0)
+  const reportActive = activeCount - selectionsActive
   const facet = (label: string, key: string, values: { value: string; devices: number }[] | undefined) => (values?.length || 0) > 0 &&
     <Choices label={label}><Choice disabled={pending} active={!params.get(key)} onClick={() => update({ [key]: null })}>All</Choice>
       {values!.map(v => { const value = v.value.toLowerCase(); return <Choice disabled={pending} key={value} active={listParam(params, key).includes(value)} onClick={() => toggle(key, value)}>{severityLabel(v.value)} <span className="opacity-60">{v.devices}</span></Choice> })}</Choices>
@@ -143,16 +147,19 @@ export function ThreatsReport() {
               selectedFleets={listParam(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={listParam(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="flex flex-wrap gap-x-8 gap-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
-                {facet("Category", "categories", catalog?.categories)}
-                {facet("Severity", "severities", catalog?.severities)}
-                {facet("Status", "statuses", catalog?.statuses)}
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
                 <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>
                   {options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{value === "checked_out" ? "Checked out" : value.charAt(0).toUpperCase() + value.slice(1)}</Choice>)}</Choices>
                 <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
+              </div>} />
+            <ReportAccordion label="Threats" activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                {facet("Category", "categories", catalog?.categories)}
+                {facet("Severity", "severities", catalog?.severities)}
+                {facet("Status", "statuses", catalog?.statuses)}
               </div>
-            </DeviceFilters>
+            </ReportAccordion>
             {error && <div role="alert" className="mx-6 my-4 p-3 text-sm text-red-800 dark:text-red-200 bg-red-50 dark:bg-red-900/20 rounded-lg">{error}<button type="button" className="underline ml-2" onClick={() => setReload(n => n + 1)}>Retry</button></div>}
             <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-start justify-between gap-4">
               <div className="flex flex-wrap items-start gap-x-8 gap-y-3">

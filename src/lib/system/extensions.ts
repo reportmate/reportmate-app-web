@@ -13,7 +13,7 @@ export const EXTENSIONS_REPORT: ItemReportConfig = {
   csvName: "extensions-report",
   description: "System extensions, kernel extensions and privileged helper tools across Macs.",
   footnote: "macOS only. Rows list reported items only. Profile management for system extensions is not collected by the current macOS client, so it shows as not reported.",
-  prompt: "Choose extensions or helper tools from Selections, pick a team id, or show extensions that are not activated or helpers that are unsigned.",
+  prompt: "Choose extensions or helper tools from the Extensions panel, pick a team id, or show extensions that are not activated or helpers that are unsigned.",
   kinds: [["systemExtension", "System extensions"], ["kernelExtension", "Kernel extensions"], ["helper", "Privileged helpers"]],
   filters: [
     { param: "activations", label: "Activation", summaryKey: "activation", choices: Object.entries(ACTIVATION_LABELS) },

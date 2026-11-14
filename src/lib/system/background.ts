@@ -34,7 +34,7 @@ export const BACKGROUND_REPORT: ItemReportConfig = {
   csvName: "background-report",
   description: "Scheduled tasks, launchd jobs and Open at Login items across devices.",
   footnote: "Services covers Windows services and the launchd jobs macOS reports as loaded, with running state. This tab covers what Services does not: launchd jobs configured on disk, Open at Login items and Windows scheduled tasks. Rows list reported items only; a device that does not list an item may not have reported it.",
-  prompt: "Choose scheduled tasks, launchd jobs or Open at Login items from Selections, or show failed scheduled tasks across the fleet.",
+  prompt: "Choose scheduled tasks, launchd jobs or Open at Login items from the Background panel, or show failed scheduled tasks across the fleet.",
   kinds: [["task", "Scheduled tasks"], ["launchd", "launchd jobs"], ["loginItem", "Open at Login"]],
   filters: [
     { param: "enabled", label: "Enabled", summaryKey: "enabledState", choices: Object.entries(ENABLED_LABELS) },
