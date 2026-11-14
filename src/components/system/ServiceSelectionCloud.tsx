@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { LoadingProgress } from "../ui/LoadingProgress"
 
 export interface SelectionOption { value: string; label: string; devices?: number }
 
@@ -31,7 +32,7 @@ export function ServiceSelectionCloud({ label, options, selected, onToggle, onSe
       {!loading && visible.length > displayed.length && <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">Showing {displayed.length} of {visible.length.toLocaleString()} choices. Search to narrow the list.</p>}
       <div className="min-h-24 max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
         <div className="flex flex-wrap gap-1">
-          {loading ? <span role="status" className="text-sm text-gray-500 p-2">Loading available {label.toLowerCase()}…</span> : displayed.map(option => {
+          {loading ? <LoadingProgress className="w-full p-2" message={`Loading available ${label.toLowerCase()}…`} /> : displayed.map(option => {
             const active = selected.includes(option.value)
             return <button type="button" key={option.value} aria-pressed={active} title={option.value} onClick={() => onToggle(option.value)}
               className={`px-2 py-1 text-xs rounded-full border transition-colors ${active
