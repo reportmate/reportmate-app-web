@@ -13,13 +13,13 @@ describe('SecurityViewSwitch (the Security header)', () => {
     expect(vulns.getAttribute('href')).toBe('/security?tab=vulnerabilities&platform=mac')
     expect(vulns.getAttribute('aria-current')).toBe('page')
     expect(screen.getByRole('link', { name: 'Threat Detections' }).getAttribute('href')).toBe('/security?tab=threats&platform=mac')
-    expect(screen.getByRole('link', { name: 'Fleet Security' }).getAttribute('href')).toBe('/security?platform=mac')
+    expect(screen.getByRole('link', { name: 'Security' }).getAttribute('href')).toBe('/security?platform=mac')
   })
 
   it('links the posture tab to the bare page', () => {
     mockParams = new URLSearchParams()
     render(<SecurityViewSwitch current="posture" />)
-    expect(screen.getByRole('link', { name: 'Fleet Security' }).getAttribute('href')).toBe('/security')
-    expect(screen.getByRole('link', { name: 'Fleet Security' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('link', { name: 'Security' }).getAttribute('href')).toBe('/security')
+    expect(screen.getByRole('link', { name: 'Security' }).getAttribute('aria-current')).toBe('page')
   })
 })
