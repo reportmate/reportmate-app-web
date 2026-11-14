@@ -75,14 +75,16 @@ export function SkeletonTimeout({
       </>
     )
   }
-  // Overlay the title row of the page skeleton (page-container, py-8 card, px-6 py-4 header)
+  // Overlay the title row of the page skeleton (page-container, py-8 card, px-6 py-4 header):
+  // the bar fills the header to the right of the title, as on /installs.
   return (
     <div className="relative">
       {children}
       <div className="absolute inset-x-0 top-0 pointer-events-none">
         <div className="page-container px-4 sm:px-6 lg:px-8 pt-8">
-          <div className="px-6 py-4 flex justify-end">
-            <div className="pointer-events-auto w-full max-w-md rounded-lg bg-white dark:bg-gray-800 py-1 pl-3">
+          <div className="px-6 py-4 flex">
+            <div aria-hidden="true" className="hidden sm:block w-72 flex-shrink-0" />
+            <div className="pointer-events-auto flex-1 min-w-0 rounded-lg bg-white dark:bg-gray-800 py-1 pl-3">
               {error
                 ? notice(`Couldn't load: ${error}`)
                 : <LoadingProgress message={message} onRetry={onRetry ? retry : undefined} limitMs={limitMs} resetKey={attempt} />}
