@@ -18,6 +18,8 @@ export interface FilterOptions {
 
 interface DeviceFiltersProps {
   children?: ReactNode
+  /** Extra device-scope dimensions rendered after Location (e.g. inventory state, archive). */
+  trailing?: ReactNode
   additionalActiveCount?: number
   filterOptions: FilterOptions
   selectedStatuses: string[]
@@ -46,6 +48,7 @@ interface DeviceFiltersProps {
 
 export default function DeviceFilters({
   children,
+  trailing,
   additionalActiveCount = 0,
   filterOptions,
   selectedStatuses,
@@ -281,6 +284,7 @@ export default function DeviceFilters({
               </div>
             </div>
           )}
+          {trailing && <div className="mt-4">{trailing}</div>}
         </div>
       </CollapsibleSection>
 

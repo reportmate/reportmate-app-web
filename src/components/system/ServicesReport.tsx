@@ -8,6 +8,7 @@ import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
 import { SystemViewSwitch } from "./SystemViewSwitch"
 import { ServiceSelectionCloud } from "./ServiceSelectionCloud"
+import { ReportAccordion } from "./ReportAccordion"
 import { peekCached, rememberCached, trackedFetch } from "../../lib/data-cache"
 import { servicesCsv } from "../../lib/system/services-export"
 import { fetchServicesReport } from "../../lib/system/services-request"
@@ -58,7 +59,8 @@ export function ServicesReport() {
   const [error, setError] = useState<string | null>(null)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(!hasQuery)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(!hasQuery)
   const [appPickerOpen, setAppPickerOpen] = useState(hasApplication)
   const [copied, setCopied] = useState(false)
   const [loadProgress, setLoadProgress] = useState<LoadCount | null>(null)
@@ -127,7 +129,7 @@ export function ServicesReport() {
   const update = (patch: Record<string, string | null>) => {
     const next = servicesUrlQuery(current, patch)
     const nextParams = new URLSearchParams(next)
-    if (!nextParams.get("serviceNames") && !nextParams.get("service")) setExpanded(true)
+    if (!nextParams.get("serviceNames") && !nextParams.get("service")) setReportExpanded(true)
     startTransition(() => router.push(`/system?${next}`, { scroll: false }))
   }
   const toggle = (key: string, value: string) => {
@@ -176,9 +178,10 @@ export function ServicesReport() {
       setError("The report could not be exported. Please retry.")
     }
   }
-  const activeCount = serviceNames.length + applicationNames.length + selectedVersions.length +
-    listParam(params, "states").length + listParam(params, "startups").length + listParam(params, "inventoryStates").length +
-    (params.has("freshness") ? 1 : 0) + (params.has("maxAgeHours") ? 1 : 0) + (params.has("includeArchived") ? 1 : 0) + (view.evidence !== "all" ? 1 : 0) + (view.checkin !== "all" ? 1 : 0)
+  const selectionsActive = listParam(params, "inventoryStates").length + (params.has("includeArchived") ? 1 : 0)
+  const reportActive = serviceNames.length + applicationNames.length + selectedVersions.length +
+    listParam(params, "states").length + listParam(params, "startups").length +
+    (params.has("freshness") ? 1 : 0) + (params.has("maxAgeHours") ? 1 : 0) + (view.evidence !== "all" ? 1 : 0) + (view.checkin !== "all" ? 1 : 0)
   const age = params.get("maxAgeHours") || "24"
   const freshness = params.get("freshness") || "all"
   const chips = [
@@ -216,25 +219,26 @@ export function ServicesReport() {
               selectedFleets={listParam(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={listParam(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="space-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
-                <div className={`grid gap-6 ${appPickerOpen || hasApplication ? "lg:grid-cols-2" : "grid-cols-1"}`}>
-                  <ServiceSelectionCloud label="Services" options={(catalog?.services || []).map(s => ({ value: s.name, label: s.displayName || s.name, devices: s.devices }))} selected={serviceNames} onToggle={toggleService} onSelect={chooseServices} loading={optionsLoading} />
-                  {(appPickerOpen || hasApplication) && <ServiceSelectionCloud label="Applications" options={(catalog?.applications || []).map(a => ({ value: a.name, label: a.name, devices: a.devices }))} selected={applicationNames} onToggle={toggleApplication} onSelect={chooseApplications} loading={optionsLoading} />}
-                </div>
-                {!appPickerOpen && !hasApplication && <button type="button" onClick={() => setAppPickerOpen(true)} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">Add application versions</button>}
-                {hasApplication && <Choices label="Versions"><Choice disabled={pending} active={selectedVersions.length === 0} onClick={() => update({ versions: null })}>All versions</Choice>{availableVersions.map(version => <Choice disabled={pending} key={version} active={selectedVersions.includes(version)} onClick={() => toggle("versions", version)}>{version}</Choice>)}</Choices>}
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                  {startupOptions.length > 0 && <Choices label="Startup type"><Choice disabled={pending} active={!params.get("startups")} onClick={() => update({ startups: null })}>All</Choice>{startupOptions.map(value => <Choice disabled={pending} key={value} active={listParam(params, "startups").includes(value)} onClick={() => toggle("startups", value)}>{stateLabel(value)}</Choice>)}</Choices>}
-                  <Choices label="Service collection age">{([['all', 'All'], ['fresh', 'Within maximum age'], ['stale', 'Older'], ['unknown', 'Unknown']] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Maximum service collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
-                  <Choices label="Device check-in age">{CHECKIN_CHOICES.map(([value, label]) => <Choice disabled={pending} key={value} active={view.checkin === value} onClick={() => update({ checkin: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Maximum check-in age">{[...new Set([24, 168, 720, view.checkinAgeHours])].map(value => <Choice disabled={pending} key={value} active={view.checkinAgeHours === value} onClick={() => update({ checkinAgeHours: value === 168 ? null : String(value) })}>{value === 24 ? "24 hours" : value === 168 ? "7 days" : value === 720 ? "30 days" : `${value} hours`}</Choice>)}</Choices>
-                  <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
-                  <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
-                </div>
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
+                <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
+              </div>} />
+            <ReportAccordion label="Services" activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                {startupOptions.length > 0 && <Choices label="Startup type"><Choice disabled={pending} active={!params.get("startups")} onClick={() => update({ startups: null })}>All</Choice>{startupOptions.map(value => <Choice disabled={pending} key={value} active={listParam(params, "startups").includes(value)} onClick={() => toggle("startups", value)}>{stateLabel(value)}</Choice>)}</Choices>}
+                <Choices label="Service collection age">{([['all', 'All'], ['fresh', 'Within maximum age'], ['stale', 'Older'], ['unknown', 'Unknown']] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Maximum service collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{value === "24" ? "24 hours" : value === "168" ? "7 days" : value === "720" ? "30 days" : `${value} hours`}</Choice>)}</Choices>
+                <Choices label="Device check-in age">{CHECKIN_CHOICES.map(([value, label]) => <Choice disabled={pending} key={value} active={view.checkin === value} onClick={() => update({ checkin: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Maximum check-in age">{[...new Set([24, 168, 720, view.checkinAgeHours])].map(value => <Choice disabled={pending} key={value} active={view.checkinAgeHours === value} onClick={() => update({ checkinAgeHours: value === 168 ? null : String(value) })}>{value === 24 ? "24 hours" : value === 168 ? "7 days" : value === 720 ? "30 days" : `${value} hours`}</Choice>)}</Choices>
               </div>
-            </DeviceFilters>
+              <div className={`grid gap-6 ${appPickerOpen || hasApplication ? "lg:grid-cols-2" : "grid-cols-1"}`}>
+                <ServiceSelectionCloud label="Services" options={(catalog?.services || []).map(s => ({ value: s.name, label: s.displayName || s.name, devices: s.devices }))} selected={serviceNames} onToggle={toggleService} onSelect={chooseServices} loading={optionsLoading} />
+                {(appPickerOpen || hasApplication) && <ServiceSelectionCloud label="Applications" options={(catalog?.applications || []).map(a => ({ value: a.name, label: a.name, devices: a.devices }))} selected={applicationNames} onToggle={toggleApplication} onSelect={chooseApplications} loading={optionsLoading} />}
+              </div>
+              {!appPickerOpen && !hasApplication && <button type="button" onClick={() => setAppPickerOpen(true)} className="text-sm text-blue-600 dark:text-blue-400 hover:underline">Add application versions</button>}
+              {hasApplication && <Choices label="Versions"><Choice disabled={pending} active={selectedVersions.length === 0} onClick={() => update({ versions: null })}>All versions</Choice>{availableVersions.map(version => <Choice disabled={pending} key={version} active={selectedVersions.includes(version)} onClick={() => toggle("versions", version)}>{version}</Choice>)}</Choices>}
+            </ReportAccordion>
             {chips.length > 0 && <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
               {chips.map(chip => <button type="button" key={chip.key} onClick={chip.clear} title={`Remove ${chip.label}`} className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-blue-50 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800">{chip.label}<span aria-hidden="true">×</span></button>)}
               <button type="button" onClick={clearAll} className="text-xs text-red-600 dark:text-red-400 hover:underline ml-2">Clear selections</button>
@@ -253,7 +257,7 @@ export function ServicesReport() {
               </details>
               {view.checkin !== "all" && <button type="button" onClick={() => update({ checkin: null })} className="text-xs text-blue-600 dark:text-blue-400">Check-in: {view.checkin} · {view.checkinAgeHours} hours ×</button>}
             </div>}
-            {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">Choose services from Selections to build your report.</p><p className="text-sm mt-2">Pick the collected services you want to compare. Results update as you select.</p></div>
+            {!hasQuery ? <div className="px-6 py-12 text-center text-gray-500 dark:text-gray-400"><p className="font-medium">Choose services from the Services panel to build your report.</p><p className="text-sm mt-2">Pick the collected services you want to compare. Results update as you select.</p></div>
               : loading ? <ReportLoading message="Loading services report…" count={loadProgress} resetKey={reload} onRetry={() => setReload(n => n + 1)} />
               : data && <ServicesTable devices={rows} generatedAt={data.generatedAt} view={view} onSort={sortColumn} pending={pending} />}
           </div>

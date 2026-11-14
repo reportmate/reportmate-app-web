@@ -19,7 +19,7 @@ export const BINARIES_REPORT: ItemReportConfig = {
   csvName: "binaries-report",
   description: "Web servers, databases, TLS libraries, runtimes and tools found on devices, with version, path, source and whether each was running.",
   footnote: "Rows list reported binaries only; a device that does not list one may not have reported it. Running means a process was observed when the System module was collected. A version is left as not reported when the client could not read it safely: macOS runs only root-owned binaries for their version, and Windows reads the file's version resource without running it.",
-  prompt: "Choose binaries such as httpd, sshd or openssl from Selections, pick a category, or show binaries that were running.",
+  prompt: "Choose binaries such as httpd, sshd or openssl from the Binaries panel, pick a category, or show binaries that were running.",
   kinds: [["binary", "Binaries"]],
   filters: [
     { param: "categories", label: "Category", summaryKey: "category", choices: Object.entries(CATEGORY_LABELS) },

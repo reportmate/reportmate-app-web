@@ -8,6 +8,7 @@ import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
 import { SystemViewSwitch } from "./SystemViewSwitch"
 import { ServiceSelectionCloud } from "./ServiceSelectionCloud"
+import { ReportAccordion } from "./ReportAccordion"
 import { UpdatesTable } from "./UpdatesTable"
 import { peekCached, rememberCached, trackedFetch } from "../../lib/data-cache"
 import { inventoryLabel } from "../../lib/system/services"
@@ -53,7 +54,8 @@ export function UpdatesReport() {
   const [error, setError] = useState<string | null>(null)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(false)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loadProgress, setLoadProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
@@ -167,8 +169,9 @@ export function UpdatesReport() {
   const freshness = params.get("freshness") || "all"
   const deferred = params.get("deferred") || "all"
   const minAge = params.get("minAgeDays") || "0"
-  const activeCount = selectedUpdates.length + selectedCves.length + commaList(params, "states").length +
-    commaList(params, "inventoryStates").length + ["securityOnly", "rebootRequired", "deferred", "minAgeDays", "freshness", "maxAgeHours", "includeArchived"].filter(k => params.has(k)).length
+  const selectionsActive = commaList(params, "inventoryStates").length + (params.has("includeArchived") ? 1 : 0)
+  const reportActive = selectedUpdates.length + selectedCves.length + commaList(params, "states").length +
+    ["securityOnly", "rebootRequired", "deferred", "minAgeDays", "freshness", "maxAgeHours"].filter(k => params.has(k)).length
   const updateLabels = new Map((catalog?.updates || []).map(option => [option.key, updateOptionLabel(option)]))
   const chips = [
     ...selectedUpdates.map(key => ({ key: `u-${key}`, label: updateLabels.get(key) || key.replace(/^(windows|macos):(title:)?/, ""), clear: () => toggleList("updates", key) })),
@@ -202,31 +205,32 @@ export function UpdatesReport() {
               selectedFleets={commaList(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={commaList(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="space-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <ServiceSelectionCloud label="Updates" loading={optionsLoading} selected={selectedUpdates}
-                    options={(catalog?.updates || []).map(option => ({ value: option.key, label: `${updateOptionLabel(option)}${platformFilter === "all" ? ` (${option.platform === "windows" ? "Windows" : "macOS"})` : ""}`, devices: option.pendingDevices + option.installedDevices }))}
-                    onToggle={value => toggleList("updates", value)} onSelect={values => chooseList("updates", values)} />
-                  <ServiceSelectionCloud label="CVEs" loading={optionsLoading} selected={selectedCves}
-                    options={(catalog?.cves || []).map(option => ({ value: option.cve, label: option.cve, devices: option.devices }))}
-                    onToggle={value => toggleList("cves", value)} onSelect={values => chooseList("cves", values)} />
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Counts are devices reporting the update pending or installed. CVEs come from pending Windows updates; macOS does not report CVEs.</p>
-                <div className="flex flex-wrap gap-x-8 gap-y-4">
-                  <Choices label="Update type">
-                    <Choice disabled={pending} active={params.get("securityOnly") === "true"} onClick={() => update({ securityOnly: params.get("securityOnly") === "true" ? null : "true" })}>Security only</Choice>
-                    <Choice disabled={pending} active={params.get("rebootRequired") === "true"} onClick={() => update({ rebootRequired: params.get("rebootRequired") === "true" ? null : "true" })}>Restart required</Choice>
-                  </Choices>
-                  <Choices label="Deferred (macOS)">{([["all", "All"], ["yes", "Deferred"], ["no", "Not deferred"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={deferred === value} onClick={() => update({ deferred: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Pending at least">{[...new Set(["0", "7", "30", "90", minAge])].map(value => <Choice disabled={pending} key={value} active={minAge === value} onClick={() => update({ minAgeDays: value === "0" ? null : value })}>{value === "0" ? "Any age" : `${value} days`}</Choice>)}</Choices>
-                  <Choices label="Update collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                  <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{hoursLabel(value)}</Choice>)}</Choices>
-                  <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={commaList(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
-                  <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
-                </div>
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={commaList(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
+                <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
+              </div>} />
+            <ReportAccordion label="Updates" activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Update type">
+                  <Choice disabled={pending} active={params.get("securityOnly") === "true"} onClick={() => update({ securityOnly: params.get("securityOnly") === "true" ? null : "true" })}>Security only</Choice>
+                  <Choice disabled={pending} active={params.get("rebootRequired") === "true"} onClick={() => update({ rebootRequired: params.get("rebootRequired") === "true" ? null : "true" })}>Restart required</Choice>
+                </Choices>
+                <Choices label="Deferred (macOS)">{([["all", "All"], ["yes", "Deferred"], ["no", "Not deferred"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={deferred === value} onClick={() => update({ deferred: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Pending at least">{[...new Set(["0", "7", "30", "90", minAge])].map(value => <Choice disabled={pending} key={value} active={minAge === value} onClick={() => update({ minAgeDays: value === "0" ? null : value })}>{value === "0" ? "Any age" : `${value} days`}</Choice>)}</Choices>
+                <Choices label="Update collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "24" ? null : value })}>{hoursLabel(value)}</Choice>)}</Choices>
               </div>
-            </DeviceFilters>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <ServiceSelectionCloud label="Updates" loading={optionsLoading} selected={selectedUpdates}
+                  options={(catalog?.updates || []).map(option => ({ value: option.key, label: `${updateOptionLabel(option)}${platformFilter === "all" ? ` (${option.platform === "windows" ? "Windows" : "macOS"})` : ""}`, devices: option.pendingDevices + option.installedDevices }))}
+                  onToggle={value => toggleList("updates", value)} onSelect={values => chooseList("updates", values)} />
+                <ServiceSelectionCloud label="CVEs" loading={optionsLoading} selected={selectedCves}
+                  options={(catalog?.cves || []).map(option => ({ value: option.cve, label: option.cve, devices: option.devices }))}
+                  onToggle={value => toggleList("cves", value)} onSelect={values => chooseList("cves", values)} />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Counts are devices reporting the update pending or installed. CVEs come from pending Windows updates; macOS does not report CVEs.</p>
+            </ReportAccordion>
             {chips.length > 0 && <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-2">
               {chips.map(chip => <button type="button" key={chip.key} onClick={chip.clear} title={`Remove ${chip.label}`} className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs bg-blue-50 text-blue-800 border border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800">{chip.label}<span aria-hidden="true">×</span></button>)}
               <button type="button" onClick={clearAll} className="text-xs text-red-600 dark:text-red-400 hover:underline ml-2">Clear selections</button>

@@ -6,6 +6,7 @@ import { ReportLoading, type LoadCount } from "../ui/LoadingProgress"
 import { useRouter, useSearchParams } from "next/navigation"
 import { usePlatformFilterSafe } from "../../providers/PlatformFilterProvider"
 import DeviceFilters from "../shared/DeviceFilters"
+import { ReportAccordion } from "../system/ReportAccordion"
 import { IdentityViewSwitch } from "./IdentityViewSwitch"
 import { PostureTable } from "./PostureTable"
 import { fetchPostureReport } from "../../lib/identity/posture-request"
@@ -42,7 +43,8 @@ export function PostureReport() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
-  const [expanded, setExpanded] = useState(false)
+  const [selectionsExpanded, setSelectionsExpanded] = useState(false)
+  const [reportExpanded, setReportExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loadProgress, setLoadProgress] = useState<LoadCount | null>(null)
   const searchValue = params.get("search") || ""
@@ -127,6 +129,8 @@ export function PostureReport() {
   const freshness = params.get("freshness") || "all"
   const activeCount = listParam(params, "inventoryStates").length + listParam(params, "rooms").length +
     (params.has("freshness") ? 1 : 0) + (params.has("maxAgeHours") ? 1 : 0) + (params.has("includeArchived") ? 1 : 0)
+  const selectionsActive = listParam(params, "rooms").length + listParam(params, "inventoryStates").length + (params.get("includeArchived") === "true" ? 1 : 0)
+  const reportActive = activeCount - selectionsActive
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
@@ -155,15 +159,18 @@ export function PostureReport() {
               selectedFleets={listParam(params, "fleets")} onFleetToggle={v => toggle("fleets", v)}
               selectedLocations={listParam(params, "locations")} onLocationToggle={v => toggle("locations", v)}
               searchQuery="" onSearchChange={() => {}} onClearAll={clearAll}
-              additionalActiveCount={activeCount} expanded={expanded} onToggle={() => setExpanded(v => !v)}>
-              <div className="flex flex-wrap gap-x-8 gap-y-4 py-3 mb-4 border-b border-gray-200 dark:border-gray-700">
+              additionalActiveCount={selectionsActive} expanded={selectionsExpanded} onToggle={() => setSelectionsExpanded(v => !v)}
+              trailing={<div className="flex flex-wrap gap-x-8 gap-y-4">
                 {options.rooms.length > 0 && <Choices label="Room">{options.rooms.map(value => <Choice disabled={pending} key={value} active={listParam(params, "rooms").includes(value)} onClick={() => toggle("rooms", value)}>{value}</Choice>)}</Choices>}
-                <Choices label="Identity collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
-                <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "168" ? null : value })}>{hoursLabel(value)}</Choice>)}</Choices>
                 <Choices label="Inventory state"><Choice disabled={pending} active={!params.get("inventoryStates")} onClick={() => update({ inventoryStates: null })}>All</Choice>{options.inventoryStates.map(value => <Choice disabled={pending} key={value} active={listParam(params, "inventoryStates").includes(value)} onClick={() => toggle("inventoryStates", value)}>{inventoryLabel(value)}</Choice>)}</Choices>
                 <Choices label="Archive"><Choice disabled={pending} active={params.get("includeArchived") === "true"} onClick={() => update({ includeArchived: params.get("includeArchived") === "true" ? null : "true" })}>Include archived</Choice></Choices>
+              </div>} />
+            <ReportAccordion label="Posture" activeCount={reportActive} expanded={reportExpanded} onToggle={() => setReportExpanded(v => !v)}>
+              <div className="flex flex-wrap gap-x-8 gap-y-4">
+                <Choices label="Identity collection age">{([["all", "All"], ["fresh", "Within maximum age"], ["stale", "Older"], ["unknown", "Unknown"]] as const).map(([value, label]) => <Choice disabled={pending} key={value} active={freshness === value} onClick={() => update({ freshness: value === "all" ? null : value })}>{label}</Choice>)}</Choices>
+                <Choices label="Maximum collection age">{[...new Set(["24", "168", "720", age])].map(value => <Choice disabled={pending} key={value} active={age === value} onClick={() => update({ maxAgeHours: value === "168" ? null : value })}>{hoursLabel(value)}</Choice>)}</Choices>
               </div>
-            </DeviceFilters>
+            </ReportAccordion>
             {error && <div role="alert" className="mx-6 my-4 p-3 text-sm text-red-800 dark:text-red-200 bg-red-50 dark:bg-red-900/20 rounded-lg">{error}<button type="button" className="underline ml-2" onClick={() => setReload(n => n + 1)}>Retry</button></div>}
             <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-start justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3"><span className="text-sm text-gray-600 dark:text-gray-400">{loading ? "Updating report…" : data ? `${rows.length.toLocaleString()} devices` : ""}</span><input type="search" aria-label="Search devices" placeholder="Search devices…" value={deviceSearch} onChange={e => setDeviceSearch(e.target.value)} className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-900 dark:text-white" /></div>
