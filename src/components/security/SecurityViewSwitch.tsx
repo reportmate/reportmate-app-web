@@ -21,7 +21,7 @@ export function SecurityViewSwitch({ current }: { current: SecurityTab }) {
     return qs ? `/security?${qs}` : "/security"
   }
   const items = [
-    { key: "posture", label: "Fleet Security" },
+    { key: "posture", label: "Security" },
     { key: "vulnerabilities", label: "Vulnerabilities" },
     { key: "threats", label: "Threat Detections" },
   ] as const
