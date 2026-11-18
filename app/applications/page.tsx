@@ -476,7 +476,7 @@ function ApplicationsPageContent() {
   const [pendingReport, setPendingReport] = useState<'usage' | 'versions' | null>(null)
   const [linkCopied, setLinkCopied] = useState(false)
 
-  // Hydrate state from URL once on mount. See URL_STATE_CONVENTIONS.md for the
+  // Hydrate state from URL once on mount. See README.md (Shareable application reports) for the
   // param contract. Auto-triggers a report load if `type` is in the URL so deep
   // links like ?type=usage&period=30&apps=Houdini render the report directly.
   useEffect(() => {
