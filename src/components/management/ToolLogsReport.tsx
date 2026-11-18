@@ -4,7 +4,7 @@
  * Fleet Management Tools Logs report, the Logs tab of /management (?tab=logs)
  * (docs/DASHBOARD-WIDGETS.md, revision 6): per tool, common messages and
  * devices with error and warning lines over a 24-hour or 7-day window. Every
- * filter lives in the URL (URL_STATE_CONVENTIONS.md); `platform` belongs to
+ * filter lives in the URL (README.md (Shareable application reports)); `platform` belongs to
  * the global toggle.
  */
 

@@ -79,6 +79,50 @@ pnpm start
 - One fleet report per module: `/applications`, `/hardware`, `/identity`, `/installs`, `/inventory`, `/management`, `/network`, `/peripherals`, `/security` and `/system`
 - Events at `/events` and settings at `/settings`
 
+## Shareable application reports
+
+Application reports hydrate their selected scope from the URL and load automatically when
+`type` is present. Copy the URL after generating the report to share the same selections.
+Recipients need access to the configured ReportMate instance. Reports read the latest stored
+inventory or usage data; freshness depends on device reporting and the selected usage period.
+
+Examples use relative URLs so each deployment supplies its own host:
+
+```text
+/applications?type=versions&apps=Example+App&platform=win
+/applications?type=usage&apps=Example+App&period=30
+/applications?type=versions&apps=Example+App&mode=missing
+```
+
+Implemented `/applications` parameters:
+
+| Parameter | Meaning |
+|---|---|
+| `type` | `versions` or `usage`; triggers report loading after URL hydration. Missing applications use `type=versions&mode=missing`, not `type=missing`. |
+| `apps` | Comma-separated application selections. Prefer names selected in the application picker. |
+| `platform` | `win` or `mac`; omit for both platforms. |
+| `period` | Usage window in days; relevant to usage reports. |
+| `mode` | `missing` for devices without the application; omit for the default installed view. |
+| `usages`, `catalogs`, `locations`, `rooms`, `fleets`, `areas` | Comma-separated inventory scope selections. |
+| `versions` | Comma-separated version selections; app-qualified selections use `App:version`. |
+| `q` | Search state. Report generation can clear it; use `apps` to scope a durable application report. |
+
+Legacy `application`, `usage`, `catalog`, `room` and `search` parameters are accepted during
+hydration; newly shared links should use the parameters above. Values are URL-encoded and
+list values are joined with commas. Defaults are generally omitted. The address bar is
+updated with `history.replaceState`, preserving `platform`, without adding a history entry
+for each filter change.
+
+Application usage drill-downs carry the originating URL in `from`, so their back link can
+restore the report. Parameters differ by page: this table is the applications contract and
+does not imply that every other list supports the same filters or sort parameters.
+
+To verify a shared report, open it in a fresh authenticated tab, confirm the app/platform and
+scope, wait for loading to finish, inspect the device/version results, then refresh and check
+that the report restores. A valid URL or sign-in redirect verifies routing only; it does not
+verify report contents. Do not label a report as a vulnerability assessment merely because
+it lists software versions.
+
 ## Testing & Demo
 
 ### Demo Mode

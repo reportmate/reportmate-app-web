@@ -6,7 +6,7 @@ The web dashboard is ReportMate's browser reader. It shows the fleet, each devic
 
 - [Project setup and environment](../README.md)
 - [Example environment settings](../.env.example)
-- [URL-as-state conventions](../URL_STATE_CONVENTIONS.md)
+- [Shareable application reports](../README.md#shareable-application-reports)
 - [Modular data processing](../MODULAR_MIGRATION.md)
 - [Continuous integration](../.github/workflows/ci.yml)
 
