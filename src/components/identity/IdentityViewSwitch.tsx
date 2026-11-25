@@ -5,9 +5,9 @@ import { useSearchParams } from "next/navigation"
 
 /**
  * The Identity report's header: the title is itself the switch between its
- * tabs. /identity and /identity?tab=posture; the global `platform` carries across.
+ * tabs. The global `platform` carries across.
  */
-export function IdentityViewSwitch({ current }: { current: "users" | "posture" }) {
+export function IdentityViewSwitch({ current }: { current: "users" | "posture" | "admins" }) {
   const searchParams = useSearchParams()
   const platform = searchParams?.get("platform")
   const withPlatform = (query: string) => {
@@ -19,6 +19,7 @@ export function IdentityViewSwitch({ current }: { current: "users" | "posture" }
   const items = [
     { key: "users", label: "Identity & Users", href: withPlatform("") },
     { key: "posture", label: "Sign-in & Recovery Posture", href: withPlatform("tab=posture") },
+    { key: "admins", label: "Admins Report", href: withPlatform("tab=admins") },
   ] as const
   return (
     <nav aria-label="Identity tabs" className="inline-flex flex-wrap rounded-lg border border-gray-300 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-900">
