@@ -19,6 +19,8 @@ import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import { csvCell } from "@/src/lib/csv"
 import { IdentityViewSwitch } from "@/src/components/identity/IdentityViewSwitch"
+import { CopyLinkButton } from "@/src/components/security/ReportParts"
+import { adminAssignments, adminAge, adminWidgetCounts } from "@/src/lib/identity/admins"
 import { PostureReport } from "@/src/components/identity/PostureReport"
 
 const IDENTITY_URL = '/api/v1/identity'
@@ -53,6 +55,7 @@ interface IdentityDevice {
   ldapBound?: boolean
   users?: { username: string; realName?: string; isAdmin?: boolean; lastLogon?: string }[]
   adminUsernames?: string[]
+  adminAccounts?: { username: string; creationTime?: string | null }[]
   loggedInUsernames?: string[]
   // Enrollment type (migrated from Management - Identity is authoritative)
   enrollmentType?: string
@@ -156,11 +159,13 @@ function IdentityPageContent() {
   const [retrying, setRetrying] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
   const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>(() => peekCached<IdentityDevice[]>(IDENTITY_URL) ?? [])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   // `admins=extra` deep-links to the existing "more than one admin" filter;
   // `admins=2|3|4+` to an exact admin count (4+ is four or more).
   const [adminFilter, setAdminFilter] = useState<string>(() => {
+    if (searchParams.get('admins') === '0') return 'no-admins'
     const admins = adminsFromParam(searchParams.get('admins'))
     return admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all'
   })
@@ -180,8 +185,7 @@ function IdentityPageContent() {
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
   const [showUtilizationReport, setShowUtilizationReport] = useState(false)
-  // Local Admins report mode (flat admin x device view)
-  const [showAdminsReport, setShowAdminsReport] = useState(false)
+  const showAdminsReport = searchParams.get('tab') === 'admins'
   // Widget click filters
   // `directory=cloud|domain|trusted|unconfirmed|broken|standard|unjoined`: the
   // Directory Services widget's classes, the dashboard card's links.
@@ -224,10 +228,10 @@ function IdentityPageContent() {
       return next
     })
   }
-  const hasActiveWidgetFilter = adminFilter !== 'all' || joinFilter.length > 0 || macDirectoryFilter.length > 0 || directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
+  const hasActiveWidgetFilter = adminFilter !== 'all' || joinFilter.length > 0 || macDirectoryFilter.length > 0 || directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || secureTokenFilter !== null || bootstrapTokenFilter !== null
   const clearWidgetFilters = () => {
     setAdminFilter('all'); setJoinFilter([]); setMacDirectoryFilter([])
-    setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null); setShowAdminsReport(false)
+    setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null)
     setSecureTokenFilter(null); setBootstrapTokenFilter(null)
   }
   const matchesAdminFilter = (d: IdentityDevice, name: string) =>
@@ -270,6 +274,7 @@ function IdentityPageContent() {
         const data = await response.json()
         setIdentityDevices(rememberCached(IDENTITY_URL, data))
         setRefreshError(null)
+        setError(null)
       } catch (err) {
         console.error('Error fetching identity:', err)
         // Keep the last rows on screen when a background refresh fails.
@@ -317,7 +322,7 @@ function IdentityPageContent() {
       if (value) params.set(key, value)
       else params.delete(key)
     }
-    set('admins', adminFilter === 'multiple-admins' ? 'extra' : adminCount)
+    set('admins', adminFilter === 'multiple-admins' ? 'extra' : adminFilter === 'no-admins' ? '0' : adminCount)
     set('join', joinFilter.length > 0 ? JOIN_TYPES.filter(j => joinFilter.includes(j)).join(',') : null)
     set('directory', macDirectoryFilter.length > 0 ? macDirectoryFilter.join(',') : directoryServiceToParam(directoryFilter))
     set('auth', authToParam(authFilter))
@@ -352,7 +357,7 @@ function IdentityPageContent() {
     lastAppliedQuery.current = currentQuery
     if (ownUrlWrites.current.delete(currentQuery)) return
     const admins = adminsFromParam(searchParams.get('admins'))
-    setAdminFilter(admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all')
+    setAdminFilter(searchParams.get('admins') === '0' ? 'no-admins' : admins === 'extra' ? 'multiple-admins' : admins ? `count:${admins}` : 'all')
     setJoinFilter(paramList(searchParams.get('join')).map(v => v.toLowerCase()).filter((v): v is JoinType => (JOIN_TYPES as string[]).includes(v)))
     setMacDirectoryFilter(directoryFromParam(searchParams.get('directory')))
     setDirectoryFilter(directoryServiceFromParam(searchParams.get('directory')))
@@ -417,7 +422,7 @@ function IdentityPageContent() {
     // Widget click: auth filter
     if (authFilter && !matchesAuth(d, authFilter)) return false
     
-    if (searchQuery.trim()) {
+    if (!showAdminsReport && searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
         d.deviceName?.toLowerCase().includes(query) ||
@@ -473,6 +478,9 @@ function IdentityPageContent() {
   // Calculate summary stats
   const totalLoggedIn = filteredDevices.reduce((sum, d) => sum + d.currentlyLoggedIn, 0)
 
+  const adminRows = showAdminsReport ? adminAssignments(filteredDevices, adminAccountFilter, searchQuery) : []
+  const adminWidgets = showAdminsReport ? adminWidgetCounts(widgetDevices) : []
+
   // Calculate identity widget stats (from selection-filtered set)
   const identityStats = {
     // adminNames is keyed by canonical (lowercase) username so that the same
@@ -519,6 +527,7 @@ function IdentityPageContent() {
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
         <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
         <div className="page-container px-4 py-8">
+          <div className="mb-4"><IdentityViewSwitch current={showAdminsReport ? "admins" : "users"} /></div>
           <LoadingSkeleton />
         </div>
       </div>
@@ -541,9 +550,9 @@ function IdentityPageContent() {
                     </svg>
                   </div>
                   <div>
-                    <IdentityViewSwitch current="users" />
+                    <IdentityViewSwitch current={showAdminsReport ? "admins" : "users"} />
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                      User accounts, sessions, and identity management across {filteredDevices.length} devices
+                      {showAdminsReport ? "Local administrator accounts reported by devices" : `User accounts, sessions, and identity management across ${filteredDevices.length} devices`}
                     </p>
                     <RefreshErrorBanner
                       error={refreshError}
@@ -556,48 +565,8 @@ function IdentityPageContent() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-3">
-                {/* Local Admins Report toggle (acts as a filter; active state = solid fill) */}
-                <button
-                  onClick={() => setShowAdminsReport(!showAdminsReport)}
-                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
-                    showAdminsReport
-                      ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-500 dark:bg-indigo-600'
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                  title="Flat per-(admin, device) report for security review"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  Admins Report
-                </button>
-
-                {/* No Admin Users toggle - only shown while the Admins Report is
-                    active (it's a security-review pivot: "which devices have no
-                    managed admin"). Activating switches back to the device list
-                    since the per-admin report has no rows for zero-admin devices. */}
-                {showAdminsReport && (
-                <button
-                  onClick={() => {
-                    const turningOn = adminFilter !== 'no-admins'
-                    setAdminFilter(turningOn ? 'no-admins' : 'all')
-                    if (turningOn) setShowAdminsReport(false)
-                  }}
-                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
-                    adminFilter === 'no-admins'
-                      ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  No Admin Users
-                </button>
-                )}
-
                 {/* Generate Utilization Report */}
-                {platformFilteredDevices.some(d => d.sessionSummary && d.sessionSummary.totalSessions > 0) && (
+                {!showAdminsReport && platformFilteredDevices.some(d => d.sessionSummary && d.sessionSummary.totalSessions > 0) && (
                   <button
                     onClick={() => setShowUtilizationReport(!showUtilizationReport)}
                     className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
@@ -614,30 +583,31 @@ function IdentityPageContent() {
                   </button>
                 )}
 
-                {/* Export CSV */}
+                {showAdminsReport && <CopyLinkButton platformFilter={globalPlatformFilter ?? "all"} onError={setLinkError} />}
+                {showAdminsReport && <Link
+                  href={`/identity?${new URLSearchParams({
+                    ...Object.fromEntries(Array.from(searchParams.entries()).filter(([key]) => key !== 'tab' && key !== 'admin')),
+                    admins: '0',
+                  })}`}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600"
+                >No Admin Users</Link>}
                 <ExportCsvButton onClick={() => {
-                    const headers = ['Device Name', 'Serial Number', 'Platform', 'Total Users', 'Admin Users', 'Currently Logged In', 'Last Seen']
-                    const rows = filteredDevices.map(d => [
-                      d.deviceName || '',
-                      d.serialNumber || '',
-                      d.platform || '',
-                      d.totalUsers || 0,
-                      d.adminUsers || 0,
-                      d.currentlyLoggedIn || 0,
-                      d.lastSeen || ''
-                    ].map(csvCell).join(','))
-                  
-                    const csv = [headers.join(','), ...rows].join('\n')
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                    const url = URL.createObjectURL(blob)
-                    const link = document.createElement('a')
-                    link.href = url
-                    link.download = `identity-report-${new Date().toISOString().split('T')[0]}.csv`
-                    document.body.appendChild(link)
-                    link.click()
-                    document.body.removeChild(link)
-                    URL.revokeObjectURL(url)
-                  }} />
+                  const headers = showAdminsReport
+                    ? ['Admin Account', 'Device Name', 'Serial Number', 'Platform', 'Account Created', 'Last Seen']
+                    : ['Device Name', 'Serial Number', 'Platform', 'Total Users', 'Admin Users', 'Currently Logged In', 'Last Seen']
+                  const rows = showAdminsReport
+                    ? adminRows.map(({ admin, device, creationTime }) => [admin, device.deviceName, device.serialNumber, device.platform, creationTime || '', device.lastSeen || ''])
+                    : filteredDevices.map(d => [d.deviceName || '', d.serialNumber || '', d.platform || '', d.totalUsers || 0, d.adminUsers || 0, d.currentlyLoggedIn || 0, d.lastSeen || ''])
+                  const csv = [headers.join(','), ...rows.map(row => row.map(csvCell).join(','))].join('\n')
+                  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.download = `${showAdminsReport ? 'local-admins' : 'identity-report'}-${new Date().toISOString().split('T')[0]}.csv`
+                  document.body.appendChild(link)
+                  link.click()
+                  link.remove()
+                  URL.revokeObjectURL(url)
+                }} />
 
                 {/* Search */}
                 <div className="relative max-w-md">
@@ -654,13 +624,21 @@ function IdentityPageContent() {
                     className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                <div className="text-center text-sm pl-3">
+                {!showAdminsReport && <div className="text-center text-sm pl-3">
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalLoggedIn}</div>
                   <div className="text-gray-500 dark:text-gray-400">Logged In</div>
-                </div>
+                </div>}
               </div>
             </div>
           </div>
+
+          {linkError && <p role="alert" className="px-6 py-2 text-sm text-red-700 dark:text-red-300">{linkError}</p>}
+          {error && <div role="alert" className="flex gap-3 px-6 py-2 text-sm text-red-700 dark:text-red-300">
+            <span>Identity data could not be loaded. {error}</span>
+            <button type="button" className="underline" disabled={retrying}
+              onClick={() => { setRetrying(true); setReloadKey(k => k + 1) }}
+            >{retrying ? 'Retrying…' : 'Retry'}</button>
+          </div>}
 
           {/* Yellow Clear Filters Bar */}
           {hasActiveWidgetFilter && (
@@ -678,7 +656,6 @@ function IdentityPageContent() {
                     directoryFilter,
                     authFilter,
                     adminAccountFilter ? `Admin: ${adminAccountFilter}` : null,
-                    showAdminsReport ? 'Admins Report' : null,
                     secureTokenFilter === 'with-token' ? 'SecureToken: holders' : secureTokenFilter === 'missing-token' ? 'SecureToken: missing' : null,
                     bootstrapTokenFilter === 'escrowed' ? 'Bootstrap: escrowed' : bootstrapTokenFilter === 'not-escrowed' ? 'Bootstrap: not escrowed' : null,
                   ].filter(Boolean).join(', ')}
@@ -750,6 +727,33 @@ function IdentityPageContent() {
             <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="px-6 py-6 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {showAdminsReport ? adminWidgets.map(widget => {
+                    const maxCount = Math.max(1, ...widget.entries.map(entry => entry.count))
+                    return (
+                      <div key={widget.title} className="rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                        <h3 className="text-lg font-medium mb-4">{widget.title}</h3>
+                        <div className="space-y-3 max-h-48 overflow-auto pr-1">
+                          {widget.entries.length === 0 && <p className="text-sm text-gray-500">No admin accounts found</p>}
+                          {widget.entries.map(({ label, count }) => (
+                            <div key={label}>
+                              <div className="flex justify-between gap-3 text-sm">
+                                {widget.byName ? (
+                                  <button type="button" aria-pressed={adminAccountFilter?.toLowerCase() === label.toLowerCase()}
+                                    className="text-left hover:underline aria-pressed:font-semibold"
+                                    onClick={() => setAdminAccountFilter(adminAccountFilter?.toLowerCase() === label.toLowerCase() ? null : label)}
+                                  >{label}</button>
+                                ) : <span>{label}</span>}
+                                <span className="tabular-nums">{count.toLocaleString()}</span>
+                              </div>
+                              <div aria-hidden="true" className="mt-1 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700">
+                                <div className="h-full rounded-full bg-indigo-500 dark:bg-indigo-400" style={{ width: `${100 * count / maxCount}%` }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  }) : <>
                   {/* Widget 1: Directory Services Donut with Expandable Legend */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Directory Services</h3>
@@ -1066,6 +1070,7 @@ function IdentityPageContent() {
                       </div>
                     </div>
                   </div>
+                  </>}
                 </div>
               </div>
             </CollapsibleSection>
@@ -1073,59 +1078,18 @@ function IdentityPageContent() {
 
           <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             {showAdminsReport ? (
-              /* Local Admins Report View — flat per-(admin,device) listing for security review */
               (() => {
-                type AdminRow = { admin: string; device: IdentityDevice }
-                const rows: AdminRow[] = []
-                const adminFilterLc = adminAccountFilter?.toLowerCase() || null
-                for (const d of filteredDevices) {
-                  for (const a of (d.adminUsernames || [])) {
-                    // When an admin filter is active, only emit rows for that
-                    // exact admin — otherwise the report shows every admin on
-                    // every matched device, which buries the account the user
-                    // was actually hunting for.
-                    if (adminFilterLc && a.toLowerCase() !== adminFilterLc) continue
-                    rows.push({ admin: a, device: d })
-                  }
-                }
-                rows.sort((a, b) => {
-                  const c = a.admin.toLowerCase().localeCompare(b.admin.toLowerCase())
-                  if (c !== 0) return c
-                  return (a.device.deviceName || '').toLowerCase().localeCompare((b.device.deviceName || '').toLowerCase())
-                })
-
-                const exportCsv = () => {
-                  const headers = ['Admin Account', 'Device Name', 'Serial Number', 'Platform', 'Last Seen']
-                  const csvRows = rows.map(r => [
-                    r.admin,
-                    r.device.deviceName || '',
-                    r.device.serialNumber || '',
-                    r.device.platform || '',
-                    r.device.lastSeen || '',
-                  ].map(csvCell).join(','))
-                  const csv = [headers.join(','), ...csvRows].join('\n')
-                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                  const url = URL.createObjectURL(blob)
-                  const link = document.createElement('a')
-                  link.href = url
-                  link.download = `local-admins-${new Date().toISOString().split('T')[0]}.csv`
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                  URL.revokeObjectURL(url)
-                }
-
+                const rows = adminRows
                 return (
                   <div className="p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Local Administrators Report</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {rows.length.toLocaleString()} admin assignments across {filteredDevices.length.toLocaleString()} devices.
+                          {rows.length.toLocaleString()} admin assignments across {new Set(rows.map(row => row.device.serialNumber)).size.toLocaleString()} devices.
                           {adminAccountFilter && <span className="ml-2 text-yellow-700 dark:text-yellow-300">Filtered to: <code>{adminAccountFilter}</code></span>}
                         </p>
                       </div>
-                      <ExportCsvButton onClick={exportCsv} />
                     </div>
 
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -1134,13 +1098,14 @@ function IdentityPageContent() {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Admin Account</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Platform</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Account Age</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {rows.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                            <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
                               No local admin accounts found.
                             </td>
                           </tr>
@@ -1168,6 +1133,7 @@ function IdentityPageContent() {
                                 </Link>
                               </td>
                               <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{r.device.platform}</td>
+                              <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{adminAge(r.creationTime)}</td>
                               <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{r.device.lastSeen ? formatRelativeTime(r.device.lastSeen) : '-'}</td>
                             </tr>
                           )
@@ -1513,7 +1479,8 @@ function IdentityPageContent() {
 
 function IdentityTabs() {
   const searchParams = useSearchParams()
-  return searchParams.get('tab') === 'posture' ? <PostureReport /> : <IdentityPageContent />
+  const tab = searchParams.get('tab')
+  return tab === 'posture' ? <PostureReport /> : <IdentityPageContent key={tab === 'admins' ? 'admins' : 'users'} />
 }
 
 export default function IdentityPage() {

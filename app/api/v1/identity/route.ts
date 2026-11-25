@@ -118,6 +118,7 @@ export async function GET(request: Request) {
 
           // Full list of admin usernames on this device (not capped at 5)
           adminUsernames: Array.isArray(item.adminUsernames) ? item.adminUsernames : [],
+          adminAccounts: Array.isArray(item.adminAccounts) ? item.adminAccounts : [],
 
           loggedInUsernames: item.loggedInUsernames || [],
 
