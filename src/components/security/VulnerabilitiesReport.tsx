@@ -23,7 +23,7 @@ import {
   vulnerabilityHref, vulnerabilityView,
   type Coverage, type CveSummary, type PagedReport, type SummaryReport, type VulnerabilityCatalog, type VulnerabilityRow,
 } from "../../lib/security/vulnerabilities"
-import { SecurityViewSwitch } from "./SecurityViewSwitch"
+import { SecurityViewSwitch, VulnerabilitiesViewSwitch } from "./SecurityViewSwitch"
 import { Choice, Choices, CopyLinkButton, ExportButton, NotReported, RefreshButton, SortHeader, When } from "./ReportParts"
 
 const TAB = "vulnerabilities"
@@ -175,6 +175,7 @@ export function VulnerabilitiesReport() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-start justify-between gap-3">
             <div>
               <SecurityViewSwitch current="vulnerabilities" />
+              <div><VulnerabilitiesViewSwitch /></div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">CVEs collected on each device: Windows security updates and macOS unpatched CVEs.</p>
             </div>
             <div className="flex flex-wrap items-start gap-3">

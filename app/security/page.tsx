@@ -32,7 +32,7 @@ import { SkeletonTimeout } from "@/src/components/ui/SkeletonTimeout"
 import { PageFrameSkeleton } from "@/src/components/ui/PageFrameSkeleton"
 import { ExportCsvButton } from "@/src/components/ui/ExportCsvButton"
 import { csvCell } from "@/src/lib/csv"
-import { SecurityViewSwitch } from "@/src/components/security/SecurityViewSwitch"
+import { isPostureReport, SECURITY_REPORTS, securityHref, SecurityViewSwitch, type PostureReport, type SecurityTab } from "@/src/components/security/SecurityViewSwitch"
 import { VulnerabilitiesReport } from "@/src/components/security/VulnerabilitiesReport"
 import { ThreatsReport } from "@/src/components/security/ThreatsReport"
 
@@ -307,13 +307,15 @@ function MiniDonut({
   colors, 
   title, 
   onFilter, 
-  activeFilter 
+  activeFilter,
+  href,
 }: { 
   data: { label: string; value: number }[]
   colors: Record<string, string>
   title: string
   onFilter?: (label: string) => void
   activeFilter?: string
+  href?: string
 }) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   let cumulativePercent = 0
@@ -322,7 +324,7 @@ function MiniDonut({
 
   return (
     <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">{title}</h4>
+      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">{href ? <Link href={href} className="hover:underline focus-visible:underline">{title}</Link> : title}</h4>
       {total === 0 ? (
         <p className="text-xs text-gray-400 dark:text-gray-500 py-2">No data</p>
       ) : (
@@ -408,7 +410,7 @@ function SortHeader({ label, column, sortColumn, sortDirection, onSort }: {
 
 // ============ MAIN CONTENT ============
 
-function SecurityPageContent() {
+function SecurityPageContent({ report }: { report?: PostureReport }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -454,7 +456,7 @@ function SecurityPageContent() {
   // Accordion
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
-  const [certSearchExpanded, setCertSearchExpanded] = useState(!!(initialUrl.certSearch || initialUrl.certStatus !== 'all'))
+  const [certSearchExpanded, setCertSearchExpanded] = useState(report === 'certificates' || !!(initialUrl.certSearch || initialUrl.certStatus !== 'all'))
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -719,7 +721,10 @@ function SecurityPageContent() {
     return (d.sipEnabled === true || d.secureBootEnabled) ? 'Secured' : 'Insecure'
   }
 
+  const reportsProtection = (d: SecurityDevice) => isWin(d) || d.antivirusEnabled || Boolean(d.antivirusName?.trim())
+
   const getProtectionLabel = (d: SecurityDevice): string => {
+    if (report === 'protection' && !reportsProtection(d)) return 'Not reported'
     if (d.antivirusEnabled && d.antivirusUpToDate) return 'Current'
     if (d.antivirusEnabled) return 'Out of Date'
     return 'Disabled'
@@ -858,7 +863,10 @@ function SecurityPageContent() {
       case 'device': av = a.deviceName?.toLowerCase() || ''; bv = b.deviceName?.toLowerCase() || ''; break
       case 'encryption': av = a.encryptionEnabled ? '1' : '0'; bv = b.encryptionEnabled ? '1' : '0'; break
       case 'protection': av = getProtectionLabel(a); bv = getProtectionLabel(b); break
-      case 'detection': av = String(a.detectionCount ?? 0).padStart(5, '0'); bv = String(b.detectionCount ?? 0).padStart(5, '0'); break
+      case 'detection': {
+        const count = (d: SecurityDevice) => report === 'detection' ? securityThreats(d as unknown as Row) : (d.detectionCount ?? 0)
+        return sortDirection === 'asc' ? count(a) - count(b) : count(b) - count(a)
+      }
       case 'firewall': av = a.firewallEnabled ? '1' : '0'; bv = b.firewallEnabled ? '1' : '0'; break
       case 'tampering': av = getTamperLabel(a); bv = getTamperLabel(b); break
       case 'remote': av = getRemoteLabel(a); bv = getRemoteLabel(b); break
@@ -868,10 +876,53 @@ function SecurityPageContent() {
     return sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
   })
 
+  const visible = (key: PostureReport | 'vulnerabilities') => !report || report === key
+  const focusLabel = report ? SECURITY_REPORTS[report] : null
+  const extraColumns: Record<PostureReport, [string, (device: SecurityDevice) => string | number | undefined][]> = {
+    encryption: [['Technology', d => isWin(d) ? 'BitLocker' : 'FileVault']],
+    protection: [
+      ['Product', d => d.antivirusName || undefined],
+      ['Version', d => d.antivirusVersion],
+      ['Last scan', d => d.antivirusLastScan],
+    ],
+    detection: [
+      ['Active threats', d => securityThreats(d as unknown as Row)],
+      ['Blocked (30 days)', d => d.detectionsBlocked30d],
+      ['Cleaned (30 days)', d => d.detectionsCleaned30d],
+      ['Last detection', d => d.lastThreatDetectedAt],
+    ],
+    firewall: [],
+    tampering: [
+      ['Secure Boot', d => d.secureBootEnabled ? 'On' : 'Off'],
+      ['SIP', d => isWin(d) ? 'Not applicable' : d.sipEnabled === undefined ? undefined : d.sipEnabled ? 'On' : 'Off'],
+      ['TPM', d => isWin(d) ? (d.tpmPresent && d.tpmEnabled ? 'On' : 'Off') : 'Not applicable'],
+      ['Firmware password', d => d.firmwarePassword?.statusDisplay],
+    ],
+    access: [['SSH configuration', d => d.secureShell?.statusDisplay]],
+    certificates: [
+      ['Reported certificates', d => d.certificateCount],
+      ['Expired', d => getExpiredCertCount(d)],
+      ['Expiring soon', d => d.expiringSoonCertCount],
+    ],
+  }
+  const details = report ? extraColumns[report] : []
+  const tableDetails = report === "tampering" || report === "encryption" ? [] : details
+  const reportHref = (tab: SecurityTab) => securityHref(tab, searchParams.get('platform'))
+
   // ============ CSV EXPORT ============
 
   const exportCSV = () => {
     const esc = csvCell
+    if (report) {
+      const status = {
+        encryption: getEncryptionLabel, protection: getProtectionLabel, detection: getDetectionLabel,
+        firewall: getFirewallLabel, tampering: getTamperLabel, access: getRemoteLabel, certificates: getCertLabel,
+      }[report]
+      const headers = ['Device Name', 'Serial Number', 'Platform', focusLabel, ...details.map(([label]) => label)]
+      const rows = filteredDevices.map(d => [d.deviceName, d.serialNumber, normalizePlatform(d.platform), status(d), ...details.map(([, read]) => read(d))])
+      downloadReport([headers, ...rows].map(row => row.map(esc).join(',')).join('\n'), `security-${report}`)
+      return
+    }
     const headers = ['Device Name','Serial Number','Platform','Encryption','Protection Name','Protection Status','Detections','Tampering','Firewall','Access','Expired Certs','Expiring Certs','Vulnerabilities','Critical Vulnerabilities']
     const rows = filteredDevices.map(d => [
       esc(d.deviceName), esc(d.serialNumber), esc(normalizePlatform(d.platform)),
@@ -892,11 +943,14 @@ function SecurityPageContent() {
       esc(getExpiredCertCount(d)), esc(d.expiringSoonCertCount),
       esc(d.cveCount), esc(d.criticalCveCount),
     ].join(','))
-    const csv = [headers.join(','), ...rows].join('\n')
+    downloadReport([headers.join(','), ...rows].join('\n'), 'security-report')
+  }
+
+  function downloadReport(csv: string, name: string) {
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `security-report-${new Date().toISOString().slice(0, 10)}.csv`
+    a.href = url; a.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click(); URL.revokeObjectURL(url)
   }
 
@@ -937,11 +991,11 @@ function SecurityPageContent() {
 
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <SecurityViewSwitch current="posture" />
+                <SecurityViewSwitch current={report ?? "posture"} />
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Security posture across {filteredDevices.length} device{filteredDevices.length !== 1 ? 's' : ''}
+                  {focusLabel ?? 'Security posture'} across {filteredDevices.length} device{filteredDevices.length !== 1 ? 's' : ''}
                 </p>
                 <RefreshErrorBanner
                   error={refreshError}
@@ -1041,22 +1095,22 @@ function SecurityPageContent() {
             </button>
             <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <MiniDonut title="Encryption" data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setEncryptionFilter} activeFilter={encryptionFilter} />
-                  <MiniDonut title="Protection" data={Object.entries(protectionCounts).map(([label, value]) => ({ label, value }))} colors={protColors} onFilter={setProtectionFilter} activeFilter={protectionFilter} />
-                  <MiniDonut title="Detection" data={Object.entries(detectionCounts).map(([label, value]) => ({ label, value }))} colors={detectionColors} onFilter={setDetectionFilter} activeFilter={detectionFilter} />
-                  <MiniDonut title="Firewall" data={Object.entries(firewallCounts).map(([label, value]) => ({ label, value }))} colors={firewallColors} onFilter={setFirewallFilter} activeFilter={firewallFilter} />
-                  <MiniDonut title="Tampering" data={Object.entries(tamperingCounts).map(([label, value]) => ({ label, value }))} colors={tamperingColors} onFilter={setTamperingFilter} activeFilter={tamperingFilter} />
-                  <MiniDonut title="Access" data={Object.entries(remoteCounts).map(([label, value]) => ({ label, value }))} colors={remoteColors} onFilter={setRemoteFilter} activeFilter={remoteFilter} />
-                  <MiniDonut title="Certificates" data={Object.entries(certCounts).map(([label, value]) => ({ label, value }))} colors={certColors} onFilter={setCertFilter} activeFilter={certFilter} />
-                  <MiniDonut title="Vulnerabilities" data={Object.entries(cveCounts).map(([label, value]) => ({ label, value }))} colors={cveColors} onFilter={setCveFilter} activeFilter={cveFilter} />
+                <div className={report ? "max-w-sm" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"}>
+                  {visible("encryption") && <MiniDonut title="Encryption" href={report ? undefined : reportHref("encryption")} data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setEncryptionFilter} activeFilter={encryptionFilter} />}
+                  {visible("protection") && <MiniDonut title="Protection" href={report ? undefined : reportHref("protection")} data={Object.entries(protectionCounts).map(([label, value]) => ({ label, value }))} colors={protColors} onFilter={setProtectionFilter} activeFilter={protectionFilter} />}
+                  {visible("detection") && <MiniDonut title="Detection" href={report ? undefined : reportHref("detection")} data={Object.entries(detectionCounts).map(([label, value]) => ({ label, value }))} colors={detectionColors} onFilter={setDetectionFilter} activeFilter={detectionFilter} />}
+                  {visible("firewall") && <MiniDonut title="Firewall" href={report ? undefined : reportHref("firewall")} data={Object.entries(firewallCounts).map(([label, value]) => ({ label, value }))} colors={firewallColors} onFilter={setFirewallFilter} activeFilter={firewallFilter} />}
+                  {visible("tampering") && <MiniDonut title="Tampering" href={report ? undefined : reportHref("tampering")} data={Object.entries(tamperingCounts).map(([label, value]) => ({ label, value }))} colors={tamperingColors} onFilter={setTamperingFilter} activeFilter={tamperingFilter} />}
+                  {visible("access") && <MiniDonut title="Access" href={report ? undefined : reportHref("access")} data={Object.entries(remoteCounts).map(([label, value]) => ({ label, value }))} colors={remoteColors} onFilter={setRemoteFilter} activeFilter={remoteFilter} />}
+                  {visible("certificates") && <MiniDonut title="Certificates" href={report ? undefined : reportHref("certificates")} data={Object.entries(certCounts).map(([label, value]) => ({ label, value }))} colors={certColors} onFilter={setCertFilter} activeFilter={certFilter} />}
+                  {visible("vulnerabilities") && <MiniDonut title="Vulnerabilities" href={report ? undefined : reportHref("vulnerabilities")} data={Object.entries(cveCounts).map(([label, value]) => ({ label, value }))} colors={cveColors} onFilter={setCveFilter} activeFilter={cveFilter} />}
                 </div>
               </div>
             </CollapsibleSection>
           </div>
 
           {/* Certificate Search Accordion */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
+          {visible("certificates") && <div className="border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setCertSearchExpanded(!certSearchExpanded)}
               className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -1245,7 +1299,7 @@ function SecurityPageContent() {
                 )}
               </div>
             </CollapsibleSection>
-          </div>
+          </div>}
 
           {/* Table */}
           <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
@@ -1253,20 +1307,21 @@ function SecurityPageContent() {
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <SortHeader label="Device" column="device" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Encryption" column="encryption" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Protection" column="protection" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Detection" column="detection" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Tampering" column="tampering" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Firewall" column="firewall" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Access" column="remote" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Certs" column="certificates" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
-                  <SortHeader label="Vulnerabilities" column="cve" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                  {visible("encryption") && <SortHeader label="Encryption" column="encryption" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("protection") && <SortHeader label="Protection" column="protection" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("detection") && <SortHeader label="Detection" column="detection" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("tampering") && <SortHeader label="Tampering" column="tampering" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("firewall") && <SortHeader label="Firewall" column="firewall" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("access") && <SortHeader label="Access" column="remote" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("certificates") && <SortHeader label="Certs" column="certificates" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {visible("vulnerabilities") && <SortHeader label="Vulnerabilities" column="cve" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />}
+                  {tableDetails.map(([label]) => <th key={label} scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-300">{label}</th>)}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={report ? 2 + tableDetails.length : 9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1283,7 +1338,7 @@ function SecurityPageContent() {
                   </tr>
                 ) : filteredDevices.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={report ? 2 + tableDetails.length : 9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1309,30 +1364,30 @@ function SecurityPageContent() {
                           </Link>
                         </td>
                         {/* Encryption */}
-                        <td className="px-3 py-3">
+                        {visible("encryption") && <td className="px-3 py-3">
                           <Badge className={d.encryptionEnabled ? greenBadge : redBadge}>
                             {win ? 'BitLocker' : 'FileVault'} {d.encryptionEnabled ? 'On' : 'Off'}
                           </Badge>
-                        </td>
+                        </td>}
                         {/* Protection */}
-                        <td className="px-3 py-3">
-                          <Badge className={d.antivirusEnabled && d.antivirusUpToDate ? greenBadge : d.antivirusEnabled ? amberBadge : redBadge}>
-                            {d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Outdated') : 'Disabled'}
+                        {visible("protection") && <td className="px-3 py-3">
+                          <Badge className={report === 'protection' && !reportsProtection(d) ? grayBadge : d.antivirusEnabled && d.antivirusUpToDate ? greenBadge : d.antivirusEnabled ? amberBadge : redBadge}>
+                            {report === 'protection' ? getProtectionLabel(d) : d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Outdated') : 'Disabled'}
                           </Badge>
-                        </td>
+                        </td>}
                         {/* Detection */}
-                        <td className="px-3 py-3">
+                        {visible("detection") && <td className="px-3 py-3">
                           {(() => {
-                            const count = d.detectionCount ?? 0
+                            const count = report ? securityThreats(d as unknown as Row) : (d.detectionCount ?? 0)
                             return (
                               <Badge className={count === 0 ? greenBadge : redBadge}>
                                 {count === 0 ? 'Clean' : `${count} threat${count !== 1 ? 's' : ''}`}
                               </Badge>
                             )
                           })()}
-                        </td>
+                        </td>}
                         {/* Tampering */}
-                        <td className="px-3 py-3">
+                        {visible("tampering") && <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-1">
                             {win ? (
                               <>
@@ -1366,15 +1421,15 @@ function SecurityPageContent() {
                               )
                             })()}
                           </div>
-                        </td>
+                        </td>}
                         {/* Firewall */}
-                        <td className="px-3 py-3">
+                        {visible("firewall") && <td className="px-3 py-3">
                           <Badge className={grayBadge}>
                             {d.firewallEnabled ? 'On' : 'Off'}
                           </Badge>
-                        </td>
+                        </td>}
                         {/* Access */}
-                        <td className="px-3 py-3">
+                        {visible("access") && <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-1">
                             {d.secureShell?.isServiceRunning && (
                               <Badge className={grayBadge}>SSH</Badge>
@@ -1386,9 +1441,9 @@ function SecurityPageContent() {
                               <span className="text-xs text-gray-400">None</span>
                             )}
                           </div>
-                        </td>
+                        </td>}
                         {/* Certificates */}
-                        <td className="px-3 py-3">
+                        {visible("certificates") && <td className="px-3 py-3">
                           <div className="flex items-center gap-1">
                             {getExpiredCertCount(d) > 0 && (
                               <Badge className={redBadge}>{getExpiredCertCount(d)}</Badge>
@@ -1400,9 +1455,9 @@ function SecurityPageContent() {
                               <span className="text-xs text-green-600 dark:text-green-400">OK</span>
                             )}
                           </div>
-                        </td>
+                        </td>}
                         {/* Vulnerabilities */}
-                        <td className="px-3 py-3">
+                        {visible("vulnerabilities") && <td className="px-3 py-3">
                           {d.cveCount > 0 ? (
                             <div className="flex items-center gap-1">
                               {d.criticalCveCount > 0 && (
@@ -1413,7 +1468,8 @@ function SecurityPageContent() {
                           ) : (
                             <span className="text-xs text-green-600 dark:text-green-400">None</span>
                           )}
-                        </td>
+                        </td>}
+                        {tableDetails.map(([label, read]) => <td key={label} className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">{read(d) ?? 'Not reported'}</td>)}
                       </tr>
                     )
                   })
@@ -1427,10 +1483,13 @@ function SecurityPageContent() {
   )
 }
 
-/** `tab=vulnerabilities` and `tab=threats` are the fleet reports; otherwise the posture table. */
 function SecurityTabs() {
-  const tab = useSearchParams().get('tab')
-  return tab === 'vulnerabilities' ? <VulnerabilitiesReport /> : tab === 'threats' ? <ThreatsReport /> : <SecurityPageContent />
+  const params = useSearchParams()
+  const tab = params.get('tab')
+  if (tab === 'threats' || (tab === 'vulnerabilities' && params.get('view') === 'threats')) return <ThreatsReport />
+  if (tab === 'vulnerabilities') return <VulnerabilitiesReport />
+  const report = isPostureReport(tab) ? tab : undefined
+  return <SecurityPageContent key={report ?? 'posture'} report={report} />
 }
 
 export default function SecurityPage() {
