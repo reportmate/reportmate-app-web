@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Fleet threat detections, /security?tab=threats: one row per collected
+ * Fleet threat detections, /security?tab=vulnerabilities&view=threats: one row per collected
  * detection and device, newest first, over a time window (`days`, default
  * 30). Only Windows clients collect individual detections today; devices
  * that do not report them are counted, not treated as clean.
@@ -21,10 +21,10 @@ import {
   patchQuery, severityLabel, shareableUrl, sortDetections, sortDir,
   type Coverage, type DetectionCatalog, type DetectionRow, type PagedReport,
 } from "../../lib/security/vulnerabilities"
-import { SecurityViewSwitch } from "./SecurityViewSwitch"
+import { SecurityViewSwitch, VulnerabilitiesViewSwitch } from "./SecurityViewSwitch"
 import { Choice, Choices, CopyLinkButton, ExportButton, NotReported, RefreshButton, SortHeader, When } from "./ReportParts"
 
-const TAB = "threats"
+const TAB = "vulnerabilities"
 const emptyOptions = { usages: [], catalogs: [], areas: [], fleets: [], locations: [], rooms: [], inventoryStates: [] }
 
 function DetectionCoverage({ coverage }: { coverage: Coverage }) {
@@ -89,13 +89,18 @@ export function ThreatsReport() {
   }, [query, reload])
 
   const update = (patch: Record<string, string | null>) => {
-    const next = patchQuery(current, TAB, patch)
+    const next = patchQuery(current, TAB, { ...patch, view: "threats" })
     startTransition(() => router.replace(`/security?${next}`, { scroll: false }))
   }
+  useEffect(() => {
+    if (new URLSearchParams(current).get("tab") === "threats") {
+      router.replace(`/security?${patchQuery(current, TAB, { view: "threats" })}`, { scroll: false })
+    }
+  }, [current, router])
   useEffect(() => { setDeviceSearch(searchValue) }, [searchValue])
   useEffect(() => {
     if (deviceSearch === searchValue) return
-    const timer = setTimeout(() => router.replace(`/security?${patchQuery(current, TAB, { search: deviceSearch })}`, { scroll: false }), 250)
+    const timer = setTimeout(() => router.replace(`/security?${patchQuery(current, TAB, { search: deviceSearch, view: "threats" })}`, { scroll: false }), 250)
     return () => clearTimeout(timer)
   }, [deviceSearch, searchValue, current, router])
 
@@ -129,7 +134,8 @@ export function ThreatsReport() {
         <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <SecurityViewSwitch current="threats" />
+              <SecurityViewSwitch current="vulnerabilities" />
+              <div><VulnerabilitiesViewSwitch threats /></div>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Threat detections collected from endpoint protection, including blocked attack surface reduction events.</p>
             </div>
             <div className="flex flex-wrap items-start gap-3">
